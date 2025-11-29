@@ -31,9 +31,6 @@ def main
   # days = (date_to.mjd - date_from.mjd + 1).times.map { |i| date_from + i }
   days = (date_from..date_to).to_a
 
-  p date_from
-  p date_to
-
   projects = get_projects(config)
   date_entries = get_time_entries_for_days(config, date_from, date_to)
   
@@ -56,13 +53,32 @@ def get_projects(config)
   res = Net::HTTP.start(uri.host, uri.port, :use_ssl => uri.scheme == 'https') { |http|
     http.request(req)
   }
+
   JSON.parse(res.body).filter { |p| p['active'] }
 end
 
 # Get time entries for specified days
 def get_time_entries_for_days(config, from_day, to_day)
-  start_time = "#{from_day}T00:00:00+09:00"
-  end_time   = "#{to_day + 1}T00:00:00+09:00"
+  # Offset is not working, so use UTC time
+  start_time = "#{from_day - 1}T15:00:00Z"
+  end_time   = "#{to_day}T15:00:00Z"
+
+  puts "Start time: #{start_time}"
+  puts "End time: #{end_time}"
+
+
+  # start_time = (from_day.to_time - Time.now.utc_offset).to_datetime.new_offset('+00:00').rfc3339
+  # end_time   = ((to_day + 1).to_time - Time.now.utc_offset).to_datetime.new_offset('+00:00').rfc3339
+
+
+  puts "Start time: #{start_time}"
+  puts "End time: #{end_time}"
+
+  # start_time = "#{from_day}T00:00:00+09:00"
+  # end_time   = "#{to_day + 1}T00:00:00+09:00"
+
+  # puts "Start time: #{start_time}"
+  # puts "End time: #{end_time}"
 
   uri = URI("https://api.track.toggl.com/api/v9/me/time_entries")
   uri.query = URI.encode_www_form({ start_date: start_time, end_date: end_time, meta: 'true' })
@@ -72,19 +88,12 @@ def get_time_entries_for_days(config, from_day, to_day)
   res = Net::HTTP.start(uri.host, uri.port, :use_ssl => uri.scheme == 'https') { |http|
     http.request(req)
   }
-  # project_time_entries = JSON.parse(res.body)
-  #   .group_by { |t| t['project_id'] }
-  #   .map{ |key, value| [key, value.map { |v| v['duration']}.sum / 60 ] }
-  #   .to_h
 
-  date_entries=JSON.parse(res.body)
+  date_entries = JSON.parse(res.body)
     .group_by { |entry|
-      # puts DateTime.parse(entry['start']).to_time.localtime.to_date.day
+      p DateTime.parse(entry['start']).to_time.localtime.to_date.day.to_s + ":" + entry['description']
       DateTime.parse(entry['start']).to_time.localtime.to_date.day
     }.map { |key, values| 
-      # grouped = values.group_by { |t| t['project_id'] }
-      #   .map{ |key, value| [key, value.map { |v| v['duration']}.sum / 60 ] }
-      #   .to_h
       [
         key,
         values.group_by { |t| t['project_id'] }
@@ -93,7 +102,6 @@ def get_time_entries_for_days(config, from_day, to_day)
       ]
   }.to_h
 
-  p date_entries
 
   date_entries
 end
