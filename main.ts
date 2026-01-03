@@ -1,8 +1,7 @@
 import { parseArgs } from "@std/cli/parse-args";
 import { join } from "@std/path";
-import { getProjects } from "./toggl/projects.ts";
-import { getTimeEntriesForDays } from "./toggl/time_entries.ts";
 import type { TogglConfig } from "./toggl/types.ts";
+import { TogglClient, togglClient } from "./toggl/api.ts";
 
 const PREVIOUS_MONTH_FLAG = "-p";
 const SEPARATOR = ",";
@@ -58,7 +57,7 @@ async function loadConfig(): Promise<Config> {
   }
 }
 
-if (import.meta.main) {
+const main = async (toggl: TogglClient) => {
   const args = Deno.args;
 
   if (args.length < 2) {
@@ -91,7 +90,7 @@ if (import.meta.main) {
   }
 
   const config = await loadConfig();
-  const projects = await getProjects(config);
+  const projects = await toggl.getProjects(config);
 
   // Generate days array
   const days: Date[] = [];
@@ -103,7 +102,7 @@ if (import.meta.main) {
     days.push(new Date(d));
   }
 
-  const dateEntries = await getTimeEntriesForDays(
+  const dateEntries = await toggl.getTimeEntriesForDays(
     config,
     startDay,
     endDay,
@@ -136,4 +135,8 @@ if (import.meta.main) {
     }).join(SEPARATOR);
     console.log(row);
   }
+};
+
+if (import.meta.main) {
+  main(togglClient);
 }
