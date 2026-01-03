@@ -1,48 +1,39 @@
+import { apiEndpoint } from "./api.ts";
+import type { TimeEntry, TogglConfig } from "./types.ts";
 
-export interface TogglConfig {
-  WORKSPACE: string;
-  TOKEN: string;
-}
-
-export interface Project {
+interface TimeEntryResponse {
   id: number;
-  name: string;
-  active: boolean;
-}
-
-export interface TimeEntry {
-  id: number;
+  workspace_id: number;
   project_id: number;
+  task_id: number;
+  billable: boolean;
   start: string;
   stop: string;
   duration: number;
   description: string;
+  duronly: boolean;
+  at: string;
+  server_deleted_at: string;
+  user_id: number;
+  uid: number;
+  wid: number;
+  pid: number;
+  client_name: string;
+  project_name: string;
+  project_color: string;
+  project_active: boolean;
+  project_billable: boolean;
+  user_name: string;
+  user_avatar_url: string;
 }
 
-export async function getProjects(config: TogglConfig): Promise<Project[]> {
-  const url = `https://api.track.toggl.com/api/v9/workspaces/${config.WORKSPACE}/projects`;
-  const response = await fetch(url, {
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Basic ${btoa(`${config.TOKEN}:api_token`)}`,
-    },
-  });
-
-  if (!response.ok) {
-    console.error(`Failed to fetch projects: ${response.statusText}`);
-    Deno.exit(1);
-  }
-
-  const projects: Project[] = await response.json();
-  return projects.filter((p) => p.active);
-}
-
+// TODO: Fix for all locales
 export async function getTimeEntriesForDays(
   config: TogglConfig,
   fromDay: number,
   toDay: number,
   year: number,
-  month: number
+  month: number,
 ): Promise<Record<number, Record<number, number>>> {
   const fromDate = new Date(Date.UTC(year, month - 1, fromDay));
   const toDate = new Date(Date.UTC(year, month - 1, toDay));
@@ -50,10 +41,10 @@ export async function getTimeEntriesForDays(
   // Calculate start_time (fromDay - 1 day at 15:00 UTC)
   const startTimeDate = new Date(fromDate);
   startTimeDate.setUTCDate(startTimeDate.getUTCDate() - 1);
-  const startTimeStr = `${startTimeDate.toISOString().split('T')[0]}T15:00:00Z`;
+  const startTimeStr = `${startTimeDate.toISOString().split("T")[0]}T15:00:00Z`;
 
   // Calculate end_time (toDay at 15:00 UTC)
-  const endTimeStr = `${toDate.toISOString().split('T')[0]}T15:00:00Z`;
+  const endTimeStr = `${toDate.toISOString().split("T")[0]}T15:00:00Z`;
 
   console.log(`Start time: ${startTimeStr}`);
   console.log(`End time: ${endTimeStr}`);
@@ -64,7 +55,7 @@ export async function getTimeEntriesForDays(
     meta: "true",
   });
 
-  const url = `https://api.track.toggl.com/api/v9/me/time_entries?${params.toString()}`;
+  const url = `${apiEndpoint}/me/time_entries?${params.toString()}`;
   const response = await fetch(url, {
     headers: {
       "Content-Type": "application/json",
@@ -77,13 +68,23 @@ export async function getTimeEntriesForDays(
     Deno.exit(1);
   }
 
-  const entries: TimeEntry[] = await response.json();
+  const entries = await response.json() as TimeEntryResponse[];
+
+  // Map to TimeEntry
+  const timeEntries: TimeEntry[] = entries.map((e) => ({
+    id: e.id,
+    project_id: e.project_id ?? e.pid,
+    start: e.start,
+    stop: e.stop,
+    duration: e.duration,
+    description: e.description,
+  }));
 
   // Aggregation
   // Group by Day -> Project -> Sum Duration
   const result: Record<number, Record<number, number>> = {};
 
-  for (const entry of entries) {
+  for (const entry of timeEntries) {
     const startDate = new Date(entry.start);
     const day = startDate.getDate(); // Local day
 
@@ -92,7 +93,7 @@ export async function getTimeEntriesForDays(
     if (!result[day]) {
       result[day] = {};
     }
-    
+
     if (!result[day][entry.project_id]) {
       result[day][entry.project_id] = 0;
     }
