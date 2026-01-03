@@ -46,7 +46,7 @@ const main = async (toggl: TogglClient) => {
   const current = new Date(targetYear, targetMonth - 1, startDay);
   const end = new Date(targetYear, targetMonth - 1, endDay);
 
-  for (let d = new Date(current); d <= end; d.setDate(d.getDate() + 1)) {
+  for (const d = new Date(current); d <= end; d.setDate(d.getDate() + 1)) {
     days.push(new Date(d));
   }
 
