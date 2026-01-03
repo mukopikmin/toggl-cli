@@ -1,35 +1,23 @@
-import { parseArgs } from "@std/cli/parse-args";
+import { parseArgs } from "node:util";
 import { TogglClient, togglClient } from "./toggl/api.ts";
 import { loadConfig } from "./config.ts";
 
-const PREVIOUS_MONTH_FLAG = "-p";
-const SEPARATOR = ",";
+interface Args {
+  startDay: number;
+  endDay: number;
+  lastMonth: boolean;
+  separator: string;
+}
 
-const main = async (toggl: TogglClient) => {
-  const args = Deno.args;
-
-  if (args.length < 2) {
-    console.log(
-      `Usage: deno run --allow-net --allow-read --allow-env main.ts <start_day> <end_day> [${PREVIOUS_MONTH_FLAG}]`,
-    );
-    console.log(
-      "Example: deno run --allow-net --allow-read --allow-env main.ts 1 15",
-    );
-    console.log(
-      `Example: deno run --allow-net --allow-read --allow-env main.ts 1 15 ${PREVIOUS_MONTH_FLAG}`,
-    );
-    Deno.exit(1);
-  }
-
-  const startDay = parseInt(args[0], 10);
-  const endDay = parseInt(args[1], 10);
-  const usePreviousMonth = args.includes(PREVIOUS_MONTH_FLAG);
-
+const main = async (
+  { startDay, endDay, lastMonth, separator }: Args,
+  toggl: TogglClient,
+) => {
   const now = new Date();
   let targetYear = now.getFullYear();
   let targetMonth = now.getMonth() + 1; // 1-12
 
-  if (usePreviousMonth) {
+  if (lastMonth) {
     targetMonth -= 1;
     if (targetMonth === 0) {
       targetMonth = 12;
@@ -72,7 +60,7 @@ const main = async (toggl: TogglClient) => {
     const m = String(d.getMonth() + 1).padStart(2, "0");
     const day = String(d.getDate()).padStart(2, "0");
     return `${y}-${m}-${day}`;
-  }).join(SEPARATOR);
+  }).join(separator);
   console.log(header);
 
   for (const project of projects) {
@@ -80,11 +68,35 @@ const main = async (toggl: TogglClient) => {
       const dayNum = d.getDate();
       const duration = dateEntries[dayNum]?.[project.id];
       return duration ? duration.toString() : "";
-    }).join(SEPARATOR);
+    }).join(separator);
     console.log(row);
   }
 };
 
 if (import.meta.main) {
-  main(togglClient);
+  const args = parseArgs({
+    options: {
+      lastMonth: {
+        type: "boolean",
+        short: "l",
+        default: false,
+      },
+      separator: {
+        type: "string",
+        short: "s",
+        default: "\t",
+      },
+    },
+    allowPositionals: true,
+  });
+  const startDay = Number(args.positionals[0]);
+  const endDay = Number(args.positionals[1]);
+  const { lastMonth, separator } = args.values;
+
+  if (Number.isNaN(startDay) || Number.isNaN(endDay)) {
+    console.error("Error: startDay and endDay must be numbers");
+    Deno.exit(1);
+  }
+
+  main({ startDay, endDay, lastMonth, separator }, togglClient);
 }
