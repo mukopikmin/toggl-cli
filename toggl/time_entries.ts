@@ -1,5 +1,6 @@
 import { apiEndpoint } from "./api.ts";
 import type { TimeEntry, TogglConfig } from "./types.ts";
+import { DateTime } from "ptera";
 
 interface TimeEntryResponse {
   id: number;
@@ -30,25 +31,11 @@ interface TimeEntryResponse {
 // TODO: Fix for all locales
 export async function getTimeEntriesForDays(
   config: TogglConfig,
-  fromDay: number,
-  toDay: number,
-  year: number,
-  month: number,
+  fromDay: DateTime,
+  toDay: DateTime,
 ): Promise<Record<number, Record<number, number>>> {
-  const fromDate = new Date(Date.UTC(year, month - 1, fromDay));
-  const toDate = new Date(Date.UTC(year, month - 1, toDay));
-
-  // Calculate start_time (fromDay - 1 day at 15:00 UTC)
-  const startTimeDate = new Date(fromDate);
-  startTimeDate.setUTCDate(startTimeDate.getUTCDate() - 1);
-  const startTimeStr = `${startTimeDate.toISOString().split("T")[0]}T15:00:00Z`;
-
-  // Calculate end_time (toDay at 15:00 UTC)
-  const endTimeStr = `${toDate.toISOString().split("T")[0]}T15:00:00Z`;
-
-  console.log(`Start time: ${startTimeStr}`);
-  console.log(`End time: ${endTimeStr}`);
-
+  const startTimeStr = fromDay.toUTC().toISO();
+  const endTimeStr = toDay.toUTC().toISO();
   const params = new URLSearchParams({
     start_date: startTimeStr,
     end_date: endTimeStr,
@@ -101,6 +88,8 @@ export async function getTimeEntriesForDays(
     // Duration is in seconds, convert to minutes
     result[day][entry.project_id] += entry.duration / 60;
   }
+
+  console.log(JSON.stringify(result, null, 2));
 
   return result;
 }

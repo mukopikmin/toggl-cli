@@ -1,21 +1,26 @@
 import { parseArgs } from "node:util";
 import { TogglClient, togglClient } from "./toggl/api.ts";
 import { loadConfig } from "./config.ts";
+import { DateTime, datetime } from "ptera";
 
 interface Args {
-  startDay: number;
-  endDay: number;
+  startDay: DateTime;
+  endDay: DateTime;
   lastMonth: boolean;
   separator: string;
 }
 
-const main = async (
-  { startDay, endDay, lastMonth, separator }: Args,
-  toggl: TogglClient,
-) => {
-  const now = new Date();
-  let targetYear = now.getFullYear();
-  let targetMonth = now.getMonth() + 1; // 1-12
+interface Command {
+  startDay: DateTime;
+  endDay: DateTime;
+  separator: string;
+}
+
+const toCommand = (args: Args): Command => {
+  const { startDay, endDay, lastMonth, separator } = args;
+  const now = datetime();
+  let targetYear = now.year;
+  let targetMonth = now.month;
 
   if (lastMonth) {
     targetMonth -= 1;
@@ -25,25 +30,34 @@ const main = async (
     }
   }
 
+  return {
+    startDay: startDay.add({ month: -1 }),
+    endDay: endDay.add({ month: -1 }),
+    separator,
+  };
+};
+
+const main = async (args: Args, toggl: TogglClient) => {
+  const { startDay, endDay, separator } = toCommand(args);
+
   const config = await loadConfig();
   const projects = await toggl.getProjects(config);
 
   // Generate days array
-  const days: Date[] = [];
+  const days: DateTime[] = [];
 
-  const current = new Date(targetYear, targetMonth - 1, startDay);
-  const end = new Date(targetYear, targetMonth - 1, endDay);
-
-  for (const d = new Date(current); d <= end; d.setDate(d.getDate() + 1)) {
-    days.push(new Date(d));
+  for (
+    let d = startDay;
+    !d.isAfter(endDay);
+    d = d.add({ day: 1 })
+  ) {
+    days.push(d);
   }
 
   const dateEntries = await toggl.getTimeEntriesForDays(
     config,
     startDay,
     endDay,
-    targetYear,
-    targetMonth,
   );
 
   console.log("--- Project list ---");
@@ -56,16 +70,16 @@ const main = async (
   );
 
   const header = days.map((d) => {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
+    const y = d.year;
+    const m = String(d.month).padStart(2, "0");
+    const day = String(d.day).padStart(2, "0");
     return `${y}-${m}-${day}`;
   }).join(separator);
   console.log(header);
 
   for (const project of projects) {
     const row = days.map((d) => {
-      const dayNum = d.getDate();
+      const dayNum = d.day;
       const duration = dateEntries[dayNum]?.[project.id];
       return duration ? duration.toString() : "";
     }).join(separator);
@@ -89,12 +103,21 @@ if (import.meta.main) {
     },
     allowPositionals: true,
   });
-  const startDay = Number(args.positionals[0]);
-  const endDay = Number(args.positionals[1]);
+  const now = datetime();
+  const startDay = datetime({
+    year: now.year,
+    month: now.month,
+    day: Number(args.positionals[0]),
+  });
+  const endDay = datetime({
+    year: now.year,
+    month: now.month,
+    day: Number(args.positionals[1]),
+  });
   const { lastMonth, separator } = args.values;
 
-  if (Number.isNaN(startDay) || Number.isNaN(endDay)) {
-    console.error("Error: startDay and endDay must be numbers");
+  if (!startDay.isValid() || !endDay.isValid() || startDay.isAfter(endDay)) {
+    console.error("Error: startDay and endDay must be valid dates");
     Deno.exit(1);
   }
 
