@@ -89,15 +89,29 @@ if (import.meta.main) {
     }
   }
 
+  const posLen = args.positionals.length;
+  if (posLen < 2) {
+    console.error("Error: Please specify start and end day");
+    Deno.exit(1);
+  }
+
+  const startDayNum = Number(args.positionals[posLen - 2]);
+  const endDayNum = Number(args.positionals[posLen - 1]);
+
+  if (isNaN(startDayNum) || isNaN(endDayNum)) {
+    console.error("Error: Start and end day must be valid numbers");
+    Deno.exit(1);
+  }
+
   const startDay = datetime({
     year: targetYear,
     month: targetMonth,
-    day: Number(args.positionals[0]),
+    day: startDayNum,
   });
   const endDay = datetime({
     year: targetYear,
     month: targetMonth,
-    day: Number(args.positionals[1]),
+    day: endDayNum,
   });
 
   if (!startDay.isValid() || !endDay.isValid() || startDay.isAfter(endDay)) {
