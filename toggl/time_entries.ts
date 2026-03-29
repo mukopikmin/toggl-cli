@@ -35,7 +35,7 @@ export async function getTimeEntriesForDays(
   toDay: DateTime,
 ): Promise<Record<number, Record<number, number>>> {
   const startTimeStr = fromDay.toUTC().toISO();
-  const endTimeStr = toDay.toUTC().toISO();
+  const endTimeStr = toDay.add({ day: 1 }).toUTC().toISO();
   const params = new URLSearchParams({
     start_date: startTimeStr,
     end_date: endTimeStr,
