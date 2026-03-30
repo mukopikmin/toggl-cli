@@ -51,9 +51,16 @@ const main = async (cmd: Command, toggl: TogglClient) => {
 
   for (const project of projects) {
     const row = days.map((d) => {
-      const dayNum = d.day;
-      const duration = dateEntries[dayNum]?.[project.id];
-      return duration ? duration.toString() : "";
+      const yStr = String(d.year);
+      const mStr = String(d.month).padStart(2, "0");
+      const dayStr = String(d.day).padStart(2, "0");
+      const dateStr = `${yStr}-${mStr}-${dayStr}`;
+
+      const duration = dateEntries[dateStr]?.[project.id];
+      if (duration) {
+        return (Math.round(duration * 100) / 100).toString();
+      }
+      return "0";
     }).join(separator);
     console.log(row);
   }
@@ -107,11 +114,19 @@ if (import.meta.main) {
     year: targetYear,
     month: targetMonth,
     day: startDayNum,
+    hour: 0,
+    minute: 0,
+    second: 0,
+    millisecond: 0,
   });
   const endDay = datetime({
     year: targetYear,
     month: targetMonth,
     day: endDayNum,
+    hour: 0,
+    minute: 0,
+    second: 0,
+    millisecond: 0,
   });
 
   if (!startDay.isValid() || !endDay.isValid() || startDay.isAfter(endDay)) {
