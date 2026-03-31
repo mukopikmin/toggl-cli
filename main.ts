@@ -60,7 +60,7 @@ const main = async (cmd: Command, toggl: TogglClient) => {
       if (duration) {
         return (Math.round(duration * 100) / 100).toString();
       }
-      return "0";
+      return " ";
     }).join(separator);
     console.log(row);
   }
