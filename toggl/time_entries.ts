@@ -33,7 +33,7 @@ export async function getTimeEntriesForDays(
   config: TogglConfig,
   fromDay: DateTime,
   toDay: DateTime,
-): Promise<Record<number, Record<number, number>>> {
+): Promise<Record<string, Record<number, number>>> {
   const startTimeStr = fromDay.toUTC().toISO();
   const endTimeStr = toDay.add({ day: 1 }).toUTC().toISO();
   const params = new URLSearchParams({
@@ -68,25 +68,30 @@ export async function getTimeEntriesForDays(
   }));
 
   // Aggregation
-  // Group by Day -> Project -> Sum Duration
-  const result: Record<number, Record<number, number>> = {};
+  // Group by YYYY-MM-DD -> Project -> Sum Duration
+  const result: Record<string, Record<number, number>> = {};
 
   for (const entry of timeEntries) {
     const startDate = new Date(entry.start);
-    const day = startDate.getDate(); // Local day
+    const yStr = String(startDate.getFullYear());
+    const mStr = String(startDate.getMonth() + 1).padStart(2, "0");
+    const dStr = String(startDate.getDate()).padStart(2, "0");
+    const dateStr = `${yStr}-${mStr}-${dStr}`;
 
-    console.log(`${day}:${entry.description || "(no description)"}`);
-
-    if (!result[day]) {
-      result[day] = {};
+    if (!result[dateStr]) {
+      result[dateStr] = {};
     }
 
-    if (!result[day][entry.project_id]) {
-      result[day][entry.project_id] = 0;
+    if (!result[dateStr][entry.project_id]) {
+      result[dateStr][entry.project_id] = 0;
     }
 
     // Duration is in seconds, convert to minutes
-    result[day][entry.project_id] += entry.duration / 60;
+    let dur = entry.duration;
+    if (dur < 0) {
+      dur = Math.floor(Date.now() / 1000) + dur;
+    }
+    result[dateStr][entry.project_id] += dur / 60;
   }
 
   console.log(JSON.stringify(result, null, 2));
