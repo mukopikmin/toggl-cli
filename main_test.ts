@@ -1,6 +1,6 @@
 import { assertEquals } from "@std/assert";
 import { datetime } from "ptera";
-import { buildWorkTimeTable } from "./main.ts";
+import { buildWorkTimeTable } from "./command/summary.ts";
 import { getProjects } from "./toggl/projects.ts";
 import { getSummaryTimeEntries } from "./toggl/summary.ts";
 import { getTimeEntriesForDays } from "./toggl/time_entries.ts";
