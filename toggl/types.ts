@@ -17,3 +17,5 @@ export interface TimeEntry {
   duration: number;
   description: string;
 }
+
+export type SummaryTimeEntriesResponse = Record<string, unknown>;
