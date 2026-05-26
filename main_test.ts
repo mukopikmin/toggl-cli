@@ -1,6 +1,9 @@
 import { assertEquals } from "@std/assert";
 import { datetime } from "ptera";
-import { buildWorkTimeTable } from "./command/summary.ts";
+import {
+  buildWorkTimeTable,
+  formatTimeEntriesJson,
+} from "./command/summary.ts";
 import { getProjects } from "./toggl/projects.ts";
 import { getSummaryTimeEntries } from "./toggl/summary.ts";
 import { getTimeEntriesForDays } from "./toggl/time_entries.ts";
@@ -41,6 +44,27 @@ Deno.test("buildWorkTimeTable structures project rows across the requested date 
       [" ", "60", " "],
     ],
   });
+});
+
+Deno.test("formatTimeEntriesJson returns explicit JSON output for time entry data", () => {
+  const json = formatTimeEntriesJson({
+    "2026-05-07": {
+      188325278: 60,
+      188325289: 180,
+      202971208: 30,
+    },
+  });
+
+  assertEquals(
+    json,
+    `{
+  "2026-05-07": {
+    "188325278": 60,
+    "188325289": 180,
+    "202971208": 30
+  }
+}`,
+  );
 });
 
 Deno.test("getProjects fetches active projects with Toggl auth", async () => {
