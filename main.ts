@@ -16,10 +16,20 @@ if (import.meta.main) {
         short: "s",
         default: "\t",
       },
+      format: {
+        type: "string",
+        short: "f",
+        default: "csv",
+      },
     },
     allowPositionals: true,
   });
-  const { lastMonth, separator } = args.values;
+  const { format, lastMonth, separator } = args.values;
+
+  if (format !== "csv" && format !== "json") {
+    console.error("Error: format must be csv or json");
+    Deno.exit(1);
+  }
 
   const now = datetime();
   let targetYear = now.year;
@@ -71,5 +81,5 @@ if (import.meta.main) {
     Deno.exit(1);
   }
 
-  runSummaryCommand({ startDay, endDay, separator }, togglClient);
+  runSummaryCommand({ startDay, endDay, separator, format }, togglClient);
 }
