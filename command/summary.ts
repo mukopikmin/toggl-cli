@@ -3,10 +3,13 @@ import { loadConfig } from "../config.ts";
 import type { TogglClient } from "../toggl/api.ts";
 import type { Project } from "../toggl/types.ts";
 
+export type SummaryFormat = "csv" | "json";
+
 export interface SummaryCommand {
   startDay: DateTime;
   endDay: DateTime;
   separator: string;
+  format: SummaryFormat;
 }
 
 export interface WorkTimeTable {
@@ -81,19 +84,37 @@ export function outputWorkTimeTable(
   }
 }
 
+export function formatTimeEntriesJson(
+  dateEntries: Record<string, Record<number, number>>,
+): string {
+  return JSON.stringify(dateEntries, null, 2);
+}
+
+export function outputTimeEntriesJson(
+  dateEntries: Record<string, Record<number, number>>,
+): void {
+  console.log(formatTimeEntriesJson(dateEntries));
+}
+
 export async function runSummaryCommand(
   cmd: SummaryCommand,
   toggl: TogglClient,
 ): Promise<void> {
-  const { startDay, endDay, separator } = cmd;
+  const { startDay, endDay, separator, format } = cmd;
 
   const config = await loadConfig();
-  const projects = await toggl.getProjects(config);
   const dateEntries = await toggl.getTimeEntriesForDays(
     config,
     startDay,
     endDay,
   );
+
+  if (format === "json") {
+    outputTimeEntriesJson(dateEntries);
+    return;
+  }
+
+  const projects = await toggl.getProjects(config);
   const table = buildWorkTimeTable(projects, dateEntries, startDay, endDay);
 
   outputWorkTimeTable(table, separator);
