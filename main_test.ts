@@ -141,7 +141,6 @@ Deno.test("getSummaryTimeEntries posts summary request with Toggl auth", async (
 
 Deno.test("getTimeEntriesForDays fetches range and aggregates minutes by date and project", async () => {
   const originalFetch = globalThis.fetch;
-  const originalConsoleLog = console.log;
   let requestedUrl = "";
   let requestedHeaders = new Headers();
 
@@ -179,7 +178,6 @@ Deno.test("getTimeEntriesForDays fetches range and aggregates minutes by date an
       },
     ]));
   }) as typeof fetch;
-  console.log = () => {};
 
   const fromDay = datetime({ year: 2026, month: 5, day: 1 });
   const toDay = datetime({ year: 2026, month: 5, day: 2 });
@@ -205,7 +203,6 @@ Deno.test("getTimeEntriesForDays fetches range and aggregates minutes by date an
       "2026-05-02": { 200: 60 },
     });
   } finally {
-    console.log = originalConsoleLog;
     globalThis.fetch = originalFetch;
   }
 });
