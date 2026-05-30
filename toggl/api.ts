@@ -1,4 +1,4 @@
-import { DateTime } from "https://deno.land/x/ptera@v1.0.2/datetime.ts";
+import { DateTime } from "ptera";
 import { getProjects } from "./projects.ts";
 import { getSummaryTimeEntries } from "./summary.ts";
 import { getTimeEntriesForDays } from "./time_entries.ts";
