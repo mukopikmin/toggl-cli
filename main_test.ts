@@ -4,6 +4,7 @@ import {
   buildWorkTimeTable,
   formatTimeEntriesJson,
 } from "./command/summary.ts";
+import { formatProjectList, formatProjectsJson } from "./main.ts";
 import { getProjects } from "./toggl/projects.ts";
 import { getSummaryTimeEntries } from "./toggl/summary.ts";
 import { getTimeEntriesForDays } from "./toggl/time_entries.ts";
@@ -20,6 +21,41 @@ function jsonResponse(body: unknown): Response {
     headers: { "Content-Type": "application/json" },
   });
 }
+
+Deno.test("formatProjectList returns one project name per line", () => {
+  assertEquals(
+    formatProjectList([
+      { id: 1, name: "Project Alpha", active: true },
+      { id: 2, name: "Project Beta", active: true },
+    ]),
+    "Project Alpha\nProject Beta",
+  );
+});
+
+Deno.test("formatProjectList returns an empty string for no projects", () => {
+  assertEquals(formatProjectList([]), "");
+});
+
+Deno.test("formatProjectsJson returns explicit JSON output for projects", () => {
+  assertEquals(
+    formatProjectsJson([
+      { id: 1, name: "Project Alpha", active: true },
+      { id: 2, name: "Project Beta", active: true },
+    ]),
+    `[
+  {
+    "id": 1,
+    "name": "Project Alpha",
+    "active": true
+  },
+  {
+    "id": 2,
+    "name": "Project Beta",
+    "active": true
+  }
+]`,
+  );
+});
 
 Deno.test("buildWorkTimeTable structures project rows across the requested date range", () => {
   const table = buildWorkTimeTable(
