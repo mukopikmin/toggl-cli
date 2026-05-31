@@ -2,14 +2,25 @@ import { parseArgs } from "node:util";
 import { TogglClient, togglClient } from "./toggl/api.ts";
 import { loadConfig } from "./config.ts";
 import { DateTime, datetime } from "ptera";
+import type { Project } from "./toggl/types.ts";
 
-interface Command {
+interface ReportCommand {
   startDay: DateTime;
   endDay: DateTime;
   separator: string;
 }
 
-const main = async (cmd: Command, toggl: TogglClient) => {
+export function formatProjectList(projects: Project[]): string {
+  return projects.map((p) => p.name).join("\n");
+}
+
+const listProjects = async (toggl: TogglClient) => {
+  const config = await loadConfig();
+  const projects = await toggl.getProjects(config);
+  console.log(formatProjectList(projects));
+};
+
+const report = async (cmd: ReportCommand, toggl: TogglClient) => {
   const { startDay, endDay, separator } = cmd;
 
   const config = await loadConfig();
@@ -84,6 +95,11 @@ if (import.meta.main) {
   });
   const { lastMonth, separator } = args.values;
 
+  if (args.positionals[0] === "projects") {
+    await listProjects(togglClient);
+    Deno.exit(0);
+  }
+
   const now = datetime();
   let targetYear = now.year;
   let targetMonth = now.month;
@@ -134,5 +150,5 @@ if (import.meta.main) {
     Deno.exit(1);
   }
 
-  main({ startDay, endDay, separator }, togglClient);
+  report({ startDay, endDay, separator }, togglClient);
 }

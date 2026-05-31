@@ -11,7 +11,7 @@ export interface TogglClient {
     config: TogglConfig,
     fromDay: DateTime,
     toDay: DateTime,
-  ) => Promise<Record<number, Record<number, number>>>;
+  ) => Promise<Record<string, Record<number, number>>>;
 }
 
 export const togglClient: TogglClient = {
