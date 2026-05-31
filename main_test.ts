@@ -1,5 +1,26 @@
 import { assertEquals } from "@std/assert";
+import { datetime } from "ptera";
+import {
+  buildWorkTimeTable,
+  formatTimeEntriesJson,
+} from "./command/summary.ts";
 import { formatProjectList } from "./main.ts";
+import { getProjects } from "./toggl/projects.ts";
+import { getSummaryTimeEntries } from "./toggl/summary.ts";
+import { getTimeEntriesForDays } from "./toggl/time_entries.ts";
+import { apiEndpoint, reportsApiEndpoint } from "./toggl/api.ts";
+
+const config = {
+  WORKSPACE: "workspace-id",
+  TOKEN: "test-token",
+};
+
+function jsonResponse(body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
 
 Deno.test("formatProjectList returns one project name per line", () => {
   assertEquals(
@@ -13,4 +34,214 @@ Deno.test("formatProjectList returns one project name per line", () => {
 
 Deno.test("formatProjectList returns an empty string for no projects", () => {
   assertEquals(formatProjectList([]), "");
+});
+
+Deno.test("buildWorkTimeTable structures project rows across the requested date range", () => {
+  const table = buildWorkTimeTable(
+    [
+      { id: 100, name: "Client work", active: true },
+      { id: 200, name: "Internal", active: true },
+    ],
+    {
+      "2026-05-01": { 100: 45.125 },
+      "2026-05-02": { 200: 60 },
+      "2026-05-03": { 100: 12 },
+    },
+    datetime({ year: 2026, month: 5, day: 1 }),
+    datetime({ year: 2026, month: 5, day: 3 }),
+  );
+
+  assertEquals(table, {
+    projectNames: ["Client work", "Internal"],
+    headers: ["2026-05-01", "2026-05-02", "2026-05-03"],
+    rows: [
+      ["45.13", " ", "12"],
+      [" ", "60", " "],
+    ],
+  });
+});
+
+Deno.test("formatTimeEntriesJson returns explicit JSON output for time entry data", () => {
+  const json = formatTimeEntriesJson({
+    "2026-05-07": {
+      188325278: 60,
+      188325289: 180,
+      202971208: 30,
+    },
+  });
+
+  assertEquals(
+    json,
+    `{
+  "2026-05-07": {
+    "188325278": 60,
+    "188325289": 180,
+    "202971208": 30
+  }
+}`,
+  );
+});
+
+Deno.test("getProjects fetches active projects with Toggl auth", async () => {
+  const originalFetch = globalThis.fetch;
+  let requestedUrl = "";
+  let requestedHeaders = new Headers();
+
+  globalThis.fetch = ((input, init) => {
+    requestedUrl = String(input);
+    requestedHeaders = new Headers(
+      (init as { headers?: HeadersInit } | undefined)?.headers,
+    );
+
+    return Promise.resolve(jsonResponse([
+      { id: 1, name: "Client work", active: true },
+      { id: 2, name: "Archived", active: false },
+      { id: 3, project_name: "Legacy shape", project_active: true },
+    ]));
+  }) as typeof fetch;
+
+  try {
+    const projects = await getProjects(config);
+
+    assertEquals(
+      requestedUrl,
+      `${apiEndpoint}/workspaces/${config.WORKSPACE}/projects`,
+    );
+    assertEquals(requestedHeaders.get("Content-Type"), "application/json");
+    assertEquals(
+      requestedHeaders.get("Authorization"),
+      `Basic ${btoa(`${config.TOKEN}:api_token`)}`,
+    );
+    assertEquals(projects, [
+      { id: 1, name: "Client work", active: true },
+      { id: 3, name: "Legacy shape", active: true },
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("getSummaryTimeEntries posts summary request with Toggl auth", async () => {
+  const originalFetch = globalThis.fetch;
+  let requestedUrl = "";
+  let requestedMethod = "";
+  let requestedHeaders = new Headers();
+  let requestedBody: unknown;
+  const summary = {
+    groups: [
+      {
+        id: 100,
+        title: { project: "Client work" },
+        seconds: 5400,
+      },
+    ],
+    seconds: 5400,
+  };
+
+  globalThis.fetch = ((input, init) => {
+    const requestInit = init as
+      | { body?: BodyInit | null; headers?: HeadersInit; method?: string }
+      | undefined;
+
+    requestedUrl = String(input);
+    requestedMethod = requestInit?.method ?? "GET";
+    requestedHeaders = new Headers(requestInit?.headers);
+    requestedBody = JSON.parse(String(requestInit?.body));
+
+    return Promise.resolve(jsonResponse(summary));
+  }) as typeof fetch;
+
+  const fromDay = datetime({ year: 2026, month: 5, day: 1 });
+  const toDay = datetime({ year: 2026, month: 5, day: 31 });
+
+  try {
+    const response = await getSummaryTimeEntries(config, fromDay, toDay);
+
+    assertEquals(
+      requestedUrl,
+      `${reportsApiEndpoint}/workspace/${config.WORKSPACE}/summary/time_entries`,
+    );
+    assertEquals(requestedMethod, "POST");
+    assertEquals(requestedHeaders.get("Content-Type"), "application/json");
+    assertEquals(
+      requestedHeaders.get("Authorization"),
+      `Basic ${btoa(`${config.TOKEN}:api_token`)}`,
+    );
+    assertEquals(requestedBody, {
+      start_date: "2026-05-01",
+      end_date: "2026-05-31",
+      grouping: "projects",
+    });
+    assertEquals(response, summary);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("getTimeEntriesForDays fetches range and aggregates minutes by date and project", async () => {
+  const originalFetch = globalThis.fetch;
+  let requestedUrl = "";
+  let requestedHeaders = new Headers();
+
+  globalThis.fetch = ((input, init) => {
+    requestedUrl = String(input);
+    requestedHeaders = new Headers(
+      (init as { headers?: HeadersInit } | undefined)?.headers,
+    );
+
+    return Promise.resolve(jsonResponse([
+      {
+        id: 10,
+        project_id: 100,
+        start: "2026-05-01T12:00:00Z",
+        stop: "2026-05-01T12:30:00Z",
+        duration: 1800,
+        description: "first block",
+      },
+      {
+        id: 11,
+        project_id: 100,
+        start: "2026-05-01T13:00:00Z",
+        stop: "2026-05-01T13:15:00Z",
+        duration: 900,
+        description: "second block",
+      },
+      {
+        id: 12,
+        project_id: null,
+        pid: 200,
+        start: "2026-05-02T12:00:00Z",
+        stop: "2026-05-02T13:00:00Z",
+        duration: 3600,
+        description: "legacy project id",
+      },
+    ]));
+  }) as typeof fetch;
+
+  const fromDay = datetime({ year: 2026, month: 5, day: 1 });
+  const toDay = datetime({ year: 2026, month: 5, day: 2 });
+
+  try {
+    const entries = await getTimeEntriesForDays(config, fromDay, toDay);
+    const url = new URL(requestedUrl);
+
+    assertEquals(url.origin + url.pathname, `${apiEndpoint}/me/time_entries`);
+    assertEquals(url.searchParams.get("start_date"), fromDay.toUTC().toISO());
+    assertEquals(
+      url.searchParams.get("end_date"),
+      toDay.add({ day: 1 }).toUTC().toISO(),
+    );
+    assertEquals(url.searchParams.get("meta"), "true");
+    assertEquals(requestedHeaders.get("Content-Type"), "application/json");
+    assertEquals(
+      requestedHeaders.get("Authorization"),
+      `Basic ${btoa(`${config.TOKEN}:api_token`)}`,
+    );
+    assertEquals(entries, {
+      "2026-05-01": { 100: 45 },
+      "2026-05-02": { 200: 60 },
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
