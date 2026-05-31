@@ -4,7 +4,7 @@ import {
   buildWorkTimeTable,
   formatTimeEntriesJson,
 } from "./command/summary.ts";
-import { formatProjectList } from "./main.ts";
+import { formatProjectList, formatProjectsJson } from "./main.ts";
 import { getProjects } from "./toggl/projects.ts";
 import { getSummaryTimeEntries } from "./toggl/summary.ts";
 import { getTimeEntriesForDays } from "./toggl/time_entries.ts";
@@ -34,6 +34,27 @@ Deno.test("formatProjectList returns one project name per line", () => {
 
 Deno.test("formatProjectList returns an empty string for no projects", () => {
   assertEquals(formatProjectList([]), "");
+});
+
+Deno.test("formatProjectsJson returns explicit JSON output for projects", () => {
+  assertEquals(
+    formatProjectsJson([
+      { id: 1, name: "Project Alpha", active: true },
+      { id: 2, name: "Project Beta", active: true },
+    ]),
+    `[
+  {
+    "id": 1,
+    "name": "Project Alpha",
+    "active": true
+  },
+  {
+    "id": 2,
+    "name": "Project Beta",
+    "active": true
+  }
+]`,
+  );
 });
 
 Deno.test("buildWorkTimeTable structures project rows across the requested date range", () => {

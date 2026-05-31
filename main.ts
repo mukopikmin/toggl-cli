@@ -9,10 +9,18 @@ export function formatProjectList(projects: Project[]): string {
   return projects.map((p) => p.name).join("\n");
 }
 
-const listProjects = async (toggl: TogglClient) => {
+export function formatProjectsJson(projects: Project[]): string {
+  return JSON.stringify(projects, null, 2);
+}
+
+const listProjects = async (toggl: TogglClient, format: "csv" | "json") => {
   const config = await loadConfig();
   const projects = await toggl.getProjects(config);
-  console.log(formatProjectList(projects));
+  console.log(
+    format === "json"
+      ? formatProjectsJson(projects)
+      : formatProjectList(projects),
+  );
 };
 
 if (import.meta.main) {
@@ -44,7 +52,7 @@ if (import.meta.main) {
   }
 
   if (args.positionals[0] === "projects") {
-    await listProjects(togglClient);
+    await listProjects(togglClient, format);
     Deno.exit(0);
   }
 
