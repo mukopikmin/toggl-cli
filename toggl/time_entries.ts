@@ -94,7 +94,5 @@ export async function getTimeEntriesForDays(
     result[dateStr][entry.project_id] += dur / 60;
   }
 
-  console.log(JSON.stringify(result, null, 2));
-
   return result;
 }

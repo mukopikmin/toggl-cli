@@ -1,70 +1,7 @@
 import { parseArgs } from "node:util";
-import { TogglClient, togglClient } from "./toggl/api.ts";
-import { loadConfig } from "./config.ts";
-import { DateTime, datetime } from "ptera";
-
-interface Command {
-  startDay: DateTime;
-  endDay: DateTime;
-  separator: string;
-}
-
-const main = async (cmd: Command, toggl: TogglClient) => {
-  const { startDay, endDay, separator } = cmd;
-
-  const config = await loadConfig();
-  const projects = await toggl.getProjects(config);
-
-  // Generate days array
-  const days: DateTime[] = [];
-
-  for (
-    let d = startDay;
-    !d.isAfter(endDay);
-    d = d.add({ day: 1 })
-  ) {
-    days.push(d);
-  }
-
-  const dateEntries = await toggl.getTimeEntriesForDays(
-    config,
-    startDay,
-    endDay,
-  );
-
-  console.log("--- Project list ---");
-  for (const p of projects) {
-    console.log(p.name);
-  }
-  console.log();
-  console.log(
-    "--- Work time table (The order of the rows follows the projects list) ---",
-  );
-
-  const header = days.map((d) => {
-    const y = d.year;
-    const m = String(d.month).padStart(2, "0");
-    const day = String(d.day).padStart(2, "0");
-    return `${y}-${m}-${day}`;
-  }).join(separator);
-  console.log(header);
-
-  for (const project of projects) {
-    const row = days.map((d) => {
-      const yStr = String(d.year);
-      const mStr = String(d.month).padStart(2, "0");
-      const dayStr = String(d.day).padStart(2, "0");
-      const dateStr = `${yStr}-${mStr}-${dayStr}`;
-
-      const duration = dateEntries[dateStr]?.[project.id];
-      if (duration) {
-        return (Math.round(duration * 100) / 100).toString();
-      }
-      return " ";
-    }).join(separator);
-    console.log(row);
-  }
-};
+import { datetime } from "ptera";
+import { runSummaryCommand } from "./command/summary.ts";
+import { togglClient } from "./toggl/api.ts";
 
 if (import.meta.main) {
   const args = parseArgs({
@@ -79,10 +16,20 @@ if (import.meta.main) {
         short: "s",
         default: "\t",
       },
+      format: {
+        type: "string",
+        short: "f",
+        default: "csv",
+      },
     },
     allowPositionals: true,
   });
-  const { lastMonth, separator } = args.values;
+  const { format, lastMonth, separator } = args.values;
+
+  if (format !== "csv" && format !== "json") {
+    console.error("Error: format must be csv or json");
+    Deno.exit(1);
+  }
 
   const now = datetime();
   let targetYear = now.year;
@@ -134,5 +81,5 @@ if (import.meta.main) {
     Deno.exit(1);
   }
 
-  main({ startDay, endDay, separator }, togglClient);
+  runSummaryCommand({ startDay, endDay, separator, format }, togglClient);
 }
