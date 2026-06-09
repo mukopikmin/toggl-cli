@@ -4,23 +4,30 @@ CLI for listing Toggl projects and summarizing time entries.
 
 ## Configuration
 
-Create `~/.toggl_config`:
+Create `~/.toggl_config.toml`:
 
-```text
-WORKSPACE=your_workspace_id
-TOKEN=your_api_token
+```toml
+workspace = "your_workspace_id"
+token = "your_api_token"
 ```
 
-Optional local project display names can be configured with
-`PROJECT_NAME_<project_id>` keys:
+Optional local project display names can be configured with the `project_names`
+table:
 
-```text
-PROJECT_NAME_123456=Client A
-PROJECT_NAME_789012=Internal
+```toml
+[project_names]
+"123456" = "Client A"
+"789012" = "Internal"
 ```
 
 These names are stored locally and are used when rendering project lists and
 summary CSV output.
+
+To migrate an old `~/.toggl_config` file, run:
+
+```sh
+deno task migrate-config
+```
 
 ## Usage
 

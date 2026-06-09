@@ -9,6 +9,7 @@ import {
   buildWorkTimeTable,
   formatTimeEntriesJson,
 } from "./command/summary.ts";
+import { parseConfigToml, parseProjectNames } from "./config.ts";
 import { getProjects } from "./toggl/projects.ts";
 import { getSummaryTimeEntries } from "./toggl/summary.ts";
 import { getTimeEntriesForDays } from "./toggl/time_entries.ts";
@@ -25,6 +26,42 @@ function jsonResponse(body: unknown): Response {
     headers: { "Content-Type": "application/json" },
   });
 }
+
+Deno.test("parseProjectNames returns project display name mapping", () => {
+  assertEquals(
+    parseProjectNames({
+      "123456": "Client A",
+      "789012": "Internal",
+      invalid: "Ignored",
+      345678: 42,
+    }),
+    {
+      123456: "Client A",
+      789012: "Internal",
+    },
+  );
+});
+
+Deno.test("parseConfigToml reads token, workspace, and project names", () => {
+  assertEquals(
+    parseConfigToml(`
+workspace = "workspace-id"
+token = "test-token"
+
+[project_names]
+"123456" = "Client A"
+"789012" = "Internal"
+`),
+    {
+      WORKSPACE: "workspace-id",
+      TOKEN: "test-token",
+      PROJECT_NAMES: {
+        123456: "Client A",
+        789012: "Internal",
+      },
+    },
+  );
+});
 
 Deno.test("formatProjectList returns one project name per line", () => {
   assertEquals(
