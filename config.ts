@@ -41,7 +41,7 @@ export function parseConfigToml(text: string): Config {
 
   if (missingKeys.length > 0) {
     console.error(
-      `Error: Missing required configuration in ~/.toggl_config.toml: ${
+      `Error: Missing required configuration in ~/.config/toggl-cli/config.toml: ${
         missingKeys.join(", ")
       }`,
     );
@@ -61,16 +61,16 @@ export async function loadConfig(): Promise<Config> {
     console.error("Error: HOME environment variable not set");
     Deno.exit(1);
   }
-  const configFile = join(home, ".toggl_config.toml");
+  const configFile = join(home, ".config", "toggl-cli", "config.toml");
 
   try {
     const text = await Deno.readTextFile(configFile);
     return parseConfigToml(text);
   } catch (error) {
     if (error instanceof Deno.errors.NotFound) {
-      console.error("Error: ~/.toggl_config.toml file not found");
+      console.error("Error: ~/.config/toggl-cli/config.toml file not found");
       console.error(
-        "Please create ~/.toggl_config.toml with the following format:",
+        "Please create ~/.config/toggl-cli/config.toml with the following format:",
       );
       console.error('workspace = "your_workspace_id"');
       console.error('token = "your_api_token"');

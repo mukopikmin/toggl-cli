@@ -63,11 +63,12 @@ if (!home) {
 }
 
 const legacyFile = join(home, ".toggl_config");
-const tomlFile = join(home, ".toggl_config.toml");
+const configDir = join(home, ".config", "toggl-cli");
+const tomlFile = join(configDir, "config.toml");
 
 try {
   await Deno.stat(tomlFile);
-  console.error("Error: ~/.toggl_config.toml already exists");
+  console.error("Error: ~/.config/toggl-cli/config.toml already exists");
   console.error("Remove it first if you want to overwrite it.");
   Deno.exit(1);
 } catch (error) {
@@ -79,6 +80,7 @@ try {
 try {
   const legacyText = await Deno.readTextFile(legacyFile);
   const config = parseLegacyConfig(legacyText);
+  await Deno.mkdir(configDir, { recursive: true });
   await Deno.writeTextFile(tomlFile, configToToml(config));
   console.log(`Wrote ${tomlFile}`);
 } catch (error) {

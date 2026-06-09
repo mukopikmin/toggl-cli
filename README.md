@@ -4,7 +4,7 @@ CLI for listing Toggl projects and summarizing time entries.
 
 ## Configuration
 
-Create `~/.toggl_config.toml`:
+Create `~/.config/toggl-cli/config.toml`:
 
 ```toml
 workspace = "your_workspace_id"
