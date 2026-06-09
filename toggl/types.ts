@@ -3,7 +3,7 @@ export interface TogglConfig {
   TOKEN: string;
 }
 
-export interface Project {
+export interface TogglProject {
   id: number;
   name: string;
   active: boolean;

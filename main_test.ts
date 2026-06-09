@@ -1,15 +1,12 @@
 import { assertEquals } from "@std/assert";
 import { datetime } from "ptera";
-import {
-  applyProjectDisplayNames,
-  formatProjectList,
-  formatProjectsJson,
-} from "./command/projects.ts";
+import { formatProjectList, formatProjectsJson } from "./command/projects.ts";
 import {
   buildWorkTimeTable,
   formatTimeEntriesJson,
 } from "./command/summary.ts";
 import { parseConfigToml, parseProjectNames } from "./config.ts";
+import { createProject } from "./model/project.ts";
 import { getProjects } from "./toggl/projects.ts";
 import { getSummaryTimeEntries } from "./toggl/summary.ts";
 import { getTimeEntriesForDays } from "./toggl/time_entries.ts";
@@ -66,10 +63,20 @@ token = "test-token"
 Deno.test("formatProjectList returns one project name per line", () => {
   assertEquals(
     formatProjectList([
-      { id: 1, name: "Project Alpha", active: true },
-      { id: 2, name: "Project Beta", active: true },
+      {
+        id: 1,
+        name: "Project Alpha",
+        displayName: "Project Alpha",
+        active: true,
+      },
+      {
+        id: 2,
+        name: "Project Beta",
+        displayName: "Custom Beta",
+        active: true,
+      },
     ]),
-    "Project Alpha\nProject Beta",
+    "Project Alpha\nCustom Beta",
   );
 });
 
@@ -77,37 +84,48 @@ Deno.test("formatProjectList returns an empty string for no projects", () => {
   assertEquals(formatProjectList([]), "");
 });
 
-Deno.test("applyProjectDisplayNames replaces project names from local mapping", () => {
+Deno.test("createProject stores original and display project names", () => {
   assertEquals(
-    applyProjectDisplayNames(
-      [
-        { id: 1, name: "Project Alpha", active: true },
-        { id: 2, name: "Project Beta", active: true },
-      ],
+    createProject(
+      { id: 2, name: "Project Beta", active: true },
       { 2: "Custom Beta" },
     ),
-    [
-      { id: 1, name: "Project Alpha", active: true },
-      { id: 2, name: "Custom Beta", active: true },
-    ],
+    {
+      id: 2,
+      name: "Project Beta",
+      displayName: "Custom Beta",
+      active: true,
+    },
   );
 });
 
 Deno.test("formatProjectsJson returns explicit JSON output for projects", () => {
   assertEquals(
     formatProjectsJson([
-      { id: 1, name: "Project Alpha", active: true },
-      { id: 2, name: "Project Beta", active: true },
+      {
+        id: 1,
+        name: "Project Alpha",
+        displayName: "Project Alpha",
+        active: true,
+      },
+      {
+        id: 2,
+        name: "Project Beta",
+        displayName: "Custom Beta",
+        active: true,
+      },
     ]),
     `[
   {
     "id": 1,
     "name": "Project Alpha",
+    "displayName": "Project Alpha",
     "active": true
   },
   {
     "id": 2,
     "name": "Project Beta",
+    "displayName": "Custom Beta",
     "active": true
   }
 ]`,
@@ -117,8 +135,18 @@ Deno.test("formatProjectsJson returns explicit JSON output for projects", () => 
 Deno.test("buildWorkTimeTable structures project rows across the requested date range", () => {
   const table = buildWorkTimeTable(
     [
-      { id: 100, name: "Client work", active: true },
-      { id: 200, name: "Internal", active: true },
+      {
+        id: 100,
+        name: "Client work",
+        displayName: "Client A",
+        active: true,
+      },
+      {
+        id: 200,
+        name: "Internal",
+        displayName: "Internal",
+        active: true,
+      },
     ],
     {
       "2026-05-01": { 100: 45.125 },
@@ -130,7 +158,7 @@ Deno.test("buildWorkTimeTable structures project rows across the requested date 
   );
 
   assertEquals(table, {
-    projectNames: ["Client work", "Internal"],
+    projectNames: ["Client A", "Internal"],
     headers: ["2026-05-01", "2026-05-02", "2026-05-03"],
     rows: [
       ["45.13", " ", "12"],

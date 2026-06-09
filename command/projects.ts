@@ -1,6 +1,7 @@
 import { loadConfig } from "../config.ts";
+import { createProjects } from "../model/project.ts";
+import type { Project } from "../model/project.ts";
 import type { TogglClient } from "../toggl/api.ts";
-import type { Project } from "../toggl/types.ts";
 
 export type ProjectsFormat = "csv" | "json";
 
@@ -8,18 +9,8 @@ export interface ProjectsCommand {
   format: ProjectsFormat;
 }
 
-export function applyProjectDisplayNames(
-  projects: Project[],
-  projectNames: Record<number, string>,
-): Project[] {
-  return projects.map((project) => ({
-    ...project,
-    name: projectNames[project.id] ?? project.name,
-  }));
-}
-
 export function formatProjectList(projects: Project[]): string {
-  return projects.map((p) => p.name).join("\n");
+  return projects.map((p) => p.displayName).join("\n");
 }
 
 export function formatProjectsJson(projects: Project[]): string {
@@ -42,7 +33,7 @@ export async function runProjectsCommand(
   toggl: TogglClient,
 ): Promise<void> {
   const config = await loadConfig();
-  const projects = applyProjectDisplayNames(
+  const projects = createProjects(
     await toggl.getProjects(config),
     config.PROJECT_NAMES,
   );
