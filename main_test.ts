@@ -1,10 +1,14 @@
 import { assertEquals } from "@std/assert";
 import { datetime } from "ptera";
 import {
+  applyProjectDisplayNames,
+  formatProjectList,
+  formatProjectsJson,
+} from "./command/projects.ts";
+import {
   buildWorkTimeTable,
   formatTimeEntriesJson,
 } from "./command/summary.ts";
-import { formatProjectList, formatProjectsJson } from "./main.ts";
 import { getProjects } from "./toggl/projects.ts";
 import { getSummaryTimeEntries } from "./toggl/summary.ts";
 import { getTimeEntriesForDays } from "./toggl/time_entries.ts";
@@ -34,6 +38,22 @@ Deno.test("formatProjectList returns one project name per line", () => {
 
 Deno.test("formatProjectList returns an empty string for no projects", () => {
   assertEquals(formatProjectList([]), "");
+});
+
+Deno.test("applyProjectDisplayNames replaces project names from local mapping", () => {
+  assertEquals(
+    applyProjectDisplayNames(
+      [
+        { id: 1, name: "Project Alpha", active: true },
+        { id: 2, name: "Project Beta", active: true },
+      ],
+      { 2: "Custom Beta" },
+    ),
+    [
+      { id: 1, name: "Project Alpha", active: true },
+      { id: 2, name: "Custom Beta", active: true },
+    ],
+  );
 });
 
 Deno.test("formatProjectsJson returns explicit JSON output for projects", () => {

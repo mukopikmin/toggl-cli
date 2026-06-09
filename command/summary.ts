@@ -2,6 +2,7 @@ import { DateTime } from "ptera";
 import { loadConfig } from "../config.ts";
 import type { TogglClient } from "../toggl/api.ts";
 import type { Project } from "../toggl/types.ts";
+import { applyProjectDisplayNames } from "./projects.ts";
 
 export type SummaryFormat = "csv" | "json";
 
@@ -114,7 +115,10 @@ export async function runSummaryCommand(
     return;
   }
 
-  const projects = await toggl.getProjects(config);
+  const projects = applyProjectDisplayNames(
+    await toggl.getProjects(config),
+    config.PROJECT_NAMES,
+  );
   const table = buildWorkTimeTable(projects, dateEntries, startDay, endDay);
 
   outputWorkTimeTable(table, separator);
