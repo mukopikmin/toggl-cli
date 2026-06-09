@@ -1,5 +1,6 @@
 import { parseArgs } from "node:util";
 import { datetime } from "ptera";
+import { runInitCommand } from "./command/init.ts";
 import { runProjectsCommand } from "./command/projects.ts";
 import { runSummaryCommand } from "./command/summary.ts";
 import { togglClient } from "./toggl/api.ts";
@@ -26,6 +27,11 @@ if (import.meta.main) {
     allowPositionals: true,
   });
   const { format, lastMonth, separator } = args.values;
+
+  if (args.positionals[0] === "init") {
+    await runInitCommand();
+    Deno.exit(0);
+  }
 
   if (format !== "csv" && format !== "json") {
     console.error("Error: format must be csv or json");

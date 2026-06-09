@@ -1,5 +1,6 @@
 import { join } from "@std/path";
 import { stringify } from "@std/toml";
+import { CONFIG_FILE_DISPLAY, getConfigFile } from "../config.ts";
 
 interface LegacyConfig {
   workspace?: string;
@@ -63,12 +64,11 @@ if (!home) {
 }
 
 const legacyFile = join(home, ".toggl_config");
-const configDir = join(home, ".config", "toggl-cli");
-const tomlFile = join(configDir, "config.toml");
+const tomlFile = getConfigFile(home);
 
 try {
   await Deno.stat(tomlFile);
-  console.error("Error: ~/.config/toggl-cli/config.toml already exists");
+  console.error(`Error: ${CONFIG_FILE_DISPLAY} already exists`);
   console.error("Remove it first if you want to overwrite it.");
   Deno.exit(1);
 } catch (error) {
@@ -80,7 +80,7 @@ try {
 try {
   const legacyText = await Deno.readTextFile(legacyFile);
   const config = parseLegacyConfig(legacyText);
-  await Deno.mkdir(configDir, { recursive: true });
+  await Deno.mkdir(join(home, ".config", "toggl-cli"), { recursive: true });
   await Deno.writeTextFile(tomlFile, configToToml(config));
   console.log(`Wrote ${tomlFile}`);
 } catch (error) {

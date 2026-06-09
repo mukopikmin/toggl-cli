@@ -4,6 +4,12 @@ CLI for listing Toggl projects and summarizing time entries.
 
 ## Configuration
 
+Create a config file:
+
+```sh
+deno task dev init
+```
+
 Create `~/.config/toggl-cli/config.toml`:
 
 ```toml

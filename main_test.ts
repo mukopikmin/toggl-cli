@@ -1,5 +1,6 @@
 import { assertEquals } from "@std/assert";
 import { datetime } from "ptera";
+import { createConfigTemplate } from "./command/init.ts";
 import { formatProjectList, formatProjectsJson } from "./command/projects.ts";
 import {
   buildWorkTimeTable,
@@ -23,6 +24,18 @@ function jsonResponse(body: unknown): Response {
     headers: { "Content-Type": "application/json" },
   });
 }
+
+Deno.test("createConfigTemplate returns TOML config template", () => {
+  assertEquals(
+    createConfigTemplate(),
+    `workspace = "your_workspace_id"
+token = "your_api_token"
+
+[project_names]
+123456 = "Client A"
+`,
+  );
+});
 
 Deno.test("parseProjectNames returns project display name mapping", () => {
   assertEquals(

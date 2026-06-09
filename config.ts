@@ -2,8 +2,14 @@ import { join } from "@std/path";
 import { parse } from "@std/toml";
 import type { TogglConfig } from "./toggl/types.ts";
 
+export const CONFIG_FILE_DISPLAY = "~/.config/toggl-cli/config.toml";
+
 export interface Config extends TogglConfig {
   PROJECT_NAMES: Record<number, string>;
+}
+
+export function getConfigFile(home: string): string {
+  return join(home, ".config", "toggl-cli", "config.toml");
 }
 
 function readString(value: unknown): string | undefined {
@@ -41,7 +47,7 @@ export function parseConfigToml(text: string): Config {
 
   if (missingKeys.length > 0) {
     console.error(
-      `Error: Missing required configuration in ~/.config/toggl-cli/config.toml: ${
+      `Error: Missing required configuration in ${CONFIG_FILE_DISPLAY}: ${
         missingKeys.join(", ")
       }`,
     );
@@ -61,16 +67,16 @@ export async function loadConfig(): Promise<Config> {
     console.error("Error: HOME environment variable not set");
     Deno.exit(1);
   }
-  const configFile = join(home, ".config", "toggl-cli", "config.toml");
+  const configFile = getConfigFile(home);
 
   try {
     const text = await Deno.readTextFile(configFile);
     return parseConfigToml(text);
   } catch (error) {
     if (error instanceof Deno.errors.NotFound) {
-      console.error("Error: ~/.config/toggl-cli/config.toml file not found");
+      console.error(`Error: ${CONFIG_FILE_DISPLAY} file not found`);
       console.error(
-        "Please create ~/.config/toggl-cli/config.toml with the following format:",
+        `Please create ${CONFIG_FILE_DISPLAY} with the following format:`,
       );
       console.error('workspace = "your_workspace_id"');
       console.error('token = "your_api_token"');
