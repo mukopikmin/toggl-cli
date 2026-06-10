@@ -6,8 +6,8 @@ import {
   buildWorkTimeTable,
   formatTimeEntriesJson,
 } from "./command/summary.ts";
-import { parseConfigToml, parseProjectNames } from "./config.ts";
-import { createProject } from "./model/project.ts";
+import { parseConfigToml, parseProjectsConfig } from "./config.ts";
+import { createProject, visibleProjects } from "./model/project.ts";
 import { getProjects } from "./toggl/projects.ts";
 import { getSummaryTimeEntries } from "./toggl/summary.ts";
 import { getTimeEntriesForDays } from "./toggl/time_entries.ts";
@@ -31,43 +31,50 @@ Deno.test("createConfigTemplate returns TOML config template", () => {
     `workspace = "your_workspace_id"
 token = "your_api_token"
 
-[project_names]
-123456 = "Client A"
+[projects.123456]
+display_name = "Client A"
+hidden = false
+
+[projects.234567]
+hidden = true
 `,
   );
 });
 
-Deno.test("parseProjectNames returns project display name mapping", () => {
+Deno.test("parseProjectsConfig returns per-project settings", () => {
   assertEquals(
-    parseProjectNames({
-      "123456": "Client A",
-      "789012": "Internal",
-      invalid: "Ignored",
-      345678: 42,
+    parseProjectsConfig({
+      "123456": { display_name: "Client A" },
+      "789012": { hidden: true },
+      invalid: { display_name: "Ignored" },
+      345678: "ignored",
     }),
     {
-      123456: "Client A",
-      789012: "Internal",
+      123456: { displayName: "Client A", hidden: false },
+      789012: { displayName: undefined, hidden: true },
     },
   );
 });
 
-Deno.test("parseConfigToml reads token, workspace, and project names", () => {
+Deno.test("parseConfigToml reads token, workspace, and project settings", () => {
   assertEquals(
     parseConfigToml(`
 workspace = "workspace-id"
 token = "test-token"
 
-[project_names]
-"123456" = "Client A"
-"789012" = "Internal"
+[projects."123456"]
+display_name = "Client A"
+hidden = true
+
+[projects."789012"]
+display_name = "Internal"
 `),
     {
       WORKSPACE: "workspace-id",
       TOKEN: "test-token",
-      PROJECT_NAMES: {
-        123456: "Client A",
-        789012: "Internal",
+      PROJECTS: {
+        123456: { displayName: "Client A", hidden: true },
+        789012: { displayName: "Internal", hidden: false },
       },
     },
   );
@@ -81,12 +88,14 @@ Deno.test("formatProjectList returns one project name per line", () => {
         name: "Project Alpha",
         displayName: "Project Alpha",
         active: true,
+        hidden: false,
       },
       {
         id: 2,
         name: "Project Beta",
         displayName: "Custom Beta",
         active: true,
+        hidden: false,
       },
     ]),
     "Project Alpha\nCustom Beta",
@@ -101,14 +110,45 @@ Deno.test("createProject stores original and display project names", () => {
   assertEquals(
     createProject(
       { id: 2, name: "Project Beta", active: true },
-      { 2: "Custom Beta" },
+      { 2: { displayName: "Custom Beta", hidden: true } },
     ),
     {
       id: 2,
       name: "Project Beta",
       displayName: "Custom Beta",
       active: true,
+      hidden: true,
     },
+  );
+});
+
+Deno.test("visibleProjects excludes hidden projects", () => {
+  assertEquals(
+    visibleProjects([
+      {
+        id: 1,
+        name: "Project Alpha",
+        displayName: "Project Alpha",
+        active: true,
+        hidden: false,
+      },
+      {
+        id: 2,
+        name: "Project Beta",
+        displayName: "Custom Beta",
+        active: true,
+        hidden: true,
+      },
+    ]),
+    [
+      {
+        id: 1,
+        name: "Project Alpha",
+        displayName: "Project Alpha",
+        active: true,
+        hidden: false,
+      },
+    ],
   );
 });
 
@@ -120,12 +160,14 @@ Deno.test("formatProjectsJson returns explicit JSON output for projects", () => 
         name: "Project Alpha",
         displayName: "Project Alpha",
         active: true,
+        hidden: false,
       },
       {
         id: 2,
         name: "Project Beta",
         displayName: "Custom Beta",
         active: true,
+        hidden: true,
       },
     ]),
     `[
@@ -133,13 +175,15 @@ Deno.test("formatProjectsJson returns explicit JSON output for projects", () => 
     "id": 1,
     "name": "Project Alpha",
     "displayName": "Project Alpha",
-    "active": true
+    "active": true,
+    "hidden": false
   },
   {
     "id": 2,
     "name": "Project Beta",
     "displayName": "Custom Beta",
-    "active": true
+    "active": true,
+    "hidden": true
   }
 ]`,
   );
@@ -153,12 +197,14 @@ Deno.test("buildWorkTimeTable structures project rows across the requested date 
         name: "Client work",
         displayName: "Client A",
         active: true,
+        hidden: false,
       },
       {
         id: 200,
         name: "Internal",
         displayName: "Internal",
         active: true,
+        hidden: false,
       },
     ],
     {

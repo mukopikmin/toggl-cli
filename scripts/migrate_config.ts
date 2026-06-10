@@ -5,12 +5,12 @@ import { CONFIG_FILE_DISPLAY, getConfigFile } from "../config.ts";
 interface LegacyConfig {
   workspace?: string;
   token?: string;
-  project_names: Record<string, string>;
+  projects: Record<string, { display_name: string }>;
 }
 
 function parseLegacyConfig(text: string): LegacyConfig {
   const config: LegacyConfig = {
-    project_names: {},
+    projects: {},
   };
 
   for (const line of text.split("\n")) {
@@ -36,7 +36,9 @@ function parseLegacyConfig(text: string): LegacyConfig {
     if (normalizedKey.startsWith("PROJECT_NAME_")) {
       const projectId = normalizedKey.slice("PROJECT_NAME_".length);
       if (projectId) {
-        config.project_names[projectId] = normalizedValue;
+        config.projects[projectId] = {
+          display_name: normalizedValue,
+        };
       }
     }
   }
@@ -50,8 +52,8 @@ function configToToml(config: LegacyConfig): string {
     token: config.token ?? "",
   };
 
-  if (Object.keys(config.project_names).length > 0) {
-    output.project_names = config.project_names;
+  if (Object.keys(config.projects).length > 0) {
+    output.projects = config.projects;
   }
 
   return stringify(output);

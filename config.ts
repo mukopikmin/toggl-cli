@@ -4,8 +4,13 @@ import type { TogglConfig } from "./toggl/types.ts";
 
 export const CONFIG_FILE_DISPLAY = "~/.config/toggl-cli/config.toml";
 
+export interface ProjectConfig {
+  displayName?: string;
+  hidden: boolean;
+}
+
 export interface Config extends TogglConfig {
-  PROJECT_NAMES: Record<number, string>;
+  PROJECTS: Record<number, ProjectConfig>;
 }
 
 export function getConfigFile(home: string): string {
@@ -16,20 +21,35 @@ function readString(value: unknown): string | undefined {
   return typeof value === "string" && value ? value : undefined;
 }
 
-export function parseProjectNames(value: unknown): Record<number, string> {
+function readBoolean(value: unknown): boolean | undefined {
+  return typeof value === "boolean" ? value : undefined;
+}
+
+export function parseProjectsConfig(
+  value: unknown,
+): Record<number, ProjectConfig> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return {};
   }
 
-  const projectNames: Record<number, string> = {};
-  for (const [key, name] of Object.entries(value)) {
+  const projects: Record<number, ProjectConfig> = {};
+  for (const [key, rawProject] of Object.entries(value)) {
     const projectId = Number(key);
-    if (!Number.isNaN(projectId) && typeof name === "string") {
-      projectNames[projectId] = name;
+    if (
+      Number.isNaN(projectId) || !rawProject ||
+      typeof rawProject !== "object" || Array.isArray(rawProject)
+    ) {
+      continue;
     }
+
+    const project = rawProject as Record<string, unknown>;
+    projects[projectId] = {
+      displayName: readString(project.display_name),
+      hidden: readBoolean(project.hidden) ?? false,
+    };
   }
 
-  return projectNames;
+  return projects;
 }
 
 export function parseConfigToml(text: string): Config {
@@ -37,7 +57,7 @@ export function parseConfigToml(text: string): Config {
   const config = {
     WORKSPACE: readString(parsed.workspace),
     TOKEN: readString(parsed.token),
-    PROJECT_NAMES: parseProjectNames(parsed.project_names),
+    PROJECTS: parseProjectsConfig(parsed.projects),
   };
 
   const missingKeys = [
@@ -57,7 +77,7 @@ export function parseConfigToml(text: string): Config {
   return {
     WORKSPACE: config.WORKSPACE,
     TOKEN: config.TOKEN,
-    PROJECT_NAMES: config.PROJECT_NAMES,
+    PROJECTS: config.PROJECTS,
   } as Config;
 }
 

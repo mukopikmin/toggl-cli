@@ -1,5 +1,5 @@
 import { loadConfig } from "../config.ts";
-import { createProjects } from "../model/project.ts";
+import { createProjects, visibleProjects } from "../model/project.ts";
 import type { Project } from "../model/project.ts";
 import type { TogglClient } from "../toggl/api.ts";
 
@@ -35,8 +35,8 @@ export async function runProjectsCommand(
   const config = await loadConfig();
   const projects = createProjects(
     await toggl.getProjects(config),
-    config.PROJECT_NAMES,
+    config.PROJECTS,
   );
 
-  outputProjects(projects, cmd.format);
+  outputProjects(visibleProjects(projects), cmd.format);
 }

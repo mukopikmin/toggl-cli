@@ -17,17 +17,19 @@ workspace = "your_workspace_id"
 token = "your_api_token"
 ```
 
-Optional local project display names can be configured with the `project_names`
-table:
+Optional per-project settings can be configured with the `projects` table:
 
 ```toml
-[project_names]
-"123456" = "Client A"
-"789012" = "Internal"
+[projects."123456"]
+display_name = "Client A"
+hidden = false
+
+[projects."789012"]
+hidden = true
 ```
 
-These names are stored locally and are used when rendering project lists and
-summary CSV output.
+Display names are used when rendering project lists and summary CSV output.
+Hidden projects are excluded from project lists and summary CSV output.
 
 To migrate an old `~/.toggl_config` file, run:
 

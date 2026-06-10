@@ -6,8 +6,14 @@ export function createConfigTemplate(): string {
   return stringify({
     workspace: "your_workspace_id",
     token: "your_api_token",
-    project_names: {
-      "123456": "Client A",
+    projects: {
+      "123456": {
+        display_name: "Client A",
+        hidden: false,
+      },
+      "234567": {
+        hidden: true,
+      },
     },
   });
 }
