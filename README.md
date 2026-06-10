@@ -10,7 +10,8 @@ Create a config file:
 deno task dev init
 ```
 
-Create `~/.config/toggl-cli/config.toml`:
+This creates `~/.config/toggl-cli/config.toml` if it does not already exist.
+You can also create it manually:
 
 ```toml
 workspace = "your_workspace_id"
@@ -29,7 +30,9 @@ hidden = true
 ```
 
 Display names are used when rendering project lists and summary CSV output.
-Hidden projects are excluded from project lists and summary CSV output.
+When `display_name` is omitted, the Toggl project name is used. When `hidden`
+is omitted, it defaults to `false`. Hidden projects are excluded from
+`projects` output and summary CSV output.
 
 To migrate an old `~/.toggl_config` file, run:
 
@@ -59,7 +62,8 @@ Use `--lastMonth` to target the previous month:
 deno task dev --lastMonth 1 31
 ```
 
-CSV output uses tabs by default. Use `--separator` to change the separator:
+Summary CSV output uses tabs by default. Use `--separator` to change the
+separator:
 
 ```sh
 deno task dev --separator "," 1 31
