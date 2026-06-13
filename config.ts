@@ -1,4 +1,4 @@
-import { join } from "@std/path";
+import { join } from "node:path";
 import { parse } from "@std/toml";
 import type { TogglConfig } from "./toggl/types.ts";
 

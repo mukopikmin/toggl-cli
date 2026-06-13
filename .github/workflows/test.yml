@@ -1,0 +1,36 @@
+name: Test
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Deno
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@667a34cdef165d8d2b2e98dde39547c9daac7282 # v2.0.4
+        with:
+          deno-version: v2.8.0
+
+      - name: Check formatting
+        run: deno fmt --check
+
+      - name: Type check
+        run: deno check --lock=deno.lock main.ts main_test.ts toggl/date_range_test.ts
+
+      - name: Test
+        run: deno test
+
+      - name: Compile
+        run: deno compile --allow-net --allow-read --allow-env --output /tmp/toggl-cli main.ts
