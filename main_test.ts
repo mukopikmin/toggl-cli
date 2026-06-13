@@ -30,6 +30,7 @@ Deno.test("createConfigTemplate returns TOML config template", () => {
     createConfigTemplate(),
     `workspace = "your_workspace_id"
 token = "your_api_token"
+timezone = "Asia/Tokyo"
 
 [projects.123456]
 display_name = "Client A"
@@ -61,6 +62,7 @@ Deno.test("parseConfigToml reads token, workspace, and project settings", () => 
     parseConfigToml(`
 workspace = "workspace-id"
 token = "test-token"
+timezone = "Asia/Tokyo"
 
 [projects."123456"]
 display_name = "Client A"
@@ -72,6 +74,7 @@ display_name = "Internal"
     {
       WORKSPACE: "workspace-id",
       TOKEN: "test-token",
+      TIMEZONE: "Asia/Tokyo",
       PROJECTS: {
         123456: { displayName: "Client A", hidden: true },
         789012: { displayName: "Internal", hidden: false },
