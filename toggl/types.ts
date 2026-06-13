@@ -1,6 +1,7 @@
 export interface TogglConfig {
   WORKSPACE: string;
   TOKEN: string;
+  TIMEZONE?: string;
 }
 
 export interface TogglProject {

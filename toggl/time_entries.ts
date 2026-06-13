@@ -1,6 +1,7 @@
 import { apiEndpoint } from "./api.ts";
 import type { TimeEntry, TogglConfig } from "./types.ts";
 import { DateTime } from "ptera";
+import { buildTimeEntriesDateRange } from "./date_range.ts";
 
 interface TimeEntryResponse {
   id: number;
@@ -34,11 +35,14 @@ export async function getTimeEntriesForDays(
   fromDay: DateTime,
   toDay: DateTime,
 ): Promise<Record<string, Record<number, number>>> {
-  const startTimeStr = fromDay.toUTC().toISO();
-  const endTimeStr = toDay.add({ day: 1 }).toUTC().toISO();
+  const { startDate, endDate } = buildTimeEntriesDateRange(
+    fromDay,
+    toDay,
+    config.TIMEZONE,
+  );
   const params = new URLSearchParams({
-    start_date: startTimeStr,
-    end_date: endTimeStr,
+    start_date: startDate,
+    end_date: endDate,
     meta: "true",
   });
 
