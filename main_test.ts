@@ -199,7 +199,43 @@ Deno.test("getSummaryTimeEntries posts summary request with Toggl auth", async (
   }
 });
 
+Deno.test("getTimeEntriesForDays fetches range without configured timezone", async () => {
+  const originalFetch = globalThis.fetch;
+  let requestedUrl = "";
+
+  globalThis.fetch = ((input) => {
+    requestedUrl = String(input);
+
+    return Promise.resolve(jsonResponse([]));
+  }) as typeof fetch;
+
+  const fromDay = datetime({ year: 2026, month: 5, day: 1 });
+  const toDay = datetime({ year: 2026, month: 5, day: 2 });
+
+  try {
+    const entries = await getTimeEntriesForDays(config, fromDay, toDay);
+    const url = new URL(requestedUrl);
+
+    assertEquals(url.origin + url.pathname, `${apiEndpoint}/me/time_entries`);
+    assertEquals(
+      url.searchParams.get("start_date"),
+      "2026-05-01T00:00:00.000Z",
+    );
+    assertEquals(
+      url.searchParams.get("end_date"),
+      "2026-05-03T00:00:00.000Z",
+    );
+    assertEquals(entries, {});
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 Deno.test("getTimeEntriesForDays fetches range and aggregates minutes by date and project", async () => {
+  const configWithTimezone = {
+    ...config,
+    TIMEZONE: "Asia/Tokyo",
+  };
   const originalFetch = globalThis.fetch;
   let requestedUrl = "";
   let requestedHeaders = new Headers();
@@ -243,15 +279,16 @@ Deno.test("getTimeEntriesForDays fetches range and aggregates minutes by date an
   const toDay = datetime({ year: 2026, month: 5, day: 2 });
 
   try {
-    const entries = await getTimeEntriesForDays(config, fromDay, toDay);
+    const entries = await getTimeEntriesForDays(
+      configWithTimezone,
+      fromDay,
+      toDay,
+    );
     const url = new URL(requestedUrl);
 
     assertEquals(url.origin + url.pathname, `${apiEndpoint}/me/time_entries`);
-    assertEquals(url.searchParams.get("start_date"), fromDay.toUTC().toISO());
-    assertEquals(
-      url.searchParams.get("end_date"),
-      toDay.add({ day: 1 }).toUTC().toISO(),
-    );
+    assertEquals(url.searchParams.get("start_date"), "2026-04-30T15:00:00Z");
+    assertEquals(url.searchParams.get("end_date"), "2026-05-02T15:00:00Z");
     assertEquals(url.searchParams.get("meta"), "true");
     assertEquals(requestedHeaders.get("Content-Type"), "application/json");
     assertEquals(
