@@ -13,6 +13,26 @@ export function formatProjectsJson(projects: Project[]): string {
   return JSON.stringify(projects, null, 2);
 }
 
+export type TargetMonth = {
+  year: number;
+  month: number;
+};
+
+export function resolveTargetMonth(
+  now: TargetMonth,
+  lastMonth: boolean,
+): TargetMonth {
+  if (!lastMonth) {
+    return { year: now.year, month: now.month };
+  }
+
+  if (now.month === 1) {
+    return { year: now.year - 1, month: 12 };
+  }
+
+  return { year: now.year, month: now.month - 1 };
+}
+
 const listProjects = async (toggl: TogglClient, format: "csv" | "json") => {
   const config = await loadConfig();
   const projects = await toggl.getProjects(config);
@@ -56,17 +76,10 @@ if (import.meta.main) {
     Deno.exit(0);
   }
 
-  const now = datetime();
-  let targetYear = now.year;
-  let targetMonth = now.month;
-
-  if (lastMonth) {
-    targetMonth -= 1;
-    if (targetMonth === 0) {
-      targetMonth = 12;
-      targetYear -= 1;
-    }
-  }
+  const { year: targetYear, month: targetMonth } = resolveTargetMonth(
+    datetime(),
+    lastMonth,
+  );
 
   const posLen = args.positionals.length;
   if (posLen < 2) {
