@@ -1,8 +1,8 @@
-import { join } from "@std/path";
+import { join } from "node:path";
 import type { TogglConfig } from "./toggl/types.ts";
 
 export interface Config extends TogglConfig {
-  [key: string]: string;
+  [key: string]: string | undefined;
 }
 
 export async function loadConfig(): Promise<Config> {
