@@ -57,6 +57,7 @@ export function parseConfigToml(text: string): Config {
   const config = {
     WORKSPACE: readString(parsed.workspace),
     TOKEN: readString(parsed.token),
+    TIMEZONE: readString(parsed.timezone),
     PROJECTS: parseProjectsConfig(parsed.projects),
   };
 
@@ -77,6 +78,7 @@ export function parseConfigToml(text: string): Config {
   return {
     WORKSPACE: config.WORKSPACE,
     TOKEN: config.TOKEN,
+    TIMEZONE: config.TIMEZONE,
     PROJECTS: config.PROJECTS,
   } as Config;
 }
