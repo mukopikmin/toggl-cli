@@ -4,7 +4,11 @@ import {
   buildWorkTimeTable,
   formatTimeEntriesJson,
 } from "./command/summary.ts";
-import { formatProjectList, formatProjectsJson } from "./main.ts";
+import {
+  formatProjectList,
+  formatProjectsJson,
+  resolveTargetMonth,
+} from "./main.ts";
 import { getProjects } from "./toggl/projects.ts";
 import { getSummaryTimeEntries } from "./toggl/summary.ts";
 import { getTimeEntriesForDays } from "./toggl/time_entries.ts";
@@ -55,6 +59,27 @@ Deno.test("formatProjectsJson returns explicit JSON output for projects", () => 
     "active": true
   }
 ]`,
+  );
+});
+
+Deno.test("resolveTargetMonth returns December in previous year for January last month", () => {
+  assertEquals(
+    resolveTargetMonth(datetime({ year: 2026, month: 1, day: 15 }), true),
+    { year: 2025, month: 12 },
+  );
+});
+
+Deno.test("resolveTargetMonth returns previous month in the same year", () => {
+  assertEquals(
+    resolveTargetMonth(datetime({ year: 2026, month: 5, day: 15 }), true),
+    { year: 2026, month: 4 },
+  );
+});
+
+Deno.test("resolveTargetMonth returns current month when lastMonth is false", () => {
+  assertEquals(
+    resolveTargetMonth(datetime({ year: 2026, month: 5, day: 15 }), false),
+    { year: 2026, month: 5 },
   );
 });
 
