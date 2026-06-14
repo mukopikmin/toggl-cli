@@ -4,11 +4,16 @@ import {
   buildWorkTimeTable,
   formatTimeEntriesJson,
 } from "./command/summary.ts";
-import { formatProjectList, formatProjectsJson } from "./main.ts";
+import {
+  formatProjectList,
+  formatProjectsJson,
+  resolveTargetMonth,
+} from "./main.ts";
 import { getProjects } from "./toggl/projects.ts";
 import { getSummaryTimeEntries } from "./toggl/summary.ts";
 import { getTimeEntriesForDays } from "./toggl/time_entries.ts";
 import { apiEndpoint, reportsApiEndpoint } from "./toggl/api.ts";
+import { formatTimeEntryDate } from "./toggl/date.ts";
 
 const config = {
   WORKSPACE: "workspace-id",
@@ -54,6 +59,27 @@ Deno.test("formatProjectsJson returns explicit JSON output for projects", () => 
     "active": true
   }
 ]`,
+  );
+});
+
+Deno.test("resolveTargetMonth returns December in previous year for January last month", () => {
+  assertEquals(
+    resolveTargetMonth(datetime({ year: 2026, month: 1, day: 15 }), true),
+    { year: 2025, month: 12 },
+  );
+});
+
+Deno.test("resolveTargetMonth returns previous month in the same year", () => {
+  assertEquals(
+    resolveTargetMonth(datetime({ year: 2026, month: 5, day: 15 }), true),
+    { year: 2026, month: 4 },
+  );
+});
+
+Deno.test("resolveTargetMonth returns current month when lastMonth is false", () => {
+  assertEquals(
+    resolveTargetMonth(datetime({ year: 2026, month: 5, day: 15 }), false),
+    { year: 2026, month: 5 },
   );
 });
 
@@ -199,6 +225,13 @@ Deno.test("getSummaryTimeEntries posts summary request with Toggl auth", async (
   }
 });
 
+Deno.test("formatTimeEntryDate converts the same instant to configured timezone dates", () => {
+  const start = "2026-05-01T15:30:00Z";
+
+  assertEquals(formatTimeEntryDate(start, "Asia/Tokyo"), "2026-05-02");
+  assertEquals(formatTimeEntryDate(start, "America/New_York"), "2026-05-01");
+});
+
 Deno.test("getTimeEntriesForDays fetches range without configured timezone", async () => {
   const originalFetch = globalThis.fetch;
   let requestedUrl = "";
@@ -298,6 +331,44 @@ Deno.test("getTimeEntriesForDays fetches range and aggregates minutes by date an
     assertEquals(entries, {
       "2026-05-01": { 100: 45 },
       "2026-05-02": { 200: 60 },
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("getTimeEntriesForDays aggregates entries by date in configured timezone", async () => {
+  const configWithTimezone = {
+    ...config,
+    TIMEZONE: "Asia/Tokyo",
+  };
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = (() => {
+    return Promise.resolve(jsonResponse([
+      {
+        id: 20,
+        project_id: 300,
+        start: "2026-05-01T15:30:00Z",
+        stop: "2026-05-01T16:00:00Z",
+        duration: 1800,
+        description: "crosses configured timezone date",
+      },
+    ]));
+  }) as typeof fetch;
+
+  const fromDay = datetime({ year: 2026, month: 5, day: 1 });
+  const toDay = datetime({ year: 2026, month: 5, day: 2 });
+
+  try {
+    const entries = await getTimeEntriesForDays(
+      configWithTimezone,
+      fromDay,
+      toDay,
+    );
+
+    assertEquals(entries, {
+      "2026-05-02": { 300: 30 },
     });
   } finally {
     globalThis.fetch = originalFetch;
