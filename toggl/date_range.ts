@@ -1,36 +1,32 @@
-import { DateTime } from "ptera";
-
 export interface TimeEntriesDateRange {
   startDate: string;
   endDate: string;
 }
 
-function startOfDayInTimeZoneUtcIso(day: DateTime, timeZone: string): string {
-  return Temporal.ZonedDateTime.from({
-    timeZone,
-    year: day.year,
-    month: day.month,
-    day: day.day,
-    hour: 0,
-    minute: 0,
-    second: 0,
-  }).toInstant().toString();
+function startOfDayInTimeZoneUtcIso(
+  day: Temporal.PlainDate,
+  timeZone: string,
+): string {
+  return day.toZonedDateTime(timeZone).toInstant().toString();
 }
 
 export function buildTimeEntriesDateRange(
-  fromDay: DateTime,
-  toDay: DateTime,
+  fromDay: Temporal.PlainDate,
+  toDay: Temporal.PlainDate,
   timeZone?: string,
 ): TimeEntriesDateRange {
   if (!timeZone) {
     return {
-      startDate: fromDay.toUTC().toISO(),
-      endDate: toDay.add({ day: 1 }).toUTC().toISO(),
+      startDate: fromDay.toZonedDateTime("UTC").toInstant().toString({
+        fractionalSecondDigits: 3,
+      }),
+      endDate: toDay.add({ days: 1 }).toZonedDateTime("UTC").toInstant()
+        .toString({ fractionalSecondDigits: 3 }),
     };
   }
 
   return {
     startDate: startOfDayInTimeZoneUtcIso(fromDay, timeZone),
-    endDate: startOfDayInTimeZoneUtcIso(toDay.add({ day: 1 }), timeZone),
+    endDate: startOfDayInTimeZoneUtcIso(toDay.add({ days: 1 }), timeZone),
   };
 }
