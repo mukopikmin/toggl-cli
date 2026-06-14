@@ -17,6 +17,8 @@
   descriptions, issue text, and review comments.
 - Use clear, concise English that explains the purpose and impact of a change.
   Avoid mixing languages in repository and GitHub communication.
+- Do not add tool-specific prefixes such as `[codex]` to pull request titles.
+  Write titles that describe the change directly.
 
 ## Documentation Consistency
 
