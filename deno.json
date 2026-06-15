@@ -1,6 +1,6 @@
 {
   "tasks": {
-    "dev": "deno run --allow-net --allow-read --allow-env main.ts",
+    "run": "deno run --allow-net --allow-read --allow-env main.ts",
     "build": "deno compile --allow-net --allow-read --allow-env --output out/toggl main.ts"
   },
   "imports": {
