@@ -1,4 +1,4 @@
-import { dirname } from "@std/path";
+import { dirname } from "node:path";
 import { stringify } from "@std/toml";
 import { CONFIG_FILE_DISPLAY, getConfigFile } from "../config.ts";
 
@@ -6,6 +6,7 @@ export function createConfigTemplate(): string {
   return stringify({
     workspace: "your_workspace_id",
     token: "your_api_token",
+    timezone: "Asia/Tokyo",
     projects: {
       "123456": {
         display_name: "Client A",

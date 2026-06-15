@@ -1,4 +1,4 @@
-import { join } from "@std/path";
+import { join } from "node:path";
 import { stringify } from "@std/toml";
 import { CONFIG_FILE_DISPLAY, getConfigFile } from "../config.ts";
 
