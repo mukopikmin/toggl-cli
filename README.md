@@ -190,10 +190,27 @@ target.
 For native targets, the release build runs the compiled binary with `--version`
 to verify that the requested release version was embedded.
 
+## Install
+
+On macOS, build in a temporary directory and install the executable to
+`$HOME/.local/bin/toggl`:
+
+```sh
+deno task install:mac
+```
+
+Make sure `$HOME/.local/bin` is included in your `PATH`, then run the installed
+command as follows:
+
+```sh
+toggl 1 15
+toggl projects
+```
+
 ## Development
 
 ```sh
 deno fmt --check
-deno check --lock=deno.lock main.ts main_test.ts toggl/date_range_test.ts
+deno check --lock=deno.lock main.ts main_test.ts scripts/compile.ts scripts/build_release.ts scripts/install_macos.ts toggl/date_range_test.ts
 deno test
 ```

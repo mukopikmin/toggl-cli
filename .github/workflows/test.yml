@@ -27,7 +27,7 @@ jobs:
         run: deno fmt --check
 
       - name: Type check
-        run: deno check --lock=deno.lock main.ts main_test.ts toggl/date_range_test.ts
+        run: deno check --lock=deno.lock main.ts main_test.ts scripts/install_macos.ts toggl/date_range_test.ts
 
       - name: Test
         run: deno test
