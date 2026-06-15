@@ -5,6 +5,26 @@ import { runProjectsCommand } from "./command/projects.ts";
 import { runSummaryCommand } from "./command/summary.ts";
 import { togglClient } from "./toggl/api.ts";
 
+export type TargetMonth = {
+  year: number;
+  month: number;
+};
+
+export function resolveTargetMonth(
+  now: TargetMonth,
+  lastMonth: boolean,
+): TargetMonth {
+  if (!lastMonth) {
+    return { year: now.year, month: now.month };
+  }
+
+  if (now.month === 1) {
+    return { year: now.year - 1, month: 12 };
+  }
+
+  return { year: now.year, month: now.month - 1 };
+}
+
 if (import.meta.main) {
   const args = parseArgs({
     options: {
@@ -43,17 +63,10 @@ if (import.meta.main) {
     Deno.exit(0);
   }
 
-  const now = datetime();
-  let targetYear = now.year;
-  let targetMonth = now.month;
-
-  if (lastMonth) {
-    targetMonth -= 1;
-    if (targetMonth === 0) {
-      targetMonth = 12;
-      targetYear -= 1;
-    }
-  }
+  const { year: targetYear, month: targetMonth } = resolveTargetMonth(
+    datetime(),
+    lastMonth,
+  );
 
   const posLen = args.positionals.length;
   if (posLen < 2) {
