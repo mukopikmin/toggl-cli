@@ -1,5 +1,6 @@
 import { parseArgs } from "node:util";
 import { datetime } from "ptera";
+import { runConfigCommand } from "./command/config.ts";
 import { runSummaryCommand } from "./command/summary.ts";
 import { loadConfig } from "./config.ts";
 import { TogglClient, togglClient } from "./toggl/api.ts";
@@ -73,6 +74,11 @@ if (import.meta.main) {
 
   if (args.positionals[0] === "projects") {
     await listProjects(togglClient, format);
+    Deno.exit(0);
+  }
+
+  if (args.positionals[0] === "config") {
+    await runConfigCommand(format);
     Deno.exit(0);
   }
 

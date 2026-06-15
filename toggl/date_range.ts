@@ -17,6 +17,10 @@ function startOfDayInTimeZoneUtcIso(day: DateTime, timeZone: string): string {
   }).toInstant().toString();
 }
 
+function startOfDayUtcIso(day: DateTime): string {
+  return new Date(Date.UTC(day.year, day.month - 1, day.day)).toISOString();
+}
+
 export function buildTimeEntriesDateRange(
   fromDay: DateTime,
   toDay: DateTime,
@@ -24,8 +28,8 @@ export function buildTimeEntriesDateRange(
 ): TimeEntriesDateRange {
   if (!timeZone) {
     return {
-      startDate: fromDay.toUTC().toISO(),
-      endDate: toDay.add({ day: 1 }).toUTC().toISO(),
+      startDate: startOfDayUtcIso(fromDay),
+      endDate: startOfDayUtcIso(toDay.add({ day: 1 })),
     };
   }
 

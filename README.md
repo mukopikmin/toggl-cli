@@ -87,6 +87,20 @@ Project information can also be output as JSON:
 deno task dev -- --format json projects
 ```
 
+### Show configuration
+
+Show the loaded configuration values:
+
+```sh
+deno task run -- config
+```
+
+The `TOKEN` setting is never printed. Configuration can also be output as JSON:
+
+```sh
+deno task run -- --format json config
+```
+
 ## Build
 
 Build a standalone executable at `out/toggl`:
@@ -101,6 +115,7 @@ Run the compiled executable as follows:
 ./out/toggl 1 15
 ./out/toggl --lastMonth 1 31
 ./out/toggl projects
+./out/toggl config
 ```
 
 ## Install
@@ -118,6 +133,7 @@ command as follows:
 ```sh
 toggl 1 15
 toggl projects
+toggl config
 ```
 
 ## Development

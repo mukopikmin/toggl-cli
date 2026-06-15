@@ -1,6 +1,11 @@
 import { assertEquals } from "@std/assert";
 import { datetime } from "ptera";
 import {
+  formatConfigJson,
+  formatConfigValues,
+  withoutSensitiveConfig,
+} from "./command/config.ts";
+import {
   buildWorkTimeTable,
   formatTimeEntriesJson,
 } from "./command/summary.ts";
@@ -59,6 +64,45 @@ Deno.test("formatProjectsJson returns explicit JSON output for projects", () => 
     "active": true
   }
 ]`,
+  );
+});
+
+Deno.test("withoutSensitiveConfig excludes TOKEN from visible settings", () => {
+  assertEquals(
+    withoutSensitiveConfig({
+      WORKSPACE: "workspace-id",
+      TOKEN: "test-token",
+      TIMEZONE: "Asia/Tokyo",
+    }),
+    {
+      WORKSPACE: "workspace-id",
+      TIMEZONE: "Asia/Tokyo",
+    },
+  );
+});
+
+Deno.test("formatConfigValues outputs visible settings as key-value lines", () => {
+  assertEquals(
+    formatConfigValues({
+      WORKSPACE: "workspace-id",
+      TOKEN: "test-token",
+      TIMEZONE: "Asia/Tokyo",
+    }),
+    "WORKSPACE=workspace-id\nTIMEZONE=Asia/Tokyo",
+  );
+});
+
+Deno.test("formatConfigJson outputs visible settings as JSON", () => {
+  assertEquals(
+    formatConfigJson({
+      WORKSPACE: "workspace-id",
+      TOKEN: "test-token",
+      TIMEZONE: "Asia/Tokyo",
+    }),
+    `{
+  "WORKSPACE": "workspace-id",
+  "TIMEZONE": "Asia/Tokyo"
+}`,
   );
 });
 
