@@ -1,7 +1,11 @@
 import { assertEquals } from "@std/assert";
 import { datetime } from "ptera";
 import { createConfigTemplate } from "./command/init.ts";
-import { formatProjectList, formatProjectsJson } from "./command/projects.ts";
+import {
+  appendMissingProjects,
+  formatProjectList,
+  formatProjectsJson,
+} from "./command/projects.ts";
 import {
   buildWorkTimeTable,
   formatTimeEntriesJson,
@@ -191,6 +195,81 @@ Deno.test("formatProjectsJson returns explicit JSON output for projects", () => 
     "hidden": true
   }
 ]`,
+  );
+});
+
+Deno.test("appendMissingProjects preserves config and appends projects by id", () => {
+  const configText = `workspace = "workspace-id"
+token = "test-token"
+
+# Keep this project setting.
+[projects."20"]
+display_name = "Custom name"
+hidden = true
+`;
+
+  assertEquals(
+    appendMissingProjects(configText, [20], [
+      { id: 30, name: "Project Thirty", active: true },
+      { id: 20, name: "Existing Project", active: true },
+      { id: 10, name: "Project Ten", active: true },
+    ]),
+    {
+      text: `${configText}
+[projects.10]
+display_name = "Project Ten"
+hidden = false
+
+[projects.30]
+display_name = "Project Thirty"
+hidden = false
+`,
+      addedCount: 2,
+    },
+  );
+});
+
+Deno.test("appendMissingProjects escapes project display names as TOML", () => {
+  const result = appendMissingProjects(
+    `workspace = "workspace-id"
+token = "test-token"
+`,
+    [],
+    [{ id: 10, name: 'Client "A"\\Internal', active: true }],
+  );
+
+  assertEquals(
+    result.text,
+    `workspace = "workspace-id"
+token = "test-token"
+
+[projects.10]
+display_name = "Client \\"A\\"\\\\Internal"
+hidden = false
+`,
+  );
+  assertEquals(parseConfigToml(result.text).PROJECTS, {
+    10: {
+      displayName: 'Client "A"\\Internal',
+      hidden: false,
+    },
+  });
+});
+
+Deno.test("appendMissingProjects does not change fully configured text", () => {
+  const configText = `workspace = "workspace-id"
+token = "test-token"
+
+[projects."10"]
+hidden = false`;
+
+  assertEquals(
+    appendMissingProjects(
+      configText,
+      [10],
+      [{ id: 10, name: "Project Ten", active: true }],
+    ),
+    { text: configText, addedCount: 0 },
   );
 });
 

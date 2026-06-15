@@ -115,6 +115,17 @@ Project information can also be output as JSON:
 deno task dev -- --format json projects
 ```
 
+To add all active Toggl projects that are not yet in the configuration file,
+run:
+
+```sh
+deno task dev -- projects sync
+```
+
+Each new project is appended with its Toggl project name as `display_name` and
+with `hidden = false`. Existing project settings and other configuration file
+content are left unchanged.
+
 ## Build
 
 Build a standalone executable at `out/toggl`:
@@ -129,6 +140,7 @@ Run the compiled executable as follows:
 ./out/toggl 1 15
 ./out/toggl --lastMonth 1 31
 ./out/toggl projects
+./out/toggl projects sync
 ```
 
 ## Development

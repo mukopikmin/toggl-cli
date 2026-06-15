@@ -1,7 +1,10 @@
 import { parseArgs } from "node:util";
 import { datetime } from "ptera";
 import { runInitCommand } from "./command/init.ts";
-import { runProjectsCommand } from "./command/projects.ts";
+import {
+  runProjectsCommand,
+  runProjectsSyncCommand,
+} from "./command/projects.ts";
 import { runSummaryCommand } from "./command/summary.ts";
 import { togglClient } from "./toggl/api.ts";
 
@@ -59,7 +62,11 @@ if (import.meta.main) {
   }
 
   if (args.positionals[0] === "projects") {
-    await runProjectsCommand({ format }, togglClient);
+    if (args.positionals[1] === "sync") {
+      await runProjectsSyncCommand(togglClient);
+    } else {
+      await runProjectsCommand({ format }, togglClient);
+    }
     Deno.exit(0);
   }
 
