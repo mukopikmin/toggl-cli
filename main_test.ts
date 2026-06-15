@@ -216,12 +216,12 @@ hidden = true
     ]),
     {
       text: `${configText}
+# Project Ten
 [projects.10]
-display_name = "Project Ten"
 hidden = false
 
+# Project Thirty
 [projects.30]
-display_name = "Project Thirty"
 hidden = false
 `,
       addedCount: 2,
@@ -229,7 +229,7 @@ hidden = false
   );
 });
 
-Deno.test("appendMissingProjects escapes project display names as TOML", () => {
+Deno.test("appendMissingProjects writes project names as comments", () => {
   const result = appendMissingProjects(
     `workspace = "workspace-id"
 token = "test-token"
@@ -243,17 +243,40 @@ token = "test-token"
     `workspace = "workspace-id"
 token = "test-token"
 
+# Client "A"\\Internal
 [projects.10]
-display_name = "Client \\"A\\"\\\\Internal"
 hidden = false
 `,
   );
   assertEquals(parseConfigToml(result.text).PROJECTS, {
     10: {
-      displayName: 'Client "A"\\Internal',
+      displayName: undefined,
       hidden: false,
     },
   });
+});
+
+Deno.test("appendMissingProjects comments every project name line", () => {
+  const result = appendMissingProjects(
+    `workspace = "workspace-id"
+token = "test-token"
+`,
+    [],
+    [{ id: 10, name: "Client A\r\nInternal\nSupport", active: true }],
+  );
+
+  assertEquals(
+    result.text,
+    `workspace = "workspace-id"
+token = "test-token"
+
+# Client A
+# Internal
+# Support
+[projects.10]
+hidden = false
+`,
+  );
 });
 
 Deno.test("appendMissingProjects does not change fully configured text", () => {

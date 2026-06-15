@@ -122,9 +122,9 @@ run:
 deno task dev -- projects sync
 ```
 
-Each new project is appended with its Toggl project name as `display_name` and
-with `hidden = false`. Existing project settings and other configuration file
-content are left unchanged.
+Each new project is appended with its Toggl project name as a comment and with
+`hidden = false`. Existing project settings and other configuration file content
+are left unchanged.
 
 ## Build
 

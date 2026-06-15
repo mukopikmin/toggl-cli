@@ -57,16 +57,21 @@ export function appendMissingProjects(
     return { text: configText, addedCount: 0 };
   }
 
-  const additions = missingProjects.map((project) =>
-    stringify({
+  const additions = missingProjects.map((project) => {
+    const projectNameComment = project.name
+      .split(/\r\n|\r|\n/)
+      .map((line) => `# ${line}`)
+      .join("\n");
+    const projectConfig = stringify({
       projects: {
         [String(project.id)]: {
-          display_name: project.name,
           hidden: false,
         },
       },
-    }).trim()
-  ).join("\n\n");
+    }).trim();
+
+    return `${projectNameComment}\n${projectConfig}`;
+  }).join("\n\n");
   const separator = configText.endsWith("\n") ? "\n" : "\n\n";
 
   return {
