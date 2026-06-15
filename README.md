@@ -39,7 +39,7 @@ Specify the start and end days as day numbers in the current month. The end day
 is included in the aggregation.
 
 ```sh
-deno task dev -- 1 15
+deno task run -- 1 15
 ```
 
 By default, the command outputs a list of active projects followed by work time
@@ -48,19 +48,19 @@ in minutes for each project and date. Columns are separated by tabs.
 Use `--lastMonth` or `-l` to aggregate the previous month:
 
 ```sh
-deno task dev -- --lastMonth 1 31
+deno task run -- --lastMonth 1 31
 ```
 
 Use `--separator` or `-s` to change the delimiter:
 
 ```sh
-deno task dev -- --separator "," 1 15
+deno task run -- --separator "," 1 15
 ```
 
 Use `--format json` or `-f json` to output JSON:
 
 ```sh
-deno task dev -- --format json 1 15
+deno task run -- --format json 1 15
 ```
 
 The JSON output maps each date to project IDs and their work time in minutes:
@@ -78,13 +78,13 @@ The JSON output maps each date to project IDs and their work time in minutes:
 List the names of all active projects:
 
 ```sh
-deno task dev -- projects
+deno task run -- projects
 ```
 
 Project information can also be output as JSON:
 
 ```sh
-deno task dev -- --format json projects
+deno task run -- --format json projects
 ```
 
 ## Build
