@@ -1,14 +1,14 @@
 import { assertEquals } from "@std/assert";
 import { datetime } from "ptera";
+import { createConfigTemplate } from "./command/init.ts";
+import { formatProjectList, formatProjectsJson } from "./command/projects.ts";
 import {
   buildWorkTimeTable,
   formatTimeEntriesJson,
 } from "./command/summary.ts";
-import {
-  formatProjectList,
-  formatProjectsJson,
-  resolveTargetMonth,
-} from "./main.ts";
+import { parseConfigToml, parseProjectsConfig } from "./config.ts";
+import { resolveTargetMonth } from "./main.ts";
+import { createProject, visibleProjects } from "./model/project.ts";
 import { getProjects } from "./toggl/projects.ts";
 import { getSummaryTimeEntries } from "./toggl/summary.ts";
 import { getTimeEntriesForDays } from "./toggl/time_entries.ts";
@@ -27,13 +27,83 @@ function jsonResponse(body: unknown): Response {
   });
 }
 
+Deno.test("createConfigTemplate returns TOML config template", () => {
+  assertEquals(
+    createConfigTemplate(),
+    `workspace = "your_workspace_id"
+token = "your_api_token"
+timezone = "Asia/Tokyo"
+
+[projects.123456]
+display_name = "Client A"
+hidden = false
+
+[projects.234567]
+hidden = true
+`,
+  );
+});
+
+Deno.test("parseProjectsConfig returns per-project settings", () => {
+  assertEquals(
+    parseProjectsConfig({
+      "123456": { display_name: "Client A" },
+      "789012": { hidden: true },
+      invalid: { display_name: "Ignored" },
+      345678: "ignored",
+    }),
+    {
+      123456: { displayName: "Client A", hidden: false },
+      789012: { displayName: undefined, hidden: true },
+    },
+  );
+});
+
+Deno.test("parseConfigToml reads token, workspace, and project settings", () => {
+  assertEquals(
+    parseConfigToml(`
+workspace = "workspace-id"
+token = "test-token"
+timezone = "Asia/Tokyo"
+
+[projects."123456"]
+display_name = "Client A"
+hidden = true
+
+[projects."789012"]
+display_name = "Internal"
+`),
+    {
+      WORKSPACE: "workspace-id",
+      TOKEN: "test-token",
+      TIMEZONE: "Asia/Tokyo",
+      PROJECTS: {
+        123456: { displayName: "Client A", hidden: true },
+        789012: { displayName: "Internal", hidden: false },
+      },
+    },
+  );
+});
+
 Deno.test("formatProjectList returns one project name per line", () => {
   assertEquals(
     formatProjectList([
-      { id: 1, name: "Project Alpha", active: true },
-      { id: 2, name: "Project Beta", active: true },
+      {
+        id: 1,
+        name: "Project Alpha",
+        displayName: "Project Alpha",
+        active: true,
+        hidden: false,
+      },
+      {
+        id: 2,
+        name: "Project Beta",
+        displayName: "Custom Beta",
+        active: true,
+        hidden: false,
+      },
     ]),
-    "Project Alpha\nProject Beta",
+    "Project Alpha\nCustom Beta",
   );
 });
 
@@ -41,22 +111,84 @@ Deno.test("formatProjectList returns an empty string for no projects", () => {
   assertEquals(formatProjectList([]), "");
 });
 
+Deno.test("createProject stores original and display project names", () => {
+  assertEquals(
+    createProject(
+      { id: 2, name: "Project Beta", active: true },
+      { 2: { displayName: "Custom Beta", hidden: true } },
+    ),
+    {
+      id: 2,
+      name: "Project Beta",
+      displayName: "Custom Beta",
+      active: true,
+      hidden: true,
+    },
+  );
+});
+
+Deno.test("visibleProjects excludes hidden projects", () => {
+  assertEquals(
+    visibleProjects([
+      {
+        id: 1,
+        name: "Project Alpha",
+        displayName: "Project Alpha",
+        active: true,
+        hidden: false,
+      },
+      {
+        id: 2,
+        name: "Project Beta",
+        displayName: "Custom Beta",
+        active: true,
+        hidden: true,
+      },
+    ]),
+    [
+      {
+        id: 1,
+        name: "Project Alpha",
+        displayName: "Project Alpha",
+        active: true,
+        hidden: false,
+      },
+    ],
+  );
+});
+
 Deno.test("formatProjectsJson returns explicit JSON output for projects", () => {
   assertEquals(
     formatProjectsJson([
-      { id: 1, name: "Project Alpha", active: true },
-      { id: 2, name: "Project Beta", active: true },
+      {
+        id: 1,
+        name: "Project Alpha",
+        displayName: "Project Alpha",
+        active: true,
+        hidden: false,
+      },
+      {
+        id: 2,
+        name: "Project Beta",
+        displayName: "Custom Beta",
+        active: true,
+        hidden: true,
+      },
     ]),
     `[
   {
     "id": 1,
     "name": "Project Alpha",
-    "active": true
+    "displayName": "Project Alpha",
+    "active": true,
+    "hidden": false
   },
   {
     "id": 2,
     "name": "Project Beta",
-    "active": true
+    "displayName": "Custom Beta",
+    "active": true,
+    "hidden": true
   }
 ]`,
   );
@@ -86,8 +218,20 @@ Deno.test("resolveTargetMonth returns current month when lastMonth is false", ()
 Deno.test("buildWorkTimeTable structures project rows across the requested date range", () => {
   const table = buildWorkTimeTable(
     [
-      { id: 100, name: "Client work", active: true },
-      { id: 200, name: "Internal", active: true },
+      {
+        id: 100,
+        name: "Client work",
+        displayName: "Client A",
+        active: true,
+        hidden: false,
+      },
+      {
+        id: 200,
+        name: "Internal",
+        displayName: "Internal",
+        active: true,
+        hidden: false,
+      },
     ],
     {
       "2026-05-01": { 100: 45.125 },
@@ -99,7 +243,7 @@ Deno.test("buildWorkTimeTable structures project rows across the requested date 
   );
 
   assertEquals(table, {
-    projectNames: ["Client work", "Internal"],
+    projectNames: ["Client A", "Internal"],
     headers: ["2026-05-01", "2026-05-02", "2026-05-03"],
     rows: [
       ["45.13", " ", "12"],
