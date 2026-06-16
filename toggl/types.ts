@@ -4,7 +4,7 @@ export interface TogglConfig {
   TIMEZONE?: string;
 }
 
-export interface Project {
+export interface TogglProject {
   id: number;
   name: string;
   active: boolean;
