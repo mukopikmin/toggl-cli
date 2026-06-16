@@ -11,24 +11,52 @@ can be output as delimiter-separated values or JSON.
 
 ## Configuration
 
-Create `~/.toggl_config` in your home directory:
+Create a config file:
 
-```ini
-WORKSPACE=your_workspace_id
-TOKEN=your_api_token
-TIMEZONE=Asia/Tokyo
+```sh
+deno task run -- init
 ```
 
-`WORKSPACE` and `TOKEN` are required. `TIMEZONE` is optional, but specifying an
-IANA time zone name is recommended so daily totals align with your local time
-zone.
+This creates `~/.config/toggl-cli/config.toml` if it does not already exist. You
+can also create it manually:
+
+```toml
+workspace = "your_workspace_id"
+token = "your_api_token"
+timezone = "Asia/Tokyo"
+```
+
+Optional per-project settings can be configured with the `projects` table:
+
+```toml
+[projects."123456"]
+display_name = "Client A"
+hidden = false
+
+[projects."789012"]
+hidden = true
+```
+
+Display names are used when rendering project lists and summary CSV output. When
+`display_name` is omitted, the Toggl project name is used. When `hidden` is
+omitted, it defaults to `false`. Hidden projects are excluded from `projects`
+output and summary CSV output.
+
+The optional `timezone` setting is used to calculate the Toggl time entry query
+range. When it is omitted, the CLI preserves the existing UTC-based behavior.
+
+To migrate an old `~/.toggl_config` file, run:
+
+```sh
+deno task migrate-config
+```
 
 You can find your API token in your Toggl Track profile settings. Because the
 configuration file contains credentials, restrict its permissions so that other
 users cannot read it:
 
 ```sh
-chmod 600 ~/.toggl_config
+chmod 600 ~/.config/toggl-cli/config.toml
 ```
 
 ## Usage
@@ -42,7 +70,7 @@ is included in the aggregation.
 deno task run -- 1 15
 ```
 
-By default, the command outputs a list of active projects followed by work time
+By default, the command outputs a list of visible projects followed by work time
 in minutes for each project and date. Columns are separated by tabs.
 
 Use `--lastMonth` or `-l` to aggregate the previous month:
@@ -75,7 +103,7 @@ The JSON output maps each date to project IDs and their work time in minutes:
 
 ### List projects
 
-List the names of all active projects:
+List the display names of all active, visible projects:
 
 ```sh
 deno task run -- projects
@@ -86,6 +114,17 @@ Project information can also be output as JSON:
 ```sh
 deno task run -- --format json projects
 ```
+
+To add all active Toggl projects that are not yet in the configuration file,
+run:
+
+```sh
+deno task run -- projects sync
+```
+
+Each new project is appended with its Toggl project name as a comment and with
+`hidden = false`. Existing project settings and other configuration file content
+are left unchanged.
 
 ## Build
 
@@ -101,6 +140,7 @@ Run the compiled executable as follows:
 ./out/toggl 1 15
 ./out/toggl --lastMonth 1 31
 ./out/toggl projects
+./out/toggl projects sync
 ```
 
 ## Install

@@ -1,5 +1,5 @@
 import { apiEndpoint } from "./api.ts";
-import type { Project, TogglConfig } from "./types.ts";
+import type { TogglConfig, TogglProject } from "./types.ts";
 
 /**
  * https://engineering.toggl.com/docs/api/projects/
@@ -33,7 +33,9 @@ interface ProjectResponse {
   active?: boolean;
 }
 
-export async function getProjects(config: TogglConfig): Promise<Project[]> {
+export async function getProjects(
+  config: TogglConfig,
+): Promise<TogglProject[]> {
   const url = `${apiEndpoint}/workspaces/${config.WORKSPACE}/projects`;
   const response = await fetch(url, {
     headers: {
