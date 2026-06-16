@@ -1,6 +1,6 @@
 {
   "tasks": {
-    "dev": "deno run --allow-net --allow-read --allow-write --allow-env main.ts",
+    "run": "deno run --allow-net --allow-read --allow-write --allow-env main.ts",
     "build": "deno compile --allow-net --allow-read --allow-write --allow-env --output out/toggl main.ts",
     "migrate-config": "deno run --allow-read --allow-write --allow-env scripts/migrate_config.ts",
     "install:mac": "deno run --allow-read --allow-write --allow-run=deno --allow-env=HOME scripts/install_macos.ts"

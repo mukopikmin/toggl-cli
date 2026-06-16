@@ -14,7 +14,7 @@ can be output as delimiter-separated values or JSON.
 Create a config file:
 
 ```sh
-deno task dev init
+deno task run -- init
 ```
 
 This creates `~/.config/toggl-cli/config.toml` if it does not already exist. You
@@ -67,7 +67,7 @@ Specify the start and end days as day numbers in the current month. The end day
 is included in the aggregation.
 
 ```sh
-deno task dev -- 1 15
+deno task run -- 1 15
 ```
 
 By default, the command outputs a list of visible projects followed by work time
@@ -76,19 +76,19 @@ in minutes for each project and date. Columns are separated by tabs.
 Use `--lastMonth` or `-l` to aggregate the previous month:
 
 ```sh
-deno task dev -- --lastMonth 1 31
+deno task run -- --lastMonth 1 31
 ```
 
 Use `--separator` or `-s` to change the delimiter:
 
 ```sh
-deno task dev -- --separator "," 1 15
+deno task run -- --separator "," 1 15
 ```
 
 Use `--format json` or `-f json` to output JSON:
 
 ```sh
-deno task dev -- --format json 1 15
+deno task run -- --format json 1 15
 ```
 
 The JSON output maps each date to project IDs and their work time in minutes:
@@ -106,20 +106,20 @@ The JSON output maps each date to project IDs and their work time in minutes:
 List the display names of all active, visible projects:
 
 ```sh
-deno task dev -- projects
+deno task run -- projects
 ```
 
 Project information can also be output as JSON:
 
 ```sh
-deno task dev -- --format json projects
+deno task run -- --format json projects
 ```
 
 To add all active Toggl projects that are not yet in the configuration file,
 run:
 
 ```sh
-deno task dev -- projects sync
+deno task run -- projects sync
 ```
 
 Each new project is appended with its Toggl project name as a comment and with
