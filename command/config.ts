@@ -5,7 +5,7 @@ export function withoutSensitiveConfig(config: Config): Record<string, string> {
   const visibleConfig: Record<string, string> = {};
 
   for (const [key, value] of Object.entries(config)) {
-    if (key === "TOKEN" || value === undefined) continue;
+    if (key === "TOKEN" || typeof value !== "string") continue;
     visibleConfig[key] = value;
   }
 

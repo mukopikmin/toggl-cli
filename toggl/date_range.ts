@@ -5,6 +5,10 @@ export interface TimeEntriesDateRange {
   endDate: string;
 }
 
+function startOfDayUtcIso(day: DateTime): string {
+  return new Date(Date.UTC(day.year, day.month - 1, day.day)).toISOString();
+}
+
 function startOfDayInTimeZoneUtcIso(day: DateTime, timeZone: string): string {
   return Temporal.ZonedDateTime.from({
     timeZone,
@@ -15,10 +19,6 @@ function startOfDayInTimeZoneUtcIso(day: DateTime, timeZone: string): string {
     minute: 0,
     second: 0,
   }).toInstant().toString();
-}
-
-function startOfDayUtcIso(day: DateTime): string {
-  return new Date(Date.UTC(day.year, day.month - 1, day.day)).toISOString();
 }
 
 export function buildTimeEntriesDateRange(

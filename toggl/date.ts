@@ -5,9 +5,9 @@ export function formatTimeEntryDate(
   const startDate = new Date(start);
 
   if (!timeZone) {
-    const yStr = String(startDate.getFullYear());
-    const mStr = String(startDate.getMonth() + 1).padStart(2, "0");
-    const dStr = String(startDate.getDate()).padStart(2, "0");
+    const yStr = String(startDate.getUTCFullYear());
+    const mStr = String(startDate.getUTCMonth() + 1).padStart(2, "0");
+    const dStr = String(startDate.getUTCDate()).padStart(2, "0");
     return `${yStr}-${mStr}-${dStr}`;
   }
 

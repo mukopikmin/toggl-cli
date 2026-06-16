@@ -1,18 +1,13 @@
 import { parseArgs } from "node:util";
 import { datetime } from "ptera";
 import { runConfigCommand } from "./command/config.ts";
+import { runInitCommand } from "./command/init.ts";
+import {
+  runProjectsCommand,
+  runProjectsSyncCommand,
+} from "./command/projects.ts";
 import { runSummaryCommand } from "./command/summary.ts";
-import { loadConfig } from "./config.ts";
-import { TogglClient, togglClient } from "./toggl/api.ts";
-import type { Project } from "./toggl/types.ts";
-
-export function formatProjectList(projects: Project[]): string {
-  return projects.map((p) => p.name).join("\n");
-}
-
-export function formatProjectsJson(projects: Project[]): string {
-  return JSON.stringify(projects, null, 2);
-}
+import { togglClient } from "./toggl/api.ts";
 
 export type TargetMonth = {
   year: number;
@@ -33,16 +28,6 @@ export function resolveTargetMonth(
 
   return { year: now.year, month: now.month - 1 };
 }
-
-const listProjects = async (toggl: TogglClient, format: "csv" | "json") => {
-  const config = await loadConfig();
-  const projects = await toggl.getProjects(config);
-  console.log(
-    format === "json"
-      ? formatProjectsJson(projects)
-      : formatProjectList(projects),
-  );
-};
 
 if (import.meta.main) {
   const args = parseArgs({
@@ -67,13 +52,22 @@ if (import.meta.main) {
   });
   const { format, lastMonth, separator } = args.values;
 
+  if (args.positionals[0] === "init") {
+    await runInitCommand();
+    Deno.exit(0);
+  }
+
   if (format !== "csv" && format !== "json") {
     console.error("Error: format must be csv or json");
     Deno.exit(1);
   }
 
   if (args.positionals[0] === "projects") {
-    await listProjects(togglClient, format);
+    if (args.positionals[1] === "sync") {
+      await runProjectsSyncCommand(togglClient);
+    } else {
+      await runProjectsCommand({ format }, togglClient);
+    }
     Deno.exit(0);
   }
 
