@@ -8,6 +8,7 @@ import {
 } from "./command/projects.ts";
 import { runSummaryCommand } from "./command/summary.ts";
 import { togglClient } from "./toggl/api.ts";
+import { version } from "./version.ts";
 
 export type TargetMonth = {
   year: number;
@@ -47,10 +48,19 @@ if (import.meta.main) {
         short: "f",
         default: "csv",
       },
+      version: {
+        type: "boolean",
+        default: false,
+      },
     },
     allowPositionals: true,
   });
-  const { format, lastMonth, separator } = args.values;
+  const { format, lastMonth, separator, version: showVersion } = args.values;
+
+  if (showVersion) {
+    console.log(version);
+    Deno.exit(0);
+  }
 
   if (args.positionals[0] === "init") {
     await runInitCommand();
@@ -76,19 +86,33 @@ if (import.meta.main) {
     Deno.exit(0);
   }
 
+  const command = args.positionals[0];
+  const summaryPositionals = command === "summary"
+    ? args.positionals.slice(1)
+    : args.positionals;
+
+  if (command && command !== "summary" && isNaN(Number(command))) {
+    console.error(`Error: Unknown command: ${command}`);
+    Deno.exit(1);
+  }
+
   const { year: targetYear, month: targetMonth } = resolveTargetMonth(
     datetime(),
     lastMonth,
   );
 
-  const posLen = args.positionals.length;
-  if (posLen < 2) {
+  if (summaryPositionals.length < 2) {
     console.error("Error: Please specify start and end day");
     Deno.exit(1);
   }
 
-  const startDayNum = Number(args.positionals[posLen - 2]);
-  const endDayNum = Number(args.positionals[posLen - 1]);
+  if (summaryPositionals.length > 2) {
+    console.error("Error: Too many arguments for summary");
+    Deno.exit(1);
+  }
+
+  const startDayNum = Number(summaryPositionals[0]);
+  const endDayNum = Number(summaryPositionals[1]);
 
   if (isNaN(startDayNum) || isNaN(endDayNum)) {
     console.error("Error: Start and end day must be valid numbers");

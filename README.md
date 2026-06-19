@@ -67,6 +67,12 @@ Specify the start and end days as day numbers in the current month. The end day
 is included in the aggregation.
 
 ```sh
+deno task run -- summary 1 15
+```
+
+The legacy root form remains supported:
+
+```sh
 deno task run -- 1 15
 ```
 
@@ -76,19 +82,19 @@ in minutes for each project and date. Columns are separated by tabs.
 Use `--lastMonth` or `-l` to aggregate the previous month:
 
 ```sh
-deno task run -- --lastMonth 1 31
+deno task run -- --lastMonth summary 1 31
 ```
 
 Use `--separator` or `-s` to change the delimiter:
 
 ```sh
-deno task run -- --separator "," 1 15
+deno task run -- --separator "," summary 1 15
 ```
 
 Use `--format json` or `-f json` to output JSON:
 
 ```sh
-deno task run -- --format json 1 15
+deno task run -- --format json summary 1 15
 ```
 
 The JSON output maps each date to project IDs and their work time in minutes:
@@ -113,6 +119,12 @@ Project information can also be output as JSON:
 
 ```sh
 deno task run -- --format json projects
+```
+
+Print the CLI version:
+
+```sh
+deno task run -- --version
 ```
 
 To add all active Toggl projects that are not yet in the configuration file,
@@ -142,7 +154,14 @@ deno task run -- --format json config
 
 ## Build
 
-Build a standalone executable at `out/toggl`:
+Compile a standalone binary:
+
+```sh
+deno task compile
+./toggl --version
+```
+
+The `build` task is a convenience alias that writes the binary to `out/toggl`:
 
 ```sh
 deno task build
@@ -151,12 +170,52 @@ deno task build
 Run the compiled executable as follows:
 
 ```sh
-./out/toggl 1 15
-./out/toggl --lastMonth 1 31
+./out/toggl summary 1 15
+./out/toggl --lastMonth summary 1 31
 ./out/toggl projects
 ./out/toggl projects sync
 ./out/toggl config
 ```
+
+If `--version` is omitted, the compiled binary reports the development version
+`0.0.0-dev`. Pass the release version explicitly when building release binaries:
+
+```sh
+deno task compile --version 0.1.0
+```
+
+## Release Archives
+
+Build release archives under `dist/`:
+
+```sh
+deno task dist --version 0.1.0
+```
+
+The release build creates archives for:
+
+- `darwin-arm64`
+- `linux-x64`
+- `windows-x64`
+
+To build a single target:
+
+```sh
+deno task dist --version 0.1.0 --target linux-x64
+```
+
+Each archive includes the `toggl` binary and `README.md`. If a `LICENSE` file is
+present, it is included as well. macOS and Linux targets are packaged as
+`.tar.gz`; Windows is packaged as `.zip`. `dist/checksums.txt` and per-archive
+`.sha256` files are generated for the final archives.
+
+The release build uses the system `tar` command for `.tar.gz` archives and the
+system `zip` command for the Windows archive. A full release build requires both
+commands. A single-target build only requires the archive command for that
+target.
+
+For native targets, the release build runs the compiled binary with `--version`
+to verify that the requested release version was embedded.
 
 ## Install
 
@@ -180,6 +239,6 @@ toggl config
 
 ```sh
 deno fmt --check
-deno check --lock=deno.lock main.ts main_test.ts scripts/install_macos.ts toggl/date_range_test.ts
+deno check --lock=deno.lock main.ts main_test.ts scripts/compile.ts scripts/build_release.ts scripts/install_macos.ts toggl/date_range_test.ts
 deno test
 ```
