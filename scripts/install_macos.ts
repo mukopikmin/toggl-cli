@@ -10,7 +10,7 @@ if (!home) {
 }
 
 const run = async (args: string[]): Promise<void> => {
-  const result = await new Deno.Command(Deno.execPath(), {
+  const result = await new Deno.Command("deno", {
     args,
     stdout: "inherit",
     stderr: "inherit",
