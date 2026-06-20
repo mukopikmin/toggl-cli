@@ -61,6 +61,32 @@ chmod 600 ~/.config/toggl-cli/config.toml
 
 ## Usage
 
+Show command-line help:
+
+```sh
+deno task run -- --help
+```
+
+### Commands
+
+| Command                         | Description                                            |
+| ------------------------------- | ------------------------------------------------------ |
+| `summary <start-day> <end-day>` | Aggregate time entries for a range of days.            |
+| `<start-day> <end-day>`         | Legacy form of the `summary` command.                  |
+| `projects`                      | List active, visible projects.                         |
+| `projects sync`                 | Add missing active projects to the configuration file. |
+| `init`                          | Create the configuration file.                         |
+
+### Options
+
+| Option                     | Description                                                     |
+| -------------------------- | --------------------------------------------------------------- |
+| `-l`, `--lastMonth`        | Aggregate the previous month.                                   |
+| `-s`, `--separator <text>` | Set the output delimiter. The default is a tab.                 |
+| `-f`, `--format <format>`  | Set the output format to `csv` or `json`. The default is `csv`. |
+| `-h`, `--help`             | Show command-line help.                                         |
+| `--version`                | Show the CLI version.                                           |
+
 ### Aggregate time entries
 
 Specify the start and end days as day numbers in the current month. The end day

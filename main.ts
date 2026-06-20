@@ -14,6 +14,22 @@ export type TargetMonth = {
   month: number;
 };
 
+export function createHelpText(): string {
+  return `Usage:
+  toggl summary <start-day> <end-day> [options]
+  toggl <start-day> <end-day> [options]
+  toggl projects [options]
+  toggl projects sync
+  toggl init
+
+Options:
+  -l, --lastMonth        Aggregate the previous month
+  -s, --separator <text> Set the output delimiter (default: tab)
+  -f, --format <format>  Set the output format: csv or json (default: csv)
+  -h, --help             Show this help
+      --version          Show the version`;
+}
+
 export function resolveTargetMonth(
   now: TargetMonth,
   lastMonth: boolean,
@@ -51,10 +67,21 @@ if (import.meta.main) {
         type: "boolean",
         default: false,
       },
+      help: {
+        type: "boolean",
+        short: "h",
+        default: false,
+      },
     },
     allowPositionals: true,
   });
-  const { format, lastMonth, separator, version: showVersion } = args.values;
+  const { format, help, lastMonth, separator, version: showVersion } =
+    args.values;
+
+  if (help) {
+    console.log(createHelpText());
+    Deno.exit(0);
+  }
 
   if (showVersion) {
     console.log(version);

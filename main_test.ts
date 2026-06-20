@@ -11,7 +11,7 @@ import {
   formatTimeEntriesJson,
 } from "./command/summary.ts";
 import { parseConfigToml, parseProjectsConfig } from "./config.ts";
-import { resolveTargetMonth } from "./main.ts";
+import { createHelpText, resolveTargetMonth } from "./main.ts";
 import { createProject, visibleProjects } from "./model/project.ts";
 import { getProjects } from "./toggl/projects.ts";
 import { getSummaryTimeEntries } from "./toggl/summary.ts";
@@ -23,6 +23,25 @@ const config = {
   WORKSPACE: "workspace-id",
   TOKEN: "test-token",
 };
+
+Deno.test("createHelpText describes commands and options", () => {
+  assertEquals(
+    createHelpText(),
+    `Usage:
+  toggl summary <start-day> <end-day> [options]
+  toggl <start-day> <end-day> [options]
+  toggl projects [options]
+  toggl projects sync
+  toggl init
+
+Options:
+  -l, --lastMonth        Aggregate the previous month
+  -s, --separator <text> Set the output delimiter (default: tab)
+  -f, --format <format>  Set the output format: csv or json (default: csv)
+  -h, --help             Show this help
+      --version          Show the version`,
+  );
+});
 
 function jsonResponse(body: unknown): Response {
   return new Response(JSON.stringify(body), {
