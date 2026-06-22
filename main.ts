@@ -1,97 +1,35 @@
-import { parseArgs } from "node:util";
-import { datetime } from "ptera";
+import { CliUsageError, HELP_TEXT, parseCliArgs } from "./cli.ts";
 import { runInitCommand } from "./command/init.ts";
 import { runProjectsCommand } from "./command/projects.ts";
 import { runSummaryCommand } from "./command/summary.ts";
 import { togglClient } from "./toggl/api.ts";
 
+export async function main(args: string[]): Promise<number> {
+  let command;
+  try {
+    command = parseCliArgs(args);
+  } catch (error) {
+    if (!(error instanceof CliUsageError)) throw error;
+    console.error(`Error: ${error.message}\n\n${HELP_TEXT}`);
+    return 1;
+  }
+
+  switch (command.name) {
+    case "help":
+      console.log(HELP_TEXT);
+      return 0;
+    case "init":
+      await runInitCommand();
+      return 0;
+    case "projects":
+      await runProjectsCommand({ format: command.format }, togglClient);
+      return 0;
+    case "summary":
+      await runSummaryCommand(command, togglClient);
+      return 0;
+  }
+}
+
 if (import.meta.main) {
-  const args = parseArgs({
-    options: {
-      lastMonth: {
-        type: "boolean",
-        short: "l",
-        default: false,
-      },
-      separator: {
-        type: "string",
-        short: "s",
-        default: "\t",
-      },
-      format: {
-        type: "string",
-        short: "f",
-        default: "csv",
-      },
-    },
-    allowPositionals: true,
-  });
-  const { format, lastMonth, separator } = args.values;
-
-  if (args.positionals[0] === "init") {
-    await runInitCommand();
-    Deno.exit(0);
-  }
-
-  if (format !== "csv" && format !== "json") {
-    console.error("Error: format must be csv or json");
-    Deno.exit(1);
-  }
-
-  if (args.positionals[0] === "projects") {
-    await runProjectsCommand({ format }, togglClient);
-    Deno.exit(0);
-  }
-
-  const now = datetime();
-  let targetYear = now.year;
-  let targetMonth = now.month;
-
-  if (lastMonth) {
-    targetMonth -= 1;
-    if (targetMonth === 0) {
-      targetMonth = 12;
-      targetYear -= 1;
-    }
-  }
-
-  const posLen = args.positionals.length;
-  if (posLen < 2) {
-    console.error("Error: Please specify start and end day");
-    Deno.exit(1);
-  }
-
-  const startDayNum = Number(args.positionals[posLen - 2]);
-  const endDayNum = Number(args.positionals[posLen - 1]);
-
-  if (isNaN(startDayNum) || isNaN(endDayNum)) {
-    console.error("Error: Start and end day must be valid numbers");
-    Deno.exit(1);
-  }
-
-  const startDay = datetime({
-    year: targetYear,
-    month: targetMonth,
-    day: startDayNum,
-    hour: 0,
-    minute: 0,
-    second: 0,
-    millisecond: 0,
-  });
-  const endDay = datetime({
-    year: targetYear,
-    month: targetMonth,
-    day: endDayNum,
-    hour: 0,
-    minute: 0,
-    second: 0,
-    millisecond: 0,
-  });
-
-  if (!startDay.isValid() || !endDay.isValid() || startDay.isAfter(endDay)) {
-    console.error("Error: startDay and endDay must be valid dates");
-    Deno.exit(1);
-  }
-
-  runSummaryCommand({ startDay, endDay, separator, format }, togglClient);
+  Deno.exit(await main(Deno.args));
 }

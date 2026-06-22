@@ -56,19 +56,19 @@ deno task dev projects --format json
 Summarize time entries for the current month:
 
 ```sh
-deno task dev 1 31
-deno task dev --format json 1 31
+deno task dev summary 1 31
+deno task dev summary --format json 1 31
 ```
 
 Use `--lastMonth` to target the previous month:
 
 ```sh
-deno task dev --lastMonth 1 31
+deno task dev summary --lastMonth 1 31
 ```
 
 Summary CSV output uses tabs by default. Use `--separator` to change the
 separator:
 
 ```sh
-deno task dev --separator "," 1 31
+deno task dev summary --separator "," 1 31
 ```
