@@ -1,5 +1,4 @@
 import { assertEquals } from "@std/assert";
-import { datetime } from "ptera";
 import { createConfigTemplate } from "./command/init.ts";
 import {
   appendMissingProjects,
@@ -298,21 +297,21 @@ hidden = false`;
 
 Deno.test("resolveTargetMonth returns December in previous year for January last month", () => {
   assertEquals(
-    resolveTargetMonth(datetime({ year: 2026, month: 1, day: 15 }), true),
+    resolveTargetMonth({ year: 2026, month: 1 }, true),
     { year: 2025, month: 12 },
   );
 });
 
 Deno.test("resolveTargetMonth returns previous month in the same year", () => {
   assertEquals(
-    resolveTargetMonth(datetime({ year: 2026, month: 5, day: 15 }), true),
+    resolveTargetMonth({ year: 2026, month: 5 }, true),
     { year: 2026, month: 4 },
   );
 });
 
 Deno.test("resolveTargetMonth returns current month when lastMonth is false", () => {
   assertEquals(
-    resolveTargetMonth(datetime({ year: 2026, month: 5, day: 15 }), false),
+    resolveTargetMonth({ year: 2026, month: 5 }, false),
     { year: 2026, month: 5 },
   );
 });
@@ -340,8 +339,8 @@ Deno.test("buildWorkTimeTable structures project rows across the requested date 
       "2026-05-02": { 200: 60 },
       "2026-05-03": { 100: 12 },
     },
-    datetime({ year: 2026, month: 5, day: 1 }),
-    datetime({ year: 2026, month: 5, day: 3 }),
+    Temporal.PlainDate.from({ year: 2026, month: 5, day: 1 }),
+    Temporal.PlainDate.from({ year: 2026, month: 5, day: 3 }),
   );
 
   assertEquals(table, {
@@ -352,6 +351,29 @@ Deno.test("buildWorkTimeTable structures project rows across the requested date 
       [" ", "60", " "],
     ],
   });
+});
+
+Deno.test("buildWorkTimeTable enumerates dates across a year boundary", () => {
+  const table = buildWorkTimeTable(
+    [
+      {
+        id: 100,
+        name: "Client work",
+        displayName: "Client work",
+        active: true,
+        hidden: false,
+      },
+    ],
+    {},
+    Temporal.PlainDate.from("2025-12-31"),
+    Temporal.PlainDate.from("2026-01-02"),
+  );
+
+  assertEquals(table.headers, [
+    "2025-12-31",
+    "2026-01-01",
+    "2026-01-02",
+  ]);
 });
 
 Deno.test("formatTimeEntriesJson returns explicit JSON output for time entry data", () => {
@@ -444,8 +466,8 @@ Deno.test("getSummaryTimeEntries posts summary request with Toggl auth", async (
     return Promise.resolve(jsonResponse(summary));
   }) as typeof fetch;
 
-  const fromDay = datetime({ year: 2026, month: 5, day: 1 });
-  const toDay = datetime({ year: 2026, month: 5, day: 31 });
+  const fromDay = Temporal.PlainDate.from("2026-05-01");
+  const toDay = Temporal.PlainDate.from("2026-05-31");
 
   try {
     const response = await getSummaryTimeEntries(config, fromDay, toDay);
@@ -488,8 +510,8 @@ Deno.test("getTimeEntriesForDays fetches range without configured timezone", asy
     return Promise.resolve(jsonResponse([]));
   }) as typeof fetch;
 
-  const fromDay = datetime({ year: 2026, month: 5, day: 1 });
-  const toDay = datetime({ year: 2026, month: 5, day: 2 });
+  const fromDay = Temporal.PlainDate.from("2026-05-01");
+  const toDay = Temporal.PlainDate.from("2026-05-02");
 
   try {
     const entries = await getTimeEntriesForDays(config, fromDay, toDay);
@@ -554,8 +576,8 @@ Deno.test("getTimeEntriesForDays fetches range and aggregates minutes by date an
     ]));
   }) as typeof fetch;
 
-  const fromDay = datetime({ year: 2026, month: 5, day: 1 });
-  const toDay = datetime({ year: 2026, month: 5, day: 2 });
+  const fromDay = Temporal.PlainDate.from("2026-05-01");
+  const toDay = Temporal.PlainDate.from("2026-05-02");
 
   try {
     const entries = await getTimeEntriesForDays(
@@ -603,8 +625,8 @@ Deno.test("getTimeEntriesForDays aggregates entries by date in configured timezo
     ]));
   }) as typeof fetch;
 
-  const fromDay = datetime({ year: 2026, month: 5, day: 1 });
-  const toDay = datetime({ year: 2026, month: 5, day: 2 });
+  const fromDay = Temporal.PlainDate.from("2026-05-01");
+  const toDay = Temporal.PlainDate.from("2026-05-02");
 
   try {
     const entries = await getTimeEntriesForDays(

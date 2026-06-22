@@ -1,19 +1,14 @@
-import { DateTime } from "ptera";
 import { reportsApiEndpoint } from "./api.ts";
 import type { SummaryTimeEntriesResponse, TogglConfig } from "./types.ts";
 
-function formatDate(day: DateTime): string {
-  const year = day.year;
-  const month = String(day.month).padStart(2, "0");
-  const date = String(day.day).padStart(2, "0");
-
-  return `${year}-${month}-${date}`;
+function formatDate(day: Temporal.PlainDate): string {
+  return day.toString();
 }
 
 export async function getSummaryTimeEntries(
   config: TogglConfig,
-  fromDay: DateTime,
-  toDay: DateTime,
+  fromDay: Temporal.PlainDate,
+  toDay: Temporal.PlainDate,
 ): Promise<SummaryTimeEntriesResponse> {
   const url =
     `${reportsApiEndpoint}/workspace/${config.WORKSPACE}/summary/time_entries`;
