@@ -204,11 +204,11 @@ to verify that the requested release version was embedded.
 
 ## Install
 
-On macOS, build in a temporary directory and install the executable to
+On Linux and macOS, build in a temporary directory and install the executable to
 `$HOME/.local/bin/toggl`:
 
 ```sh
-deno task install:mac
+deno task install --version 0.1.0
 ```
 
 Make sure `$HOME/.local/bin` is included in your `PATH`, then run the installed
@@ -219,10 +219,13 @@ toggl 1 15
 toggl projects
 ```
 
+On Windows, download the `windows-x64` release archive, extract `toggl.exe`, and
+place it in a directory included in your `PATH`.
+
 ## Development
 
 ```sh
 deno fmt --check
-deno check --lock=deno.lock main.ts main_test.ts scripts/compile.ts scripts/build_release.ts scripts/install_macos.ts toggl/date_range_test.ts
+deno check --lock=deno.lock main.ts main_test.ts scripts/compile.ts scripts/build_release.ts scripts/install.ts toggl/date_range_test.ts
 deno test
 ```
