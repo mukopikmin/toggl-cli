@@ -228,4 +228,5 @@ place it in a directory included in your `PATH`.
 deno fmt --check
 deno check --lock=deno.lock main.ts main_test.ts scripts/compile.ts scripts/build_release.ts scripts/install.ts toggl/date_range_test.ts
 deno test
+>>>>>>> refs/remotes/origin/main
 ```
