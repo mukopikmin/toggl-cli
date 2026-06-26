@@ -1,5 +1,4 @@
 import { parseArgs } from "node:util";
-import { datetime } from "ptera";
 import { runInitCommand } from "./command/init.ts";
 import {
   runProjectsCommand,
@@ -118,7 +117,7 @@ if (import.meta.main) {
   }
 
   const { year: targetYear, month: targetMonth } = resolveTargetMonth(
-    datetime(),
+    Temporal.Now.plainDateISO(),
     lastMonth,
   );
 
@@ -140,26 +139,24 @@ if (import.meta.main) {
     Deno.exit(1);
   }
 
-  const startDay = datetime({
-    year: targetYear,
-    month: targetMonth,
-    day: startDayNum,
-    hour: 0,
-    minute: 0,
-    second: 0,
-    millisecond: 0,
-  });
-  const endDay = datetime({
-    year: targetYear,
-    month: targetMonth,
-    day: endDayNum,
-    hour: 0,
-    minute: 0,
-    second: 0,
-    millisecond: 0,
-  });
+  let startDay: Temporal.PlainDate;
+  let endDay: Temporal.PlainDate;
+  try {
+    startDay = Temporal.PlainDate.from(
+      { year: targetYear, month: targetMonth, day: startDayNum },
+      { overflow: "reject" },
+    );
+    endDay = Temporal.PlainDate.from(
+      { year: targetYear, month: targetMonth, day: endDayNum },
+      { overflow: "reject" },
+    );
+  } catch (error) {
+    if (!(error instanceof RangeError)) throw error;
+    console.error("Error: startDay and endDay must be valid dates");
+    Deno.exit(1);
+  }
 
-  if (!startDay.isValid() || !endDay.isValid() || startDay.isAfter(endDay)) {
+  if (Temporal.PlainDate.compare(startDay, endDay) > 0) {
     console.error("Error: startDay and endDay must be valid dates");
     Deno.exit(1);
   }

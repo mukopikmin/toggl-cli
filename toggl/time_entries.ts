@@ -1,6 +1,5 @@
 import { apiEndpoint } from "./api.ts";
 import type { TimeEntry, TogglConfig } from "./types.ts";
-import { DateTime } from "ptera";
 import { buildTimeEntriesDateRange } from "./date_range.ts";
 import { formatTimeEntryDate } from "./date.ts";
 
@@ -33,8 +32,8 @@ interface TimeEntryResponse {
 // TODO: Fix for all locales
 export async function getTimeEntriesForDays(
   config: TogglConfig,
-  fromDay: DateTime,
-  toDay: DateTime,
+  fromDay: Temporal.PlainDate,
+  toDay: Temporal.PlainDate,
 ): Promise<Record<string, Record<number, number>>> {
   const { startDate, endDate } = buildTimeEntriesDateRange(
     fromDay,

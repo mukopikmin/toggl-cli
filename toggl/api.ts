@@ -1,4 +1,3 @@
-import { DateTime } from "ptera";
 import { getProjects } from "./projects.ts";
 import { getSummaryTimeEntries } from "./summary.ts";
 import { getTimeEntriesForDays } from "./time_entries.ts";
@@ -15,13 +14,13 @@ export interface TogglClient {
   getProjects: (config: TogglConfig) => Promise<TogglProject[]>;
   getSummaryTimeEntries: (
     config: TogglConfig,
-    fromDay: DateTime,
-    toDay: DateTime,
+    fromDay: Temporal.PlainDate,
+    toDay: Temporal.PlainDate,
   ) => Promise<SummaryTimeEntriesResponse>;
   getTimeEntriesForDays: (
     config: TogglConfig,
-    fromDay: DateTime,
-    toDay: DateTime,
+    fromDay: Temporal.PlainDate,
+    toDay: Temporal.PlainDate,
   ) => Promise<Record<string, Record<number, number>>>;
 }
 
