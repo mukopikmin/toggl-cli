@@ -1,4 +1,3 @@
-import { DateTime } from "ptera";
 import { loadConfig } from "../config.ts";
 import { createProjects, visibleProjects } from "../model/project.ts";
 import type { Project } from "../model/project.ts";
@@ -7,8 +6,8 @@ import type { TogglClient } from "../toggl/api.ts";
 export type SummaryFormat = "csv" | "json";
 
 export interface SummaryCommand {
-  startDay: DateTime;
-  endDay: DateTime;
+  startDay: Temporal.PlainDate;
+  endDay: Temporal.PlainDate;
   separator: string;
   format: SummaryFormat;
 }
@@ -19,21 +18,20 @@ export interface WorkTimeTable {
   rows: string[][];
 }
 
-function formatDay(day: DateTime): string {
-  const y = day.year;
-  const m = String(day.month).padStart(2, "0");
-  const d = String(day.day).padStart(2, "0");
-
-  return `${y}-${m}-${d}`;
+function formatDay(day: Temporal.PlainDate): string {
+  return day.toString();
 }
 
-function daysBetween(startDay: DateTime, endDay: DateTime): DateTime[] {
-  const days: DateTime[] = [];
+function daysBetween(
+  startDay: Temporal.PlainDate,
+  endDay: Temporal.PlainDate,
+): Temporal.PlainDate[] {
+  const days: Temporal.PlainDate[] = [];
 
   for (
     let d = startDay;
-    !d.isAfter(endDay);
-    d = d.add({ day: 1 })
+    Temporal.PlainDate.compare(d, endDay) <= 0;
+    d = d.add({ days: 1 })
   ) {
     days.push(d);
   }
@@ -44,8 +42,8 @@ function daysBetween(startDay: DateTime, endDay: DateTime): DateTime[] {
 export function buildWorkTimeTable(
   projects: Project[],
   dateEntries: Record<string, Record<number, number>>,
-  startDay: DateTime,
-  endDay: DateTime,
+  startDay: Temporal.PlainDate,
+  endDay: Temporal.PlainDate,
 ): WorkTimeTable {
   const days = daysBetween(startDay, endDay);
   const headers = days.map(formatDay);

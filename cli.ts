@@ -5,7 +5,7 @@ import type { SummaryFormat } from "./command/summary.ts";
 
 export const HELP_TEXT = `Usage:
   toggl init
-  toggl projects [--format csv|json]
+  toggl projects [sync] [--format csv|json]
   toggl summary [--lastMonth] [--separator VALUE] [--format csv|json] START_DAY END_DAY
 
 Commands:
@@ -22,6 +22,7 @@ export type CliCommand =
   | { name: "help" }
   | { name: "init" }
   | { name: "projects"; format: ProjectsFormat }
+  | { name: "projects-sync" }
   | {
     name: "summary";
     startDay: DateTime;
@@ -136,6 +137,12 @@ export function parseCliArgs(
         }
         return { name: "init" };
       case "projects":
+        if (commandArgs[0] === "sync") {
+          if (commandArgs.length > 1) {
+            throw new CliUsageError("projects sync does not accept arguments");
+          }
+          return { name: "projects-sync" };
+        }
         return parseProjectsArgs(commandArgs);
       case "summary":
         return parseSummaryArgs(commandArgs, now);

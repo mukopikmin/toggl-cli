@@ -1,8 +1,31 @@
 import { CliUsageError, HELP_TEXT, parseCliArgs } from "./cli.ts";
 import { runInitCommand } from "./command/init.ts";
-import { runProjectsCommand } from "./command/projects.ts";
+import {
+  runProjectsCommand,
+  runProjectsSyncCommand,
+} from "./command/projects.ts";
 import { runSummaryCommand } from "./command/summary.ts";
 import { togglClient } from "./toggl/api.ts";
+
+export type TargetMonth = {
+  year: number;
+  month: number;
+};
+
+export function resolveTargetMonth(
+  now: TargetMonth,
+  lastMonth: boolean,
+): TargetMonth {
+  if (!lastMonth) {
+    return { year: now.year, month: now.month };
+  }
+
+  if (now.month === 1) {
+    return { year: now.year - 1, month: 12 };
+  }
+
+  return { year: now.year, month: now.month - 1 };
+}
 
 export async function main(args: string[]): Promise<number> {
   let command;
@@ -23,6 +46,9 @@ export async function main(args: string[]): Promise<number> {
       return 0;
     case "projects":
       await runProjectsCommand({ format: command.format }, togglClient);
+      return 0;
+    case "projects-sync":
+      await runProjectsSyncCommand(togglClient);
       return 0;
     case "summary":
       await runSummaryCommand(command, togglClient);

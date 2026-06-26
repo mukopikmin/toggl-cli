@@ -13,6 +13,12 @@ export interface Config extends TogglConfig {
   PROJECTS: Record<number, ProjectConfig>;
 }
 
+export interface ConfigDocument {
+  configFile: string;
+  text: string;
+  config: Config;
+}
+
 export function getConfigFile(home: string): string {
   return join(home, ".config", "toggl-cli", "config.toml");
 }
@@ -83,7 +89,7 @@ export function parseConfigToml(text: string): Config {
   } as Config;
 }
 
-export async function loadConfig(): Promise<Config> {
+export async function loadConfigDocument(): Promise<ConfigDocument> {
   const home = Deno.env.get("HOME");
   if (!home) {
     console.error("Error: HOME environment variable not set");
@@ -93,7 +99,11 @@ export async function loadConfig(): Promise<Config> {
 
   try {
     const text = await Deno.readTextFile(configFile);
-    return parseConfigToml(text);
+    return {
+      configFile,
+      text,
+      config: parseConfigToml(text),
+    };
   } catch (error) {
     if (error instanceof Deno.errors.NotFound) {
       console.error(`Error: ${CONFIG_FILE_DISPLAY} file not found`);
@@ -106,4 +116,8 @@ export async function loadConfig(): Promise<Config> {
     }
     throw error;
   }
+}
+
+export async function loadConfig(): Promise<Config> {
+  return (await loadConfigDocument()).config;
 }
