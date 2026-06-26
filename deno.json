@@ -12,7 +12,6 @@
     "@std/assert": "jsr:@std/assert@1",
     "@std/cli": "jsr:@std/cli@1",
     "@std/path": "jsr:@std/path@1",
-    "@std/toml": "jsr:@std/toml@1",
-    "ptera": "https://deno.land/x/ptera/mod.ts"
+    "@std/toml": "jsr:@std/toml@1"
   }
 }
