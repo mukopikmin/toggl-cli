@@ -70,31 +70,25 @@ is included in the aggregation.
 toggl summary 1 15
 ```
 
-The legacy root form remains supported:
-
-```sh
-toggl 1 15
-```
-
 By default, the command outputs a list of visible projects followed by work time
 in minutes for each project and date. Columns are separated by tabs.
 
 Use `--lastMonth` or `-l` to aggregate the previous month:
 
 ```sh
-toggl --lastMonth summary 1 31
+toggl summary --lastMonth 1 31
 ```
 
 Use `--separator` or `-s` to change the delimiter:
 
 ```sh
-toggl --separator "," summary 1 15
+toggl summary --separator "," 1 15
 ```
 
 Use `--format json` or `-f json` to output JSON:
 
 ```sh
-toggl --format json summary 1 15
+toggl summary --format json 1 15
 ```
 
 The JSON output maps each date to project IDs and their work time in minutes:
@@ -118,7 +112,7 @@ toggl projects
 Project information can also be output as JSON:
 
 ```sh
-toggl --format json projects
+toggl projects --format json
 ```
 
 Print the CLI version:
@@ -157,7 +151,7 @@ Run the compiled executable as follows:
 
 ```sh
 ./out/toggl summary 1 15
-./out/toggl --lastMonth summary 1 31
+./out/toggl summary --lastMonth 1 31
 ./out/toggl projects
 ./out/toggl projects sync
 ```
@@ -215,7 +209,7 @@ Make sure `$HOME/.local/bin` is included in your `PATH`, then run the installed
 command as follows:
 
 ```sh
-toggl 1 15
+toggl summary 1 15
 toggl projects
 ```
 
@@ -226,7 +220,7 @@ place it in a directory included in your `PATH`.
 
 ```sh
 deno fmt --check
-deno check --lock=deno.lock main.ts main_test.ts scripts/compile.ts scripts/build_release.ts scripts/install.ts toggl/date_range_test.ts
+deno check --lock=deno.lock main.ts main_test.ts scripts/install.ts toggl/date_range_test.ts
 deno test
->>>>>>> refs/remotes/origin/main
+deno compile --allow-net --allow-read --allow-env --output /tmp/toggl-cli main.ts
 ```

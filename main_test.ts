@@ -28,6 +28,11 @@ const config = {
 Deno.test("parseCliArgs returns help for the root command", () => {
   assertEquals(parseCliArgs([]), { name: "help" });
   assertEquals(HELP_TEXT.includes("toggl summary"), true);
+  assertEquals(HELP_TEXT.includes("toggl --version"), true);
+});
+
+Deno.test("parseCliArgs parses the version option", () => {
+  assertEquals(parseCliArgs(["--version"]), { name: "version" });
 });
 
 Deno.test("parseCliArgs parses the explicit summary command", () => {
