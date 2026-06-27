@@ -1,7 +1,7 @@
 import { assertEquals, assertThrows } from "@std/assert";
 import { datetime } from "ptera";
 import { CliUsageError, HELP_TEXT, parseCliArgs } from "./cli.ts";
-import { createConfigTemplate } from "./command/init.ts";
+import { createConfigTemplate, createConfigToml } from "./command/init.ts";
 import {
   appendMissingProjects,
   formatProjectList,
@@ -120,13 +120,30 @@ Deno.test("createConfigTemplate returns TOML config template", () => {
     `workspace = "your_workspace_id"
 token = "your_api_token"
 timezone = "Asia/Tokyo"
+`,
+  );
+});
 
-[projects.123456]
-display_name = "Client A"
-hidden = false
+Deno.test("createConfigToml returns TOML from entered values", () => {
+  assertEquals(
+    createConfigToml({
+      workspace: "workspace-id",
+      token: "test-token",
+      timezone: "America/New_York",
+    }),
+    `workspace = "workspace-id"
+token = "test-token"
+timezone = "America/New_York"
+`,
+  );
+});
 
-[projects.234567]
-hidden = true
+Deno.test("createConfigToml uses the default timezone when omitted", () => {
+  assertEquals(
+    createConfigToml({ workspace: "workspace-id", token: "test-token" }),
+    `workspace = "workspace-id"
+token = "test-token"
+timezone = "Asia/Tokyo"
 `,
   );
 });
