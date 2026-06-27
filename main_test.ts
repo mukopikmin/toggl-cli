@@ -13,7 +13,11 @@ import {
 } from "./command/summary.ts";
 import { parseConfigToml, parseProjectsConfig } from "./config.ts";
 import { resolveTargetMonth } from "./main.ts";
-import { createProject, visibleProjects } from "./model/project.ts";
+import {
+  createProject,
+  sortProjectsByDisplayOrder,
+  visibleProjects,
+} from "./model/project.ts";
 import { getProjects } from "./toggl/projects.ts";
 import { getSummaryTimeEntries } from "./toggl/summary.ts";
 import { getTimeEntriesForDays } from "./toggl/time_entries.ts";
@@ -124,9 +128,11 @@ timezone = "Asia/Tokyo"
 [projects.123456]
 display_name = "Client A"
 hidden = false
+display_order = 10
 
 [projects.234567]
 hidden = true
+display_order = 20
 `,
   );
 });
@@ -134,13 +140,13 @@ hidden = true
 Deno.test("parseProjectsConfig returns per-project settings", () => {
   assertEquals(
     parseProjectsConfig({
-      "123456": { display_name: "Client A" },
+      "123456": { display_name: "Client A", display_order: 10 },
       "789012": { hidden: true },
       invalid: { display_name: "Ignored" },
       345678: "ignored",
     }),
     {
-      123456: { displayName: "Client A", hidden: false },
+      123456: { displayName: "Client A", hidden: false, displayOrder: 10 },
       789012: { displayName: undefined, hidden: true },
     },
   );
@@ -156,6 +162,7 @@ timezone = "Asia/Tokyo"
 [projects."123456"]
 display_name = "Client A"
 hidden = true
+display_order = 20
 
 [projects."789012"]
 display_name = "Internal"
@@ -165,7 +172,7 @@ display_name = "Internal"
       TOKEN: "test-token",
       TIMEZONE: "Asia/Tokyo",
       PROJECTS: {
-        123456: { displayName: "Client A", hidden: true },
+        123456: { displayName: "Client A", hidden: true, displayOrder: 20 },
         789012: { displayName: "Internal", hidden: false },
       },
     },
@@ -202,7 +209,7 @@ Deno.test("createProject stores original and display project names", () => {
   assertEquals(
     createProject(
       { id: 2, name: "Project Beta", active: true },
-      { 2: { displayName: "Custom Beta", hidden: true } },
+      { 2: { displayName: "Custom Beta", hidden: true, displayOrder: 5 } },
     ),
     {
       id: 2,
@@ -210,7 +217,63 @@ Deno.test("createProject stores original and display project names", () => {
       displayName: "Custom Beta",
       active: true,
       hidden: true,
+      displayOrder: 5,
     },
+  );
+});
+
+Deno.test("sortProjectsByDisplayOrder puts configured projects first", () => {
+  assertEquals(
+    sortProjectsByDisplayOrder([
+      {
+        id: 1,
+        name: "Project Alpha",
+        displayName: "Project Alpha",
+        active: true,
+        hidden: false,
+      },
+      {
+        id: 2,
+        name: "Project Beta",
+        displayName: "Project Beta",
+        active: true,
+        hidden: false,
+        displayOrder: 20,
+      },
+      {
+        id: 3,
+        name: "Project Gamma",
+        displayName: "Project Gamma",
+        active: true,
+        hidden: false,
+        displayOrder: 10,
+      },
+    ]),
+    [
+      {
+        id: 3,
+        name: "Project Gamma",
+        displayName: "Project Gamma",
+        active: true,
+        hidden: false,
+        displayOrder: 10,
+      },
+      {
+        id: 2,
+        name: "Project Beta",
+        displayName: "Project Beta",
+        active: true,
+        hidden: false,
+        displayOrder: 20,
+      },
+      {
+        id: 1,
+        name: "Project Alpha",
+        displayName: "Project Alpha",
+        active: true,
+        hidden: false,
+      },
+    ],
   );
 });
 

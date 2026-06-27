@@ -11,9 +11,11 @@ export function createConfigTemplate(): string {
       "123456": {
         display_name: "Client A",
         hidden: false,
+        display_order: 10,
       },
       "234567": {
         hidden: true,
+        display_order: 20,
       },
     },
   });

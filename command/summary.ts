@@ -1,5 +1,9 @@
 import { loadConfig } from "../config.ts";
-import { createProjects, visibleProjects } from "../model/project.ts";
+import {
+  createProjects,
+  sortProjectsByDisplayOrder,
+  visibleProjects,
+} from "../model/project.ts";
 import type { Project } from "../model/project.ts";
 import type { TogglClient } from "../toggl/api.ts";
 
@@ -118,7 +122,7 @@ export async function runSummaryCommand(
     config.PROJECTS,
   );
   const table = buildWorkTimeTable(
-    visibleProjects(projects),
+    sortProjectsByDisplayOrder(visibleProjects(projects)),
     dateEntries,
     startDay,
     endDay,

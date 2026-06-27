@@ -1,6 +1,10 @@
 import { stringify } from "@std/toml";
 import { loadConfig, loadConfigDocument } from "../config.ts";
-import { createProjects, visibleProjects } from "../model/project.ts";
+import {
+  createProjects,
+  sortProjectsByDisplayOrder,
+  visibleProjects,
+} from "../model/project.ts";
 import type { Project } from "../model/project.ts";
 import type { TogglClient } from "../toggl/api.ts";
 import type { TogglProject } from "../toggl/types.ts";
@@ -40,7 +44,10 @@ export async function runProjectsCommand(
     config.PROJECTS,
   );
 
-  outputProjects(visibleProjects(projects), cmd.format);
+  outputProjects(
+    sortProjectsByDisplayOrder(visibleProjects(projects)),
+    cmd.format,
+  );
 }
 
 export function appendMissingProjects(

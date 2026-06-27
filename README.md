@@ -32,15 +32,20 @@ Optional per-project settings can be configured with the `projects` table:
 [projects."123456"]
 display_name = "Client A"
 hidden = false
+display_order = 10
 
 [projects."789012"]
 hidden = true
+display_order = 20
 ```
 
 Display names are used when rendering project lists and summary CSV output. When
 `display_name` is omitted, the Toggl project name is used. When `hidden` is
 omitted, it defaults to `false`. Hidden projects are excluded from `projects`
-output and summary CSV output.
+output and summary CSV output. The optional `display_order` setting controls the
+order of visible projects in `projects` output and summary CSV rows. Projects
+with `display_order` are shown first in ascending numeric order, and projects
+without `display_order` keep their Toggl API order after the ordered projects.
 
 The optional `timezone` setting is used to calculate the Toggl time entry query
 range. When it is omitted, the CLI preserves the existing UTC-based behavior.
@@ -226,7 +231,6 @@ place it in a directory included in your `PATH`.
 
 ```sh
 deno fmt --check
-deno check --lock=deno.lock main.ts main_test.ts scripts/compile.ts scripts/build_release.ts scripts/install.ts toggl/date_range_test.ts
+deno check --lock=deno.lock main.ts main_test.ts scripts/install.ts toggl/date_range_test.ts
 deno test
->>>>>>> refs/remotes/origin/main
 ```
