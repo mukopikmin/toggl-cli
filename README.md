@@ -17,8 +17,10 @@ Create a config file:
 deno task run -- init
 ```
 
-This creates `~/.config/toggl-cli/config.toml` if it does not already exist. You
-can also create it manually:
+This asks for your workspace ID, API token, and timezone, then creates
+`~/.config/toggl-cli/config.toml` if it does not already exist. The API token is
+not printed back to the terminal after entry. You can also create the file
+manually:
 
 ```toml
 workspace = "your_workspace_id"
@@ -32,15 +34,20 @@ Optional per-project settings can be configured with the `projects` table:
 [projects."123456"]
 display_name = "Client A"
 hidden = false
+display_order = 10
 
 [projects."789012"]
 hidden = true
+display_order = 20
 ```
 
 Display names are used when rendering project lists and summary CSV output. When
 `display_name` is omitted, the Toggl project name is used. When `hidden` is
 omitted, it defaults to `false`. Hidden projects are excluded from `projects`
-output and summary CSV output.
+output and summary CSV output. The optional `display_order` setting controls the
+order of visible projects in `projects` output and summary CSV rows. Projects
+with `display_order` are shown first in ascending numeric order, and projects
+without `display_order` keep their Toggl API order after the ordered projects.
 
 The optional `timezone` setting is used to calculate the Toggl time entry query
 range. When it is omitted, the CLI preserves the existing UTC-based behavior.
@@ -102,8 +109,10 @@ The legacy root form remains supported:
 deno task run -- 1 15
 ```
 
-By default, the command outputs a list of visible projects followed by work time
-in minutes for each project and date. Columns are separated by tabs.
+By default, the command outputs a single tab-separated table with projects in
+the first column and work time in minutes for each project and date in the
+remaining columns. You can paste this output directly into spreadsheet
+applications such as Excel.
 
 Use `--lastMonth` or `-l` to aggregate the previous month:
 
