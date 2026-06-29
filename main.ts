@@ -6,6 +6,7 @@ import {
 } from "./command/projects.ts";
 import { runSummaryCommand } from "./command/summary.ts";
 import { togglClient } from "./toggl/api.ts";
+import { version } from "./version.ts";
 
 export type TargetMonth = {
   year: number;
@@ -40,6 +41,9 @@ export async function main(args: string[]): Promise<number> {
   switch (command.name) {
     case "help":
       console.log(HELP_TEXT);
+      return 0;
+    case "version":
+      console.log(version);
       return 0;
     case "init":
       await runInitCommand();
