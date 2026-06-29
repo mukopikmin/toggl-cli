@@ -1,4 +1,5 @@
 import { CliUsageError, HELP_TEXT, parseCliArgs } from "./cli.ts";
+import { runConfigCommand } from "./command/config.ts";
 import { runInitCommand } from "./command/init.ts";
 import {
   runProjectsCommand,
@@ -6,6 +7,7 @@ import {
 } from "./command/projects.ts";
 import { runSummaryCommand } from "./command/summary.ts";
 import { togglClient } from "./toggl/api.ts";
+import { version } from "./version.ts";
 
 export type TargetMonth = {
   year: number;
@@ -41,11 +43,17 @@ export async function main(args: string[]): Promise<number> {
     case "help":
       console.log(HELP_TEXT);
       return 0;
+    case "version":
+      console.log(version);
+      return 0;
     case "init":
       await runInitCommand();
       return 0;
     case "projects":
       await runProjectsCommand({ format: command.format }, togglClient);
+      return 0;
+    case "config":
+      await runConfigCommand(command.format);
       return 0;
     case "projects-sync":
       await runProjectsSyncCommand(togglClient);
