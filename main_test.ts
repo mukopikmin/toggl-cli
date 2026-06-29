@@ -13,6 +13,11 @@ import {
   formatProjectsJson,
 } from "./command/projects.ts";
 import {
+  formatConfigJson,
+  formatConfigValues,
+  withoutSensitiveConfig,
+} from "./command/config.ts";
+import {
   buildWorkTimeTable,
   formatTimeEntriesJson,
 } from "./command/summary.ts";
@@ -33,6 +38,7 @@ const config = {
 Deno.test("parseCliArgs returns help for the root command", () => {
   assertEquals(parseCliArgs([]), { name: "help" });
   assertEquals(HELP_TEXT.includes("toggl summary"), true);
+  assertEquals(HELP_TEXT.includes("toggl config"), true);
   assertEquals(HELP_TEXT.includes("-h, --help"), true);
 });
 
@@ -44,7 +50,14 @@ Deno.test("createHelpText describes commands and options", () => {
   toggl <start-day> <end-day> [options]
   toggl projects [options]
   toggl projects sync
+  toggl config [options]
   toggl init
+
+Commands:
+  init      Create the configuration file
+  projects  List projects
+  config    Show configuration values
+  summary   Summarize time entries for a range of days
 
 Options:
   -l, --lastMonth        Aggregate the previous month
@@ -138,6 +151,14 @@ Deno.test("parseCliArgs preserves init and projects routing", () => {
   });
   assertEquals(parseCliArgs(["projects", "sync"]), {
     name: "projects-sync",
+  });
+  assertEquals(parseCliArgs(["config"]), {
+    name: "config",
+    format: "csv",
+  });
+  assertEquals(parseCliArgs(["config", "--format", "json"]), {
+    name: "config",
+    format: "json",
   });
 });
 
@@ -312,6 +333,48 @@ Deno.test("formatProjectsJson returns explicit JSON output for projects", () => 
     "hidden": true
   }
 ]`,
+  );
+});
+
+Deno.test("withoutSensitiveConfig excludes TOKEN from visible settings", () => {
+  assertEquals(
+    withoutSensitiveConfig({
+      WORKSPACE: "workspace-id",
+      TOKEN: "test-token",
+      TIMEZONE: "Asia/Tokyo",
+      PROJECTS: {},
+    }),
+    {
+      WORKSPACE: "workspace-id",
+      TIMEZONE: "Asia/Tokyo",
+    },
+  );
+});
+
+Deno.test("formatConfigValues outputs visible settings as key-value lines", () => {
+  assertEquals(
+    formatConfigValues({
+      WORKSPACE: "workspace-id",
+      TOKEN: "test-token",
+      TIMEZONE: "Asia/Tokyo",
+      PROJECTS: {},
+    }),
+    "WORKSPACE=workspace-id\nTIMEZONE=Asia/Tokyo",
+  );
+});
+
+Deno.test("formatConfigJson outputs visible settings as JSON", () => {
+  assertEquals(
+    formatConfigJson({
+      WORKSPACE: "workspace-id",
+      TOKEN: "test-token",
+      TIMEZONE: "Asia/Tokyo",
+      PROJECTS: {},
+    }),
+    `{
+  "WORKSPACE": "workspace-id",
+  "TIMEZONE": "Asia/Tokyo"
+}`,
   );
 });
 

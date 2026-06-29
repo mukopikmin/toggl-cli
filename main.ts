@@ -1,4 +1,5 @@
 import { CliUsageError, HELP_TEXT, parseCliArgs } from "./cli.ts";
+import { runConfigCommand } from "./command/config.ts";
 import { runInitCommand } from "./command/init.ts";
 import {
   runProjectsCommand,
@@ -50,6 +51,9 @@ export async function main(args: string[]): Promise<number> {
       return 0;
     case "projects":
       await runProjectsCommand({ format: command.format }, togglClient);
+      return 0;
+    case "config":
+      await runConfigCommand(command.format);
       return 0;
     case "projects-sync":
       await runProjectsSyncCommand(togglClient);
