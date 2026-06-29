@@ -17,8 +17,10 @@ Create a config file:
 deno task run -- init
 ```
 
-This creates `~/.config/toggl-cli/config.toml` if it does not already exist. You
-can also create it manually:
+This asks for your workspace ID, API token, and timezone, then creates
+`~/.config/toggl-cli/config.toml` if it does not already exist. The API token is
+not printed back to the terminal after entry. You can also create the file
+manually:
 
 ```toml
 workspace = "your_workspace_id"
