@@ -83,8 +83,10 @@ The legacy root form remains supported:
 deno task run -- 1 15
 ```
 
-By default, the command outputs a list of visible projects followed by work time
-in minutes for each project and date. Columns are separated by tabs.
+By default, the command outputs a single tab-separated table with projects in
+the first column and work time in minutes for each project and date in the
+remaining columns. You can paste this output directly into spreadsheet
+applications such as Excel.
 
 Use `--lastMonth` or `-l` to aggregate the previous month:
 
