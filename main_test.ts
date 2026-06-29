@@ -1,7 +1,7 @@
 import { assertEquals, assertThrows } from "@std/assert";
 import { datetime } from "ptera";
 import { CliUsageError, HELP_TEXT, parseCliArgs } from "./cli.ts";
-import { createConfigTemplate } from "./command/init.ts";
+import { createConfigTemplate, createConfigToml } from "./command/init.ts";
 import {
   appendMissingProjects,
   formatProjectList,
@@ -152,6 +152,30 @@ display_order = 10
 [projects.234567]
 hidden = true
 display_order = 20
+`,
+  );
+});
+
+Deno.test("createConfigToml returns TOML from entered values", () => {
+  assertEquals(
+    createConfigToml({
+      workspace: "workspace-id",
+      token: "test-token",
+      timezone: "America/New_York",
+    }),
+    `workspace = "workspace-id"
+token = "test-token"
+timezone = "America/New_York"
+`,
+  );
+});
+
+Deno.test("createConfigToml uses the default timezone when omitted", () => {
+  assertEquals(
+    createConfigToml({ workspace: "workspace-id", token: "test-token" }),
+    `workspace = "workspace-id"
+token = "test-token"
+timezone = "Asia/Tokyo"
 `,
   );
 });
