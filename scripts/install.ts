@@ -1,5 +1,8 @@
-if (Deno.build.os !== "darwin") {
-  console.error("This installer is intended for macOS.");
+const supportsUnixInstall = Deno.build.os === "darwin" ||
+  Deno.build.os === "linux";
+
+if (!supportsUnixInstall) {
+  console.error("This installer supports only macOS and Linux.");
   Deno.exit(1);
 }
 

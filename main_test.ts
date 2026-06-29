@@ -1,4 +1,11 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals, assertThrows } from "@std/assert";
+import { datetime } from "ptera";
+import {
+  CliUsageError,
+  createHelpText,
+  HELP_TEXT,
+  parseCliArgs,
+} from "./cli.ts";
 import { createConfigTemplate } from "./command/init.ts";
 import {
   appendMissingProjects,
@@ -10,7 +17,7 @@ import {
   formatTimeEntriesJson,
 } from "./command/summary.ts";
 import { parseConfigToml, parseProjectsConfig } from "./config.ts";
-import { createHelpText, resolveTargetMonth } from "./main.ts";
+import { resolveTargetMonth } from "./main.ts";
 import { createProject, visibleProjects } from "./model/project.ts";
 import { getProjects } from "./toggl/projects.ts";
 import { getSummaryTimeEntries } from "./toggl/summary.ts";
@@ -22,6 +29,12 @@ const config = {
   WORKSPACE: "workspace-id",
   TOKEN: "test-token",
 };
+
+Deno.test("parseCliArgs returns help for the root command", () => {
+  assertEquals(parseCliArgs([]), { name: "help" });
+  assertEquals(HELP_TEXT.includes("toggl summary"), true);
+  assertEquals(HELP_TEXT.includes("-h, --help"), true);
+});
 
 Deno.test("createHelpText describes commands and options", () => {
   assertEquals(
@@ -40,6 +53,92 @@ Options:
   -h, --help             Show this help
       --version          Show the version`,
   );
+});
+
+Deno.test("parseCliArgs parses the help option", () => {
+  assertEquals(parseCliArgs(["--help"]), { name: "help" });
+  assertEquals(parseCliArgs(["-h"]), { name: "help" });
+});
+
+Deno.test("parseCliArgs parses the version option", () => {
+  assertEquals(parseCliArgs(["--version"]), { name: "version" });
+});
+
+Deno.test("parseCliArgs parses the explicit summary command", () => {
+  const command = parseCliArgs(
+    ["summary", "--format", "json", "1", "31"],
+    datetime({ year: 2026, month: 5, day: 10 }),
+  );
+
+  if (command.name !== "summary") throw new Error("expected summary command");
+  assertEquals(command.format, "json");
+  assertEquals(command.separator, "\t");
+  assertEquals(
+    [command.startDay.year, command.startDay.month, command.startDay.day],
+    [2026, 5, 1],
+  );
+  assertEquals(
+    [command.endDay.year, command.endDay.month, command.endDay.day],
+    [2026, 5, 31],
+  );
+});
+
+Deno.test("parseCliArgs applies summary options and the previous month", () => {
+  const command = parseCliArgs(
+    ["summary", "--lastMonth", "--separator", ",", "1", "31"],
+    datetime({ year: 2026, month: 1, day: 10 }),
+  );
+
+  if (command.name !== "summary") throw new Error("expected summary command");
+  assertEquals(command.separator, ",");
+  assertEquals(
+    [command.startDay.year, command.startDay.month, command.startDay.day],
+    [2025, 12, 1],
+  );
+});
+
+Deno.test("parseCliArgs validates summary format and dates", () => {
+  assertThrows(
+    () => parseCliArgs(["summary", "--format", "xml", "1", "2"]),
+    CliUsageError,
+    "format must be csv or json",
+  );
+  assertThrows(
+    () =>
+      parseCliArgs(
+        ["summary", "31", "1"],
+        datetime({ year: 2026, month: 5, day: 10 }),
+      ),
+    CliUsageError,
+    "start and end day must be valid dates",
+  );
+});
+
+Deno.test("parseCliArgs rejects the removed root summary syntax", () => {
+  const error = assertThrows(
+    () => parseCliArgs(["1", "31"]),
+    CliUsageError,
+  );
+  assertEquals(error.message, "unknown command: 1");
+});
+
+Deno.test("parseCliArgs rejects unknown commands", () => {
+  const error = assertThrows(
+    () => parseCliArgs(["foo", "1", "31"]),
+    CliUsageError,
+  );
+  assertEquals(error.message, "unknown command: foo");
+});
+
+Deno.test("parseCliArgs preserves init and projects routing", () => {
+  assertEquals(parseCliArgs(["init"]), { name: "init" });
+  assertEquals(parseCliArgs(["projects", "--format", "json"]), {
+    name: "projects",
+    format: "json",
+  });
+  assertEquals(parseCliArgs(["projects", "sync"]), {
+    name: "projects-sync",
+  });
 });
 
 function jsonResponse(body: unknown): Response {
