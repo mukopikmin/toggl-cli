@@ -53,7 +53,7 @@ export function buildWorkTimeTable(
       if (duration) {
         return (Math.round(duration * 100) / 100).toString();
       }
-      return " ";
+      return "";
     })
   );
 
@@ -64,23 +64,26 @@ export function buildWorkTimeTable(
   };
 }
 
+export function formatWorkTimeTable(
+  table: WorkTimeTable,
+  separator: string,
+): string {
+  const lines = [
+    ["Project", ...table.headers].join(separator),
+  ];
+
+  for (const [index, row] of table.rows.entries()) {
+    lines.push([table.projectNames[index], ...row].join(separator));
+  }
+
+  return lines.join("\n");
+}
+
 export function outputWorkTimeTable(
   table: WorkTimeTable,
   separator: string,
 ): void {
-  console.log("--- Project list ---");
-  for (const projectName of table.projectNames) {
-    console.log(projectName);
-  }
-  console.log();
-  console.log(
-    "--- Work time table (The order of the rows follows the projects list) ---",
-  );
-  console.log(table.headers.join(separator));
-
-  for (const row of table.rows) {
-    console.log(row.join(separator));
-  }
+  console.log(formatWorkTimeTable(table, separator));
 }
 
 export function formatTimeEntriesJson(

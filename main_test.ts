@@ -10,6 +10,7 @@ import {
 import {
   buildWorkTimeTable,
   formatTimeEntriesJson,
+  formatWorkTimeTable,
 } from "./command/summary.ts";
 import { parseConfigToml, parseProjectsConfig } from "./config.ts";
 import { resolveTargetMonth } from "./main.ts";
@@ -431,8 +432,8 @@ Deno.test("buildWorkTimeTable structures project rows across the requested date 
     projectNames: ["Client A", "Internal"],
     headers: ["2026-05-01", "2026-05-02", "2026-05-03"],
     rows: [
-      ["45.13", " ", "12"],
-      [" ", "60", " "],
+      ["45.13", "", "12"],
+      ["", "60", ""],
     ],
   });
 });
@@ -458,6 +459,42 @@ Deno.test("buildWorkTimeTable enumerates dates across a year boundary", () => {
     "2026-01-01",
     "2026-01-02",
   ]);
+});
+
+Deno.test("formatWorkTimeTable renders a single TSV table for spreadsheet paste", () => {
+  const table = buildWorkTimeTable(
+    [
+      {
+        id: 100,
+        name: "Client work",
+        displayName: "Client A",
+        active: true,
+        hidden: false,
+      },
+      {
+        id: 200,
+        name: "Internal",
+        displayName: "Internal",
+        active: true,
+        hidden: false,
+      },
+    ],
+    {
+      "2026-05-01": { 100: 5 },
+      "2026-05-10": { 200: 123.45 },
+    },
+    Temporal.PlainDate.from("2026-05-01"),
+    Temporal.PlainDate.from("2026-05-10"),
+  );
+
+  assertEquals(
+    formatWorkTimeTable(table, "\t"),
+    [
+      "Project\t2026-05-01\t2026-05-02\t2026-05-03\t2026-05-04\t2026-05-05\t2026-05-06\t2026-05-07\t2026-05-08\t2026-05-09\t2026-05-10",
+      "Client A\t5\t\t\t\t\t\t\t\t\t",
+      "Internal\t\t\t\t\t\t\t\t\t\t123.45",
+    ].join("\n"),
+  );
 });
 
 Deno.test("formatTimeEntriesJson returns explicit JSON output for time entry data", () => {
