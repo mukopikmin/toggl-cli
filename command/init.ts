@@ -19,11 +19,22 @@ export function createConfigToml(config: InitialConfig): string {
 }
 
 export function createConfigTemplate(): string {
-  return createConfigToml({
-    workspace: "your_workspace_id",
-    token: "your_api_token",
-    timezone: DEFAULT_TIMEZONE,
-  });
+  return `${
+    createConfigToml({
+      workspace: "your_workspace_id",
+      token: "your_api_token",
+      timezone: DEFAULT_TIMEZONE,
+    })
+  }
+[projects.123456]
+display_name = "Client A"
+hidden = false
+display_order = 10
+
+[projects.234567]
+hidden = true
+display_order = 20
+`;
 }
 
 async function assertConfigFileDoesNotExist(configFile: string): Promise<void> {

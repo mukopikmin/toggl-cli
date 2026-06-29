@@ -7,6 +7,7 @@ export const CONFIG_FILE_DISPLAY = "~/.config/toggl-cli/config.toml";
 export interface ProjectConfig {
   displayName?: string;
   hidden: boolean;
+  displayOrder?: number;
 }
 
 export interface Config extends TogglConfig {
@@ -31,6 +32,12 @@ function readBoolean(value: unknown): boolean | undefined {
   return typeof value === "boolean" ? value : undefined;
 }
 
+function readNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value)
+    ? value
+    : undefined;
+}
+
 export function parseProjectsConfig(
   value: unknown,
 ): Record<number, ProjectConfig> {
@@ -49,9 +56,11 @@ export function parseProjectsConfig(
     }
 
     const project = rawProject as Record<string, unknown>;
+    const displayOrder = readNumber(project.display_order);
     projects[projectId] = {
       displayName: readString(project.display_name),
       hidden: readBoolean(project.hidden) ?? false,
+      ...(displayOrder === undefined ? {} : { displayOrder }),
     };
   }
 

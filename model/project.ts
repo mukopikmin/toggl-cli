@@ -7,6 +7,7 @@ export interface Project {
   displayName: string;
   active: boolean;
   hidden: boolean;
+  displayOrder?: number;
 }
 
 export function createProject(
@@ -19,6 +20,9 @@ export function createProject(
     ...project,
     displayName: config?.displayName ?? project.name,
     hidden: config?.hidden ?? false,
+    ...(config?.displayOrder === undefined
+      ? {}
+      : { displayOrder: config.displayOrder }),
   };
 }
 
@@ -31,4 +35,19 @@ export function createProjects(
 
 export function visibleProjects(projects: Project[]): Project[] {
   return projects.filter((project) => !project.hidden);
+}
+
+export function sortProjectsByDisplayOrder(projects: Project[]): Project[] {
+  return projects.toSorted((a, b) => {
+    if (a.displayOrder === undefined && b.displayOrder === undefined) {
+      return 0;
+    }
+    if (a.displayOrder === undefined) {
+      return 1;
+    }
+    if (b.displayOrder === undefined) {
+      return -1;
+    }
+    return a.displayOrder - b.displayOrder;
+  });
 }
