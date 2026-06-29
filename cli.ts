@@ -7,11 +7,13 @@ export const HELP_TEXT = `Usage:
   toggl --version
   toggl init
   toggl projects [sync] [--format csv|json]
+  toggl config [--format csv|json]
   toggl summary [--lastMonth] [--separator VALUE] [--format csv|json] START_DAY END_DAY
 
 Commands:
   init      Create the configuration file
   projects  List projects
+  config    Show configuration values
   summary   Summarize time entries for a range of days
 
 Summary options:
@@ -24,6 +26,7 @@ export type CliCommand =
   | { name: "version" }
   | { name: "init" }
   | { name: "projects"; format: ProjectsFormat }
+  | { name: "config"; format: ProjectsFormat }
   | { name: "projects-sync" }
   | {
     name: "summary";
@@ -58,6 +61,23 @@ function parseProjectsArgs(args: string[]): CliCommand {
   }
 
   return { name: "projects", format: parseFormat(parsed.values.format) };
+}
+
+function parseConfigArgs(args: string[]): CliCommand {
+  const parsed = parseArgs({
+    args,
+    options: {
+      format: { type: "string", short: "f", default: "csv" },
+    },
+    allowPositionals: true,
+    strict: true,
+  });
+
+  if (parsed.positionals.length > 0) {
+    throw new CliUsageError("config does not accept positional arguments");
+  }
+
+  return { name: "config", format: parseFormat(parsed.values.format) };
 }
 
 function parseSummaryArgs(args: string[], now: DateTime): CliCommand {
@@ -151,6 +171,8 @@ export function parseCliArgs(
           return { name: "projects-sync" };
         }
         return parseProjectsArgs(commandArgs);
+      case "config":
+        return parseConfigArgs(commandArgs);
       case "summary":
         return parseSummaryArgs(commandArgs, now);
       default:

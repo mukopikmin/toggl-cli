@@ -14,7 +14,7 @@ can be output as delimiter-separated values or JSON.
 Create a config file:
 
 ```sh
-toggl init
+deno task run -- init
 ```
 
 This creates `~/.config/toggl-cli/config.toml` if it does not already exist. You
@@ -67,7 +67,13 @@ Specify the start and end days as day numbers in the current month. The end day
 is included in the aggregation.
 
 ```sh
-toggl summary 1 15
+deno task run -- summary 1 15
+```
+
+The legacy root form remains supported:
+
+```sh
+deno task run -- 1 15
 ```
 
 By default, the command outputs a list of visible projects followed by work time
@@ -76,19 +82,19 @@ in minutes for each project and date. Columns are separated by tabs.
 Use `--lastMonth` or `-l` to aggregate the previous month:
 
 ```sh
-toggl summary --lastMonth 1 31
+deno task run -- --lastMonth summary 1 31
 ```
 
 Use `--separator` or `-s` to change the delimiter:
 
 ```sh
-toggl summary --separator "," 1 15
+deno task run -- --separator "," summary 1 15
 ```
 
 Use `--format json` or `-f json` to output JSON:
 
 ```sh
-toggl summary --format json 1 15
+deno task run -- --format json summary 1 15
 ```
 
 The JSON output maps each date to project IDs and their work time in minutes:
@@ -106,31 +112,47 @@ The JSON output maps each date to project IDs and their work time in minutes:
 List the display names of all active, visible projects:
 
 ```sh
-toggl projects
+deno task run -- projects
 ```
 
 Project information can also be output as JSON:
 
 ```sh
-toggl projects --format json
+deno task run -- --format json projects
 ```
 
 Print the CLI version:
 
 ```sh
-toggl --version
+deno task run -- --version
 ```
 
 To add all active Toggl projects that are not yet in the configuration file,
 run:
 
 ```sh
-toggl projects sync
+deno task run -- projects sync
 ```
 
 Each new project is appended with its Toggl project name as a comment and with
 `hidden = false`. Existing project settings and other configuration file content
 are left unchanged.
+
+### Show configuration
+
+Show the loaded configuration values:
+
+```sh
+deno task run -- config
+```
+
+Configuration can also be output as JSON:
+
+```sh
+deno task run -- config --format json
+```
+
+The `TOKEN` setting is never printed.
 
 ## Build
 
@@ -151,9 +173,10 @@ Run the compiled executable as follows:
 
 ```sh
 ./out/toggl summary 1 15
-./out/toggl summary --lastMonth 1 31
+./out/toggl --lastMonth summary 1 31
 ./out/toggl projects
 ./out/toggl projects sync
+./out/toggl config
 ```
 
 If `--version` is omitted, the compiled binary reports the development version
@@ -211,6 +234,7 @@ command as follows:
 ```sh
 toggl summary 1 15
 toggl projects
+toggl config
 ```
 
 On Windows, download the `windows-x64` release archive, extract `toggl.exe`, and
