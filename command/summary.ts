@@ -14,6 +14,12 @@ export interface SummaryCommand {
   endDay: Temporal.PlainDate;
   separator: string;
   format: SummaryFormat;
+  clipboard: boolean;
+}
+
+export interface SummaryOutput {
+  writeStdout(text: string): void;
+  writeClipboard(text: string): Promise<void>;
 }
 
 export interface WorkTimeTable {
@@ -102,11 +108,37 @@ export function outputTimeEntriesJson(
   console.log(formatTimeEntriesJson(dateEntries));
 }
 
+const defaultSummaryOutput: SummaryOutput = {
+  writeStdout(text: string): void {
+    console.log(text);
+  },
+  async writeClipboard(text: string): Promise<void> {
+    if (!navigator.clipboard?.writeText) {
+      throw new Error("Clipboard API is not available");
+    }
+
+    await navigator.clipboard.writeText(text);
+  },
+};
+
+export async function outputSummaryText(
+  text: string,
+  clipboard: boolean,
+  output: SummaryOutput = defaultSummaryOutput,
+): Promise<void> {
+  output.writeStdout(text);
+
+  if (clipboard) {
+    await output.writeClipboard(text);
+  }
+}
+
 export async function runSummaryCommand(
   cmd: SummaryCommand,
   toggl: TogglClient,
+  output: SummaryOutput = defaultSummaryOutput,
 ): Promise<void> {
-  const { startDay, endDay, separator, format } = cmd;
+  const { startDay, endDay, separator, format, clipboard } = cmd;
 
   const config = await loadConfig();
   const dateEntries = await toggl.getTimeEntriesForDays(
@@ -116,7 +148,11 @@ export async function runSummaryCommand(
   );
 
   if (format === "json") {
-    outputTimeEntriesJson(dateEntries);
+    await outputSummaryText(
+      formatTimeEntriesJson(dateEntries),
+      clipboard,
+      output,
+    );
     return;
   }
 
@@ -131,5 +167,9 @@ export async function runSummaryCommand(
     endDay,
   );
 
-  outputWorkTimeTable(table, separator);
+  await outputSummaryText(
+    formatWorkTimeTable(table, separator),
+    clipboard,
+    output,
+  );
 }
