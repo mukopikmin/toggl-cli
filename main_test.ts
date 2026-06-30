@@ -1,6 +1,11 @@
 import { assertEquals, assertThrows } from "@std/assert";
 import { datetime } from "ptera";
-import { CliUsageError, HELP_TEXT, parseCliArgs } from "./cli.ts";
+import {
+  CliUsageError,
+  createHelpText,
+  HELP_TEXT,
+  parseCliArgs,
+} from "./cli.ts";
 import { createConfigTemplate, createConfigToml } from "./command/init.ts";
 import {
   appendMissingProjects,
@@ -38,8 +43,39 @@ const config = {
 Deno.test("parseCliArgs returns help for the root command", () => {
   assertEquals(parseCliArgs([]), { name: "help" });
   assertEquals(HELP_TEXT.includes("toggl summary"), true);
-  assertEquals(HELP_TEXT.includes("toggl --version"), true);
   assertEquals(HELP_TEXT.includes("toggl config"), true);
+  assertEquals(HELP_TEXT.includes("-h, --help"), true);
+});
+
+Deno.test("createHelpText describes commands and options", () => {
+  assertEquals(
+    createHelpText(),
+    `Usage:
+  toggl summary <start-day> <end-day> [options]
+  toggl <start-day> <end-day> [options]
+  toggl projects [options]
+  toggl projects sync
+  toggl config [options]
+  toggl init
+
+Commands:
+  init      Create the configuration file
+  projects  List projects
+  config    Show configuration values
+  summary   Summarize time entries for a range of days
+
+Options:
+  -l, --lastMonth        Aggregate the previous month
+  -s, --separator <text> Set the output delimiter (default: tab)
+  -f, --format <format>  Set the output format: csv or json (default: csv)
+  -h, --help             Show this help
+      --version          Show the version`,
+  );
+});
+
+Deno.test("parseCliArgs parses the help option", () => {
+  assertEquals(parseCliArgs(["--help"]), { name: "help" });
+  assertEquals(parseCliArgs(["-h"]), { name: "help" });
 });
 
 Deno.test("parseCliArgs parses the version option", () => {
