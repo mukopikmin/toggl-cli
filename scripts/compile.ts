@@ -56,6 +56,7 @@ const command = new Deno.Command(Deno.execPath(), {
     "--allow-read",
     "--allow-write",
     "--allow-net",
+    "--allow-run=pbcopy,wl-copy,xclip,xsel,clip,powershell.exe,powershell",
     "--allow-env",
     ...targetArgs,
     "--output",
