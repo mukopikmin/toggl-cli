@@ -9,6 +9,10 @@ updates:
     labels:
       - "dependencies"
       - "deno"
+    groups:
+      deno-dependencies:
+        patterns:
+          - "*"
     open-pull-requests-limit: 5
 
   - package-ecosystem: "github-actions"
@@ -20,4 +24,8 @@ updates:
     labels:
       - "dependencies"
       - "github-actions"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
     open-pull-requests-limit: 5
