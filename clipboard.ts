@@ -3,6 +3,13 @@ export interface ClipboardCommand {
   args: string[];
 }
 
+export class ClipboardUnavailableError extends Error {
+  constructor() {
+    super("Could not copy output to the clipboard.");
+    this.name = "ClipboardUnavailableError";
+  }
+}
+
 function clipboardCommands(): ClipboardCommand[] {
   switch (Deno.build.os) {
     case "darwin":
@@ -57,20 +64,14 @@ async function writeClipboardWithCommand(
 }
 
 export async function writeClipboardText(text: string): Promise<void> {
-  const errors: string[] = [];
-
   for (const command of clipboardCommands()) {
     try {
       await writeClipboardWithCommand(text, command);
       return;
-    } catch (error) {
-      errors.push(error instanceof Error ? error.message : String(error));
+    } catch {
+      // Try the next platform-specific clipboard command.
     }
   }
 
-  throw new Error(
-    `Could not copy output to the clipboard.${
-      errors.length > 0 ? ` Tried: ${errors.join("; ")}` : ""
-    }`,
-  );
+  throw new ClipboardUnavailableError();
 }

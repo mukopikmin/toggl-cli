@@ -1,5 +1,6 @@
-import { assertEquals, assertThrows } from "@std/assert";
+import { assertEquals, assertRejects, assertThrows } from "@std/assert";
 import { datetime } from "ptera";
+import { ClipboardUnavailableError } from "./clipboard.ts";
 import { CliUsageError, HELP_TEXT, parseCliArgs } from "./cli.ts";
 import { createConfigTemplate, createConfigToml } from "./command/init.ts";
 import {
@@ -133,6 +134,30 @@ Deno.test("outputSummaryText writes to stdout and clipboard", async () => {
 
   assertEquals(stdout, ["summary output"]);
   assertEquals(clipboard, ["summary output"]);
+});
+
+Deno.test("outputSummaryText reports clipboard failure without command details", async () => {
+  const stdout: string[] = [];
+
+  await assertRejects(
+    () =>
+      outputSummaryText("summary output", true, {
+        writeStdout(text) {
+          stdout.push(text);
+        },
+        writeClipboard() {
+          throw new ClipboardUnavailableError();
+        },
+      }),
+    ClipboardUnavailableError,
+    "Could not copy output to the clipboard.",
+  );
+
+  assertEquals(stdout, ["summary output"]);
+  assertEquals(
+    new ClipboardUnavailableError().message.includes("not found"),
+    false,
+  );
 });
 
 Deno.test("parseCliArgs rejects the removed root summary syntax", () => {
