@@ -1,5 +1,6 @@
-import { assertEquals, assertThrows } from "@std/assert";
+import { assertEquals, assertRejects, assertThrows } from "@std/assert";
 import { datetime } from "ptera";
+import { ClipboardUnavailableError } from "./clipboard.ts";
 import { CliUsageError, HELP_TEXT, parseCliArgs } from "./cli.ts";
 import { createConfigTemplate, createConfigToml } from "./command/init.ts";
 import {
@@ -16,6 +17,7 @@ import {
   buildWorkTimeTable,
   formatTimeEntriesJson,
   formatWorkTimeTable,
+  outputSummaryText,
 } from "./command/summary.ts";
 import { parseConfigToml, parseProjectsConfig } from "./config.ts";
 import { resolveTargetMonth } from "./main.ts";
@@ -55,6 +57,7 @@ Deno.test("parseCliArgs parses the explicit summary command", () => {
   if (command.name !== "summary") throw new Error("expected summary command");
   assertEquals(command.format, "json");
   assertEquals(command.separator, "\t");
+  assertEquals(command.clipboard, false);
   assertEquals(
     [command.startDay.year, command.startDay.month, command.startDay.day],
     [2026, 5, 1],
@@ -67,12 +70,13 @@ Deno.test("parseCliArgs parses the explicit summary command", () => {
 
 Deno.test("parseCliArgs applies summary options and the previous month", () => {
   const command = parseCliArgs(
-    ["summary", "--lastMonth", "--separator", ",", "1", "31"],
+    ["summary", "--lastMonth", "--separator", ",", "--clipboard", "1", "31"],
     datetime({ year: 2026, month: 1, day: 10 }),
   );
 
   if (command.name !== "summary") throw new Error("expected summary command");
   assertEquals(command.separator, ",");
+  assertEquals(command.clipboard, true);
   assertEquals(
     [command.startDay.year, command.startDay.month, command.startDay.day],
     [2025, 12, 1],
@@ -93,6 +97,66 @@ Deno.test("parseCliArgs validates summary format and dates", () => {
       ),
     CliUsageError,
     "start and end day must be valid dates",
+  );
+});
+
+Deno.test("outputSummaryText writes to stdout only by default", async () => {
+  const stdout: string[] = [];
+  const clipboard: string[] = [];
+
+  await outputSummaryText("summary output", false, {
+    writeStdout(text) {
+      stdout.push(text);
+    },
+    writeClipboard(text) {
+      clipboard.push(text);
+      return Promise.resolve();
+    },
+  });
+
+  assertEquals(stdout, ["summary output"]);
+  assertEquals(clipboard, []);
+});
+
+Deno.test("outputSummaryText writes to stdout and clipboard", async () => {
+  const stdout: string[] = [];
+  const clipboard: string[] = [];
+
+  await outputSummaryText("summary output", true, {
+    writeStdout(text) {
+      stdout.push(text);
+    },
+    writeClipboard(text) {
+      clipboard.push(text);
+      return Promise.resolve();
+    },
+  });
+
+  assertEquals(stdout, ["summary output"]);
+  assertEquals(clipboard, ["summary output"]);
+});
+
+Deno.test("outputSummaryText reports clipboard failure without command details", async () => {
+  const stdout: string[] = [];
+
+  await assertRejects(
+    () =>
+      outputSummaryText("summary output", true, {
+        writeStdout(text) {
+          stdout.push(text);
+        },
+        writeClipboard() {
+          throw new ClipboardUnavailableError();
+        },
+      }),
+    ClipboardUnavailableError,
+    "Could not copy output to the clipboard.",
+  );
+
+  assertEquals(stdout, ["summary output"]);
+  assertEquals(
+    new ClipboardUnavailableError().message.includes("not found"),
+    false,
   );
 });
 

@@ -77,12 +77,6 @@ is included in the aggregation.
 deno task run -- summary 1 15
 ```
 
-The legacy root form remains supported:
-
-```sh
-deno task run -- 1 15
-```
-
 By default, the command outputs a single tab-separated table with projects in
 the first column and work time in minutes for each project and date in the
 remaining columns. You can paste this output directly into spreadsheet
@@ -91,19 +85,26 @@ applications such as Excel.
 Use `--lastMonth` or `-l` to aggregate the previous month:
 
 ```sh
-deno task run -- --lastMonth summary 1 31
+deno task run -- summary --lastMonth 1 31
 ```
 
 Use `--separator` or `-s` to change the delimiter:
 
 ```sh
-deno task run -- --separator "," summary 1 15
+deno task run -- summary --separator "," 1 15
 ```
 
 Use `--format json` or `-f json` to output JSON:
 
 ```sh
-deno task run -- --format json summary 1 15
+deno task run -- summary --format json 1 15
+```
+
+Use `--clipboard` to print the summary and copy the same output to the
+clipboard:
+
+```sh
+deno task run -- summary --clipboard 1 15
 ```
 
 The JSON output maps each date to project IDs and their work time in minutes:
@@ -182,7 +183,8 @@ Run the compiled executable as follows:
 
 ```sh
 ./out/toggl summary 1 15
-./out/toggl --lastMonth summary 1 31
+./out/toggl summary --clipboard 1 15
+./out/toggl summary --lastMonth 1 31
 ./out/toggl projects
 ./out/toggl projects sync
 ./out/toggl config
@@ -242,6 +244,7 @@ command as follows:
 
 ```sh
 toggl summary 1 15
+toggl summary --clipboard 1 15
 toggl projects
 toggl config
 ```
