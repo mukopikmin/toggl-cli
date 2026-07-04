@@ -3,12 +3,14 @@ import { type DateTime, datetime } from "ptera";
 import type { ProjectsFormat } from "./command/projects.ts";
 import type { SummaryFormat } from "./command/summary.ts";
 
-export const HELP_TEXT = `Usage:
-  toggl --version
+export function createHelpText(): string {
+  return `Usage:
+  toggl summary <start-day> <end-day> [options]
+  toggl <start-day> <end-day> [options]
+  toggl projects [options]
+  toggl projects sync
+  toggl config [options]
   toggl init
-  toggl projects [sync] [--format csv|json]
-  toggl config [--format csv|json]
-  toggl summary [--lastMonth] [--separator VALUE] [--format csv|json] START_DAY END_DAY
 
 Commands:
   init      Create the configuration file
@@ -16,10 +18,15 @@ Commands:
   config    Show configuration values
   summary   Summarize time entries for a range of days
 
-Summary options:
-  -l, --lastMonth       Use the previous month
-  -s, --separator VALUE Set the CSV separator (default: tab)
-  -f, --format FORMAT   Output format: csv or json (default: csv)`;
+Options:
+  -l, --lastMonth        Aggregate the previous month
+  -s, --separator <text> Set the output delimiter (default: tab)
+  -f, --format <format>  Set the output format: csv or json (default: csv)
+  -h, --help             Show this help
+      --version          Show the version`;
+}
+
+export const HELP_TEXT = createHelpText();
 
 export type CliCommand =
   | { name: "help" }
@@ -153,6 +160,12 @@ export function parseCliArgs(
 
   try {
     switch (command) {
+      case "--help":
+      case "-h":
+        if (commandArgs.length > 0) {
+          throw new CliUsageError("--help does not accept arguments");
+        }
+        return { name: "help" };
       case "--version":
         if (commandArgs.length > 0) {
           throw new CliUsageError("--version does not accept arguments");
