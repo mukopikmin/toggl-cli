@@ -23,6 +23,7 @@ Options:
   -s, --separator <text> Set the output delimiter (default: tab)
   -f, --format <format>  Set the output format: csv or json (default: csv)
   -h, --help             Show this help
+      --no-project       Omit the project column from CSV output
       --version          Show the version`;
 }
 
@@ -41,6 +42,7 @@ export type CliCommand =
     endDay: DateTime;
     separator: string;
     format: SummaryFormat;
+    noProject: boolean;
   };
 
 export class CliUsageError extends Error {}
@@ -94,6 +96,7 @@ function parseSummaryArgs(args: string[], now: DateTime): CliCommand {
       lastMonth: { type: "boolean", short: "l", default: false },
       separator: { type: "string", short: "s", default: "\t" },
       format: { type: "string", short: "f", default: "csv" },
+      "no-project": { type: "boolean", default: false },
     },
     allowPositionals: true,
     strict: true,
@@ -148,6 +151,7 @@ function parseSummaryArgs(args: string[], now: DateTime): CliCommand {
     endDay,
     separator: parsed.values.separator ?? "\t",
     format: parseFormat(parsed.values.format),
+    noProject: parsed.values["no-project"] ?? false,
   };
 }
 

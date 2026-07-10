@@ -107,6 +107,7 @@ deno task run -- --help
 | `-s`, `--separator <text>` | Set the output delimiter. The default is a tab.                 |
 | `-f`, `--format <format>`  | Set the output format to `csv` or `json`. The default is `csv`. |
 | `-h`, `--help`             | Show command-line help.                                         |
+| `--no-project`             | Omit the project column from CSV output.                        |
 | `--version`                | Show the CLI version.                                           |
 
 ### Aggregate time entries
@@ -133,6 +134,12 @@ Use `--separator` or `-s` to change the delimiter:
 
 ```sh
 toggl summary --separator "," 1 15
+```
+
+Use `--no-project` to omit the project column from CSV output:
+
+```sh
+toggl summary --no-project 1 15
 ```
 
 Use `--format json` or `-f json` to output JSON:
@@ -218,6 +225,7 @@ Run the compiled executable as follows:
 ```sh
 ./out/toggl summary 1 15
 ./out/toggl summary --lastMonth 1 31
+./out/toggl summary --no-project 1 15
 ./out/toggl projects
 ./out/toggl projects sync
 ./out/toggl config
