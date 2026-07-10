@@ -9,12 +9,27 @@ can be output as delimiter-separated values or JSON.
 - A Toggl Track API token
 - The ID of the target workspace
 
+## Installation
+
+On Linux and macOS, run the install script:
+
+```sh
+deno task install --version 0.1.0
+```
+
+This builds the executable in a temporary directory and installs it to
+`$HOME/.local/bin/toggl`. Make sure `$HOME/.local/bin` is included in your
+`PATH`, then run the installed command as `toggl`.
+
+On Windows, download the `windows-x64` release archive, extract `toggl.exe`, and
+place it in a directory included in your `PATH`.
+
 ## Configuration
 
 Create a config file:
 
 ```sh
-deno task run -- init
+toggl init
 ```
 
 This asks for your workspace ID, API token, and timezone, then creates
@@ -67,6 +82,32 @@ chmod 600 ~/.config/toggl-cli/config.toml
 ```
 
 ## Usage
+
+Show command-line help:
+
+```sh
+deno task run -- --help
+```
+
+### Commands
+
+| Command                         | Description                                            |
+| ------------------------------- | ------------------------------------------------------ |
+| `summary <start-day> <end-day>` | Aggregate time entries for a range of days.            |
+| `<start-day> <end-day>`         | Legacy form of the `summary` command.                  |
+| `projects`                      | List active, visible projects.                         |
+| `projects sync`                 | Add missing active projects to the configuration file. |
+| `init`                          | Create the configuration file.                         |
+
+### Options
+
+| Option                     | Description                                                     |
+| -------------------------- | --------------------------------------------------------------- |
+| `-l`, `--lastMonth`        | Aggregate the previous month.                                   |
+| `-s`, `--separator <text>` | Set the output delimiter. The default is a tab.                 |
+| `-f`, `--format <format>`  | Set the output format to `csv` or `json`. The default is `csv`. |
+| `-h`, `--help`             | Show command-line help.                                         |
+| `--version`                | Show the CLI version.                                           |
 
 ### Aggregate time entries
 
@@ -253,6 +294,15 @@ On Windows, download the `windows-x64` release archive, extract `toggl.exe`, and
 place it in a directory included in your `PATH`.
 
 ## Development
+
+When running from a checkout without installing the executable, use
+`deno task run --` and pass the same arguments after it:
+
+```sh
+deno task run -- init
+deno task run -- summary 1 15
+deno task run -- projects
+```
 
 ```sh
 deno fmt --check
