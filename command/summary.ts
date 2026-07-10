@@ -16,6 +16,7 @@ export interface SummaryCommand {
   separator: string;
   format: SummaryFormat;
   clipboard: boolean;
+  noProject: boolean;
 }
 
 export interface SummaryOutput {
@@ -78,13 +79,18 @@ export function buildWorkTimeTable(
 export function formatWorkTimeTable(
   table: WorkTimeTable,
   separator: string,
+  noProject = false,
 ): string {
   const lines = [
-    ["Project", ...table.headers].join(separator),
+    (noProject ? table.headers : ["Project", ...table.headers]).join(
+      separator,
+    ),
   ];
 
   for (const [index, row] of table.rows.entries()) {
-    lines.push([table.projectNames[index], ...row].join(separator));
+    lines.push(
+      (noProject ? row : [table.projectNames[index], ...row]).join(separator),
+    );
   }
 
   return lines.join("\n");
@@ -133,7 +139,7 @@ export async function runSummaryCommand(
   toggl: TogglClient,
   output: SummaryOutput = defaultSummaryOutput,
 ): Promise<void> {
-  const { startDay, endDay, separator, format, clipboard } = cmd;
+  const { startDay, endDay, separator, format, clipboard, noProject } = cmd;
 
   const config = await loadConfig();
   const dateEntries = await toggl.getTimeEntriesForDays(
@@ -163,7 +169,7 @@ export async function runSummaryCommand(
   );
 
   await outputSummaryText(
-    formatWorkTimeTable(table, separator),
+    formatWorkTimeTable(table, separator, noProject),
     clipboard,
     output,
   );

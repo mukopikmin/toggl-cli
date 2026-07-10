@@ -94,6 +94,12 @@ Use `--separator` or `-s` to change the delimiter:
 deno task run -- summary --separator "," 1 15
 ```
 
+Use `--no-project` to omit the project column from CSV output:
+
+```sh
+deno task run -- summary --no-project 1 15
+```
+
 Use `--format json` or `-f json` to output JSON:
 
 ```sh
@@ -185,6 +191,7 @@ Run the compiled executable as follows:
 ./out/toggl summary 1 15
 ./out/toggl summary --clipboard 1 15
 ./out/toggl summary --lastMonth 1 31
+./out/toggl summary --no-project 1 15
 ./out/toggl projects
 ./out/toggl projects sync
 ./out/toggl config

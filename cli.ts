@@ -8,7 +8,7 @@ export const HELP_TEXT = `Usage:
   toggl init
   toggl projects [sync] [--format csv|json]
   toggl config [--format csv|json]
-  toggl summary [--lastMonth] [--separator VALUE] [--format csv|json] [--clipboard] START_DAY END_DAY
+  toggl summary [--lastMonth] [--separator VALUE] [--format csv|json] [--clipboard] [--no-project] START_DAY END_DAY
 
 Commands:
   init      Create the configuration file
@@ -20,7 +20,8 @@ Summary options:
   -l, --lastMonth       Use the previous month
   -s, --separator VALUE Set the CSV separator (default: tab)
   -f, --format FORMAT   Output format: csv or json (default: csv)
-      --clipboard       Copy the output to the clipboard as well as stdout`;
+      --clipboard       Copy the output to the clipboard as well as stdout
+      --no-project      Omit the project column from CSV output`;
 
 export type CliCommand =
   | { name: "help" }
@@ -36,6 +37,7 @@ export type CliCommand =
     separator: string;
     format: SummaryFormat;
     clipboard: boolean;
+    noProject: boolean;
   };
 
 export class CliUsageError extends Error {}
@@ -90,6 +92,7 @@ function parseSummaryArgs(args: string[], now: DateTime): CliCommand {
       separator: { type: "string", short: "s", default: "\t" },
       format: { type: "string", short: "f", default: "csv" },
       clipboard: { type: "boolean", default: false },
+      "no-project": { type: "boolean", default: false },
     },
     allowPositionals: true,
     strict: true,
@@ -145,6 +148,7 @@ function parseSummaryArgs(args: string[], now: DateTime): CliCommand {
     separator: parsed.values.separator ?? "\t",
     format: parseFormat(parsed.values.format),
     clipboard: parsed.values.clipboard ?? false,
+    noProject: parsed.values["no-project"] ?? false,
   };
 }
 
