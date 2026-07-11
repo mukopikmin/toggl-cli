@@ -20,6 +20,20 @@
 - Do not add tool-specific prefixes such as `[codex]` to pull request titles.
   Write titles that describe the change directly.
 
+## Tool Usage
+
+- If `gh auth status` fails inside the sandbox, do not immediately conclude that
+  the token is invalid. Run `gh auth status` again with network-enabled or
+  escalated execution.
+- Ask the user to reauthenticate only when the network-enabled or escalated
+  check also confirms that the token is invalid or expired.
+- If an authenticated GitHub CLI is unavailable but GitHub MCP is available, use
+  GitHub MCP for repository and pull request operations.
+- Treat Git remote authentication, including authentication used by `git push`,
+  independently from GitHub CLI authentication.
+- Ask the user to authenticate or intervene only when neither an authenticated
+  GitHub CLI nor GitHub MCP is available.
+
 ## Documentation Consistency
 
 - When changing commands, options, configuration fields, required Deno versions,
