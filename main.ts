@@ -6,6 +6,7 @@ import {
   runProjectsSyncCommand,
 } from "./command/projects.ts";
 import { runSummaryCommand } from "./command/summary.ts";
+import { runTimeEntriesCommand } from "./command/time_entries.ts";
 import { togglClient } from "./toggl/api.ts";
 import { version } from "./version.ts";
 
@@ -60,6 +61,9 @@ export async function main(args: string[]): Promise<number> {
       return 0;
     case "summary":
       await runSummaryCommand(command, togglClient);
+      return 0;
+    case "time-entries":
+      await runTimeEntriesCommand(command, togglClient);
       return 0;
   }
 }
