@@ -91,23 +91,23 @@ deno task run -- --help
 
 ### Commands
 
-| Command                         | Description                                            |
-| ------------------------------- | ------------------------------------------------------ |
-| `summary <start-day> <end-day>` | Aggregate time entries for a range of days.            |
-| `<start-day> <end-day>`         | Legacy form of the `summary` command.                  |
-| `projects`                      | List active, visible projects.                         |
-| `projects sync`                 | Add missing active projects to the configuration file. |
-| `init`                          | Create the configuration file.                         |
+| Command                              | Description                                            |
+| ------------------------------------ | ------------------------------------------------------ |
+| `summary <start-day> <end-day>`      | Aggregate time entries for a range of days.            |
+| `time-entries <start-day> <end-day>` | List individual time entries for a range of days.      |
+| `projects`                           | List active, visible projects.                         |
+| `projects sync`                      | Add missing active projects to the configuration file. |
+| `init`                               | Create the configuration file.                         |
 
 ### Options
 
 | Option                     | Description                                                     |
 | -------------------------- | --------------------------------------------------------------- |
-| `-l`, `--lastMonth`        | Aggregate the previous month.                                   |
+| `-l`, `--lastMonth`        | Aggregate the previous month (`summary` only).                  |
 | `-s`, `--separator <text>` | Set the output delimiter. The default is a tab.                 |
 | `-f`, `--format <format>`  | Set the output format to `csv` or `json`. The default is `csv`. |
 | `-h`, `--help`             | Show command-line help.                                         |
-| `--no-project`             | Omit the project column from CSV output.                        |
+| `--no-project`             | Omit the project column from `summary` CSV output.              |
 | `--version`                | Show the CLI version.                                           |
 
 ### Aggregate time entries
@@ -157,6 +157,48 @@ The JSON output maps each date to project IDs and their work time in minutes:
   }
 }
 ```
+
+### List time entries
+
+List individual time entries between two day numbers in the current month. The
+end day is included in the query.
+
+```sh
+toggl time-entries 1 15
+```
+
+The default output is tab-separated with the columns `id`, `description`,
+`project_id`, `start`, `stop`, and `duration_minutes`. Entries are sorted by
+start time in ascending order. Descriptions containing delimiters, quotes, or
+line breaks are quoted. Use `--separator` or `-s` to select another delimiter:
+
+```sh
+toggl time-entries --separator "," 1 15
+```
+
+Use `--format json` or `-f json` to output an array of objects with the same
+fields:
+
+```sh
+toggl time-entries --format json 1 15
+```
+
+```json
+[
+  {
+    "id": 123456789,
+    "description": "Review",
+    "project_id": 987654321,
+    "start": "2026-07-01T01:00:00Z",
+    "stop": "2026-07-01T01:30:00Z",
+    "duration_minutes": 30
+  }
+]
+```
+
+For a running entry, `stop` is `null` in JSON (and empty in CSV) and the
+duration is calculated through the time the response is processed. Entries
+without a project similarly use `null` in JSON and an empty CSV field.
 
 ### List projects
 
@@ -226,6 +268,7 @@ Run the compiled executable as follows:
 ./out/toggl summary 1 15
 ./out/toggl summary --lastMonth 1 31
 ./out/toggl summary --no-project 1 15
+./out/toggl time-entries 1 15
 ./out/toggl projects
 ./out/toggl projects sync
 ./out/toggl config
@@ -279,6 +322,7 @@ When running from a checkout without installing the executable, use
 ```sh
 deno task run -- init
 deno task run -- summary 1 15
+deno task run -- time-entries 1 15
 deno task run -- projects
 ```
 
