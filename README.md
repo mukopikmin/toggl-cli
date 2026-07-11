@@ -91,19 +91,17 @@ deno task run -- --help
 
 ### Commands
 
-| Command                         | Description                                            |
-| ------------------------------- | ------------------------------------------------------ |
-| `summary <start-day> <end-day>` | Aggregate time entries for a range of days.            |
-| `<start-day> <end-day>`         | Legacy form of the `summary` command.                  |
-| `projects`                      | List active, visible projects.                         |
-| `projects sync`                 | Add missing active projects to the configuration file. |
-| `init`                          | Create the configuration file.                         |
+| Command                           | Description                                            |
+| --------------------------------- | ------------------------------------------------------ |
+| `summary <start-date> <end-date>` | Aggregate time entries for a date range.               |
+| `projects`                        | List active, visible projects.                         |
+| `projects sync`                   | Add missing active projects to the configuration file. |
+| `init`                            | Create the configuration file.                         |
 
 ### Options
 
 | Option                     | Description                                                     |
 | -------------------------- | --------------------------------------------------------------- |
-| `-l`, `--lastMonth`        | Aggregate the previous month.                                   |
 | `-s`, `--separator <text>` | Set the output delimiter. The default is a tab.                 |
 | `-f`, `--format <format>`  | Set the output format to `csv` or `json`. The default is `csv`. |
 | `-h`, `--help`             | Show command-line help.                                         |
@@ -112,11 +110,11 @@ deno task run -- --help
 
 ### Aggregate time entries
 
-Specify the start and end days as day numbers in the current month. The end day
-is included in the aggregation.
+Specify the inclusive start and end dates in `YYYY-MM-DD` format. Date ranges
+may cross month and year boundaries.
 
 ```sh
-toggl summary 1 15
+toggl summary 2026-06-01 2026-06-15
 ```
 
 By default, the command outputs a single tab-separated table with projects in
@@ -124,28 +122,22 @@ the first column and work time in minutes for each project and date in the
 remaining columns. You can paste this output directly into spreadsheet
 applications such as Excel.
 
-Use `--lastMonth` or `-l` to aggregate the previous month:
-
-```sh
-toggl summary --lastMonth 1 31
-```
-
 Use `--separator` or `-s` to change the delimiter:
 
 ```sh
-toggl summary --separator "," 1 15
+toggl summary --separator "," 2026-06-01 2026-06-15
 ```
 
 Use `--no-project` to omit the project column from CSV output:
 
 ```sh
-toggl summary --no-project 1 15
+toggl summary --no-project 2026-06-01 2026-06-15
 ```
 
 Use `--format json` or `-f json` to output JSON:
 
 ```sh
-toggl summary --format json 1 15
+toggl summary --format json 2026-06-01 2026-06-15
 ```
 
 The JSON output maps each date to project IDs and their work time in minutes:
@@ -223,9 +215,8 @@ deno task build
 Run the compiled executable as follows:
 
 ```sh
-./out/toggl summary 1 15
-./out/toggl summary --lastMonth 1 31
-./out/toggl summary --no-project 1 15
+./out/toggl summary 2026-06-01 2026-06-15
+./out/toggl summary --no-project 2026-06-01 2026-06-15
 ./out/toggl projects
 ./out/toggl projects sync
 ./out/toggl config
@@ -278,7 +269,7 @@ When running from a checkout without installing the executable, use
 
 ```sh
 deno task run -- init
-deno task run -- summary 1 15
+deno task run -- summary 2026-06-01 2026-06-15
 deno task run -- projects
 ```
 
