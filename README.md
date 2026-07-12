@@ -104,6 +104,7 @@ deno task run -- --help
 | -------------------------- | --------------------------------------------------------------- |
 | `-s`, `--separator <text>` | Set the output delimiter. The default is a tab.                 |
 | `-f`, `--format <format>`  | Set the output format to `csv` or `json`. The default is `csv`. |
+| `-d`, `--days <days>`      | Aggregate from this many days ago through today.                |
 | `-h`, `--help`             | Show command-line help.                                         |
 | `--no-project`             | Omit the project column from CSV output.                        |
 | `--version`                | Show the CLI version.                                           |
@@ -115,6 +116,16 @@ may cross month and year boundaries.
 
 ```sh
 toggl summary 2026-06-01 2026-06-15
+```
+
+Alternatively, use `--days` or `-d` to aggregate from the specified number of
+days ago through today. Today is determined using the configured `timezone`, or
+UTC when no timezone is configured. Both endpoints are included, so `--days 7`
+outputs eight days including today.
+
+```sh
+toggl summary --days 7
+toggl summary -d 7
 ```
 
 By default, the command outputs a single tab-separated table with projects in
