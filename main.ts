@@ -9,26 +9,6 @@ import { runSummaryCommand } from "./command/summary.ts";
 import { togglClient } from "./toggl/api.ts";
 import { version } from "./version.ts";
 
-export type TargetMonth = {
-  year: number;
-  month: number;
-};
-
-export function resolveTargetMonth(
-  now: TargetMonth,
-  lastMonth: boolean,
-): TargetMonth {
-  if (!lastMonth) {
-    return { year: now.year, month: now.month };
-  }
-
-  if (now.month === 1) {
-    return { year: now.year - 1, month: 12 };
-  }
-
-  return { year: now.year, month: now.month - 1 };
-}
-
 export async function main(args: string[]): Promise<number> {
   let command;
   try {

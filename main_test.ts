@@ -23,7 +23,6 @@ import {
   formatWorkTimeTable,
 } from "./command/summary.ts";
 import { parseConfigToml, parseProjectsConfig } from "./config.ts";
-import { resolveTargetMonth } from "./main.ts";
 import {
   createProject,
   sortProjectsByDisplayOrder,
@@ -51,8 +50,7 @@ Deno.test("createHelpText describes commands and options", () => {
   assertEquals(
     createHelpText(),
     `Usage:
-  toggl summary <start-day> <end-day> [options]
-  toggl <start-day> <end-day> [options]
+  toggl summary <start-date> <end-date> [options]
   toggl projects [options]
   toggl projects sync
   toggl config [options]
@@ -65,10 +63,10 @@ Commands:
   summary   Summarize time entries for a range of days
 
 Options:
-  -l, --lastMonth        Aggregate the previous month
   -s, --separator <text> Set the output delimiter (default: tab)
   -f, --format <format>  Set the output format: csv or json (default: csv)
   -h, --help             Show this help
+      --no-project       Omit the project column from CSV output
       --version          Show the version`,
   );
 });
@@ -84,13 +82,13 @@ Deno.test("parseCliArgs parses the version option", () => {
 
 Deno.test("parseCliArgs parses the explicit summary command", () => {
   const command = parseCliArgs(
-    ["summary", "--format", "json", "1", "31"],
-    datetime({ year: 2026, month: 5, day: 10 }),
+    ["summary", "--format", "json", "2026-05-01", "2026-05-31"],
   );
 
   if (command.name !== "summary") throw new Error("expected summary command");
   assertEquals(command.format, "json");
   assertEquals(command.separator, "\t");
+  assertEquals(command.noProject, false);
   assertEquals(
     [command.startDay.year, command.startDay.month, command.startDay.day],
     [2026, 5, 1],
@@ -101,35 +99,64 @@ Deno.test("parseCliArgs parses the explicit summary command", () => {
   );
 });
 
-Deno.test("parseCliArgs applies summary options and the previous month", () => {
+Deno.test("parseCliArgs accepts a summary range across years", () => {
   const command = parseCliArgs(
-    ["summary", "--lastMonth", "--separator", ",", "1", "31"],
-    datetime({ year: 2026, month: 1, day: 10 }),
+    ["summary", "--separator", ",", "2025-12-31", "2026-01-01"],
   );
 
   if (command.name !== "summary") throw new Error("expected summary command");
   assertEquals(command.separator, ",");
+  assertEquals(command.noProject, false);
   assertEquals(
     [command.startDay.year, command.startDay.month, command.startDay.day],
-    [2025, 12, 1],
+    [2025, 12, 31],
   );
+  assertEquals(command.endDay.toString(), "2026-01-01");
+});
+
+Deno.test("parseCliArgs parses summary without the project column", () => {
+  const command = parseCliArgs(
+    ["summary", "--no-project", "2026-05-01", "2026-05-15"],
+  );
+
+  if (command.name !== "summary") throw new Error("expected summary command");
+  assertEquals(command.noProject, true);
 });
 
 Deno.test("parseCliArgs validates summary format and dates", () => {
   assertThrows(
-    () => parseCliArgs(["summary", "--format", "xml", "1", "2"]),
+    () =>
+      parseCliArgs(["summary", "--format", "xml", "2026-05-01", "2026-05-02"]),
     CliUsageError,
     "format must be csv or json",
   );
   assertThrows(
-    () =>
-      parseCliArgs(
-        ["summary", "31", "1"],
-        datetime({ year: 2026, month: 5, day: 10 }),
-      ),
+    () => parseCliArgs(["summary", "2026-05-31", "2026-05-01"]),
     CliUsageError,
-    "start and end day must be valid dates",
+    "start date must not be after end date",
   );
+  assertThrows(
+    () => parseCliArgs(["summary", "2026-02-29", "2026-03-01"]),
+    CliUsageError,
+    "start and end date must be valid dates",
+  );
+  assertThrows(
+    () => parseCliArgs(["summary", "1", "15"]),
+    CliUsageError,
+    "start and end date must use YYYY-MM-DD",
+  );
+  assertThrows(
+    () => parseCliArgs(["summary", "--lastMonth", "2026-05-01", "2026-05-31"]),
+    CliUsageError,
+    "Unknown option",
+  );
+});
+
+Deno.test("parseCliArgs accepts leap-day summary boundaries", () => {
+  const command = parseCliArgs(["summary", "2024-02-01", "2024-02-29"]);
+  if (command.name !== "summary") throw new Error("expected summary command");
+  assertEquals(command.startDay.toString(), "2024-02-01");
+  assertEquals(command.endDay.toString(), "2024-02-29");
 });
 
 Deno.test("parseCliArgs rejects the removed root summary syntax", () => {
@@ -564,27 +591,6 @@ hidden = false`;
   );
 });
 
-Deno.test("resolveTargetMonth returns December in previous year for January last month", () => {
-  assertEquals(
-    resolveTargetMonth({ year: 2026, month: 1 }, true),
-    { year: 2025, month: 12 },
-  );
-});
-
-Deno.test("resolveTargetMonth returns previous month in the same year", () => {
-  assertEquals(
-    resolveTargetMonth({ year: 2026, month: 5 }, true),
-    { year: 2026, month: 4 },
-  );
-});
-
-Deno.test("resolveTargetMonth returns current month when lastMonth is false", () => {
-  assertEquals(
-    resolveTargetMonth({ year: 2026, month: 5 }, false),
-    { year: 2026, month: 5 },
-  );
-});
-
 Deno.test("buildWorkTimeTable structures project rows across the requested date range", () => {
   const table = buildWorkTimeTable(
     [
@@ -677,6 +683,42 @@ Deno.test("formatWorkTimeTable renders a single TSV table for spreadsheet paste"
       "Project\t2026-05-01\t2026-05-02\t2026-05-03\t2026-05-04\t2026-05-05\t2026-05-06\t2026-05-07\t2026-05-08\t2026-05-09\t2026-05-10",
       "Client A\t5\t\t\t\t\t\t\t\t\t",
       "Internal\t\t\t\t\t\t\t\t\t\t123.45",
+    ].join("\n"),
+  );
+});
+
+Deno.test("formatWorkTimeTable can omit the project column", () => {
+  const table = buildWorkTimeTable(
+    [
+      {
+        id: 100,
+        name: "Client work",
+        displayName: "Client A",
+        active: true,
+        hidden: false,
+      },
+      {
+        id: 200,
+        name: "Internal",
+        displayName: "Internal",
+        active: true,
+        hidden: false,
+      },
+    ],
+    {
+      "2026-05-01": { 100: 5 },
+      "2026-05-02": { 200: 30 },
+    },
+    Temporal.PlainDate.from("2026-05-01"),
+    Temporal.PlainDate.from("2026-05-02"),
+  );
+
+  assertEquals(
+    formatWorkTimeTable(table, "\t", true),
+    [
+      "2026-05-01\t2026-05-02",
+      "5\t",
+      "\t30",
     ].join("\n"),
   );
 });
