@@ -9,13 +9,23 @@ import type { TogglClient } from "../toggl/api.ts";
 
 export type SummaryFormat = "csv" | "json";
 
-export interface SummaryCommand {
-  startDay: Temporal.PlainDate;
-  endDay: Temporal.PlainDate;
+interface SummaryOptions {
   separator: string;
   format: SummaryFormat;
   noProject: boolean;
 }
+
+export type SummaryDateRange = {
+  startDay: Temporal.PlainDate;
+  endDay: Temporal.PlainDate;
+};
+
+export type SummaryCommand =
+  & SummaryOptions
+  & (
+    | SummaryDateRange
+    | { days: number }
+  );
 
 export interface WorkTimeTable {
   projectNames: string[];
@@ -109,13 +119,30 @@ export function outputTimeEntriesJson(
   console.log(formatTimeEntriesJson(dateEntries));
 }
 
+export function resolveSummaryDateRange(
+  cmd: SummaryCommand,
+  timeZone: string | undefined,
+  now: Temporal.Instant = Temporal.Now.instant(),
+): SummaryDateRange {
+  if (!("days" in cmd)) {
+    return { startDay: cmd.startDay, endDay: cmd.endDay };
+  }
+
+  const endDay = now.toZonedDateTimeISO(timeZone ?? "UTC").toPlainDate();
+  return {
+    startDay: endDay.subtract({ days: cmd.days }),
+    endDay,
+  };
+}
+
 export async function runSummaryCommand(
   cmd: SummaryCommand,
   toggl: TogglClient,
 ): Promise<void> {
-  const { startDay, endDay, separator, format, noProject } = cmd;
+  const { separator, format, noProject } = cmd;
 
   const config = await loadConfig();
+  const { startDay, endDay } = resolveSummaryDateRange(cmd, config.TIMEZONE);
   const dateEntries = await toggl.getTimeEntriesForDays(
     config,
     startDay,

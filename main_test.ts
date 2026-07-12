@@ -21,6 +21,7 @@ import {
   buildWorkTimeTable,
   formatTimeEntriesJson,
   formatWorkTimeTable,
+  resolveSummaryDateRange,
 } from "./command/summary.ts";
 import { parseConfigToml, parseProjectsConfig } from "./config.ts";
 import {
@@ -51,6 +52,7 @@ Deno.test("createHelpText describes commands and options", () => {
     createHelpText(),
     `Usage:
   toggl summary <start-date> <end-date> [options]
+  toggl summary --days <days> [options]
   toggl projects [options]
   toggl projects sync
   toggl config [options]
@@ -65,6 +67,7 @@ Commands:
 Options:
   -s, --separator <text> Set the output delimiter (default: tab)
   -f, --format <format>  Set the output format: csv or json (default: csv)
+  -d, --days <days>      Aggregate from this many days ago through today
   -h, --help             Show this help
       --no-project       Omit the project column from CSV output
       --version          Show the version`,
@@ -85,7 +88,9 @@ Deno.test("parseCliArgs parses the explicit summary command", () => {
     ["summary", "--format", "json", "2026-05-01", "2026-05-31"],
   );
 
-  if (command.name !== "summary") throw new Error("expected summary command");
+  if (command.name !== "summary" || !("startDay" in command)) {
+    throw new Error("expected summary date range");
+  }
   assertEquals(command.format, "json");
   assertEquals(command.separator, "\t");
   assertEquals(command.noProject, false);
@@ -104,7 +109,9 @@ Deno.test("parseCliArgs accepts a summary range across years", () => {
     ["summary", "--separator", ",", "2025-12-31", "2026-01-01"],
   );
 
-  if (command.name !== "summary") throw new Error("expected summary command");
+  if (command.name !== "summary" || !("startDay" in command)) {
+    throw new Error("expected summary date range");
+  }
   assertEquals(command.separator, ",");
   assertEquals(command.noProject, false);
   assertEquals(
@@ -121,6 +128,68 @@ Deno.test("parseCliArgs parses summary without the project column", () => {
 
   if (command.name !== "summary") throw new Error("expected summary command");
   assertEquals(command.noProject, true);
+});
+
+Deno.test("parseCliArgs parses long and short summary days options", () => {
+  for (const option of ["--days", "-d"]) {
+    const command = parseCliArgs([
+      "summary",
+      option,
+      "7",
+      "--format",
+      "json",
+    ]);
+
+    if (command.name !== "summary" || !("days" in command)) {
+      throw new Error("expected relative summary range");
+    }
+    assertEquals(command.days, 7);
+    assertEquals(command.format, "json");
+  }
+});
+
+Deno.test("parseCliArgs accepts zero summary days", () => {
+  const command = parseCliArgs(["summary", "--days", "0"]);
+  if (command.name !== "summary" || !("days" in command)) {
+    throw new Error("expected relative summary range");
+  }
+  assertEquals(command.days, 0);
+});
+
+Deno.test("parseCliArgs rejects invalid or ambiguous summary days", () => {
+  assertThrows(
+    () => parseCliArgs(["summary", "--days", "-1"]),
+    CliUsageError,
+  );
+  for (const days of ["1.5", "seven", "9007199254740992"]) {
+    assertThrows(
+      () => parseCliArgs(["summary", "--days", days]),
+      CliUsageError,
+      "days must be a non-negative integer",
+    );
+  }
+  assertThrows(
+    () =>
+      parseCliArgs([
+        "summary",
+        "--days",
+        "7",
+        "2026-05-01",
+        "2026-05-31",
+      ]),
+    CliUsageError,
+    "summary accepts either start and end date or --days, not both",
+  );
+  assertThrows(
+    () => parseCliArgs(["summary"]),
+    CliUsageError,
+    "summary requires start and end date or --days",
+  );
+  assertThrows(
+    () => parseCliArgs(["summary", "--days"]),
+    CliUsageError,
+    "argument missing",
+  );
 });
 
 Deno.test("parseCliArgs validates summary format and dates", () => {
@@ -154,9 +223,41 @@ Deno.test("parseCliArgs validates summary format and dates", () => {
 
 Deno.test("parseCliArgs accepts leap-day summary boundaries", () => {
   const command = parseCliArgs(["summary", "2024-02-01", "2024-02-29"]);
-  if (command.name !== "summary") throw new Error("expected summary command");
+  if (command.name !== "summary" || !("startDay" in command)) {
+    throw new Error("expected summary date range");
+  }
   assertEquals(command.startDay.toString(), "2024-02-01");
   assertEquals(command.endDay.toString(), "2024-02-29");
+});
+
+Deno.test("resolveSummaryDateRange uses the configured timezone", () => {
+  const command = {
+    days: 7,
+    separator: "\t",
+    format: "csv" as const,
+    noProject: false,
+  };
+  const now = Temporal.Instant.from("2026-01-01T00:30:00Z");
+
+  assertEquals(resolveSummaryDateRange(command, "UTC", now), {
+    startDay: Temporal.PlainDate.from("2025-12-25"),
+    endDay: Temporal.PlainDate.from("2026-01-01"),
+  });
+  assertEquals(resolveSummaryDateRange(command, "America/Los_Angeles", now), {
+    startDay: Temporal.PlainDate.from("2025-12-24"),
+    endDay: Temporal.PlainDate.from("2025-12-31"),
+  });
+});
+
+Deno.test("resolveSummaryDateRange defaults to UTC and accepts zero days", () => {
+  const range = resolveSummaryDateRange(
+    { days: 0, separator: "\t", format: "csv", noProject: false },
+    undefined,
+    Temporal.Instant.from("2026-05-10T23:30:00Z"),
+  );
+
+  assertEquals(range.startDay, Temporal.PlainDate.from("2026-05-10"));
+  assertEquals(range.endDay, Temporal.PlainDate.from("2026-05-10"));
 });
 
 Deno.test("parseCliArgs rejects the removed root summary syntax", () => {

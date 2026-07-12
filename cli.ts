@@ -6,6 +6,7 @@ import type { SummaryFormat } from "./command/summary.ts";
 export function createHelpText(): string {
   return `Usage:
   toggl summary <start-date> <end-date> [options]
+  toggl summary --days <days> [options]
   toggl projects [options]
   toggl projects sync
   toggl config [options]
@@ -20,6 +21,7 @@ Commands:
 Options:
   -s, --separator <text> Set the output delimiter (default: tab)
   -f, --format <format>  Set the output format: csv or json (default: csv)
+  -d, --days <days>      Aggregate from this many days ago through today
   -h, --help             Show this help
       --no-project       Omit the project column from CSV output
       --version          Show the version`;
@@ -36,12 +38,14 @@ export type CliCommand =
   | { name: "projects-sync" }
   | {
     name: "summary";
-    startDay: Temporal.PlainDate;
-    endDay: Temporal.PlainDate;
     separator: string;
     format: SummaryFormat;
     noProject: boolean;
-  };
+  }
+    & (
+      | { startDay: Temporal.PlainDate; endDay: Temporal.PlainDate }
+      | { days: number }
+    );
 
 export class CliUsageError extends Error {}
 
@@ -105,14 +109,40 @@ function parseSummaryArgs(args: string[]): CliCommand {
     options: {
       separator: { type: "string", short: "s", default: "\t" },
       format: { type: "string", short: "f", default: "csv" },
+      days: { type: "string", short: "d" },
       "no-project": { type: "boolean", default: false },
     },
     allowPositionals: true,
     strict: true,
   });
 
+  const common = {
+    name: "summary",
+    separator: parsed.values.separator ?? "\t",
+    format: parseFormat(parsed.values.format),
+    noProject: parsed.values["no-project"] ?? false,
+  } as const;
+
+  if (parsed.values.days !== undefined) {
+    if (parsed.positionals.length > 0) {
+      throw new CliUsageError(
+        "summary accepts either start and end date or --days, not both",
+      );
+    }
+
+    if (!/^\d+$/.test(parsed.values.days)) {
+      throw new CliUsageError("days must be a non-negative integer");
+    }
+    const days = Number(parsed.values.days);
+    if (!Number.isSafeInteger(days)) {
+      throw new CliUsageError("days must be a non-negative integer");
+    }
+
+    return { ...common, days };
+  }
+
   if (parsed.positionals.length !== 2) {
-    throw new CliUsageError("summary requires start and end date");
+    throw new CliUsageError("summary requires start and end date or --days");
   }
 
   const startDay = parseIsoDate(parsed.positionals[0]);
@@ -122,14 +152,7 @@ function parseSummaryArgs(args: string[]): CliCommand {
     throw new CliUsageError("start date must not be after end date");
   }
 
-  return {
-    name: "summary",
-    startDay,
-    endDay,
-    separator: parsed.values.separator ?? "\t",
-    format: parseFormat(parsed.values.format),
-    noProject: parsed.values["no-project"] ?? false,
-  };
+  return { ...common, startDay, endDay };
 }
 
 export function parseCliArgs(
