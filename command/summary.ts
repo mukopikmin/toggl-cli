@@ -14,6 +14,7 @@ export interface SummaryCommand {
   endDay: Temporal.PlainDate;
   separator: string;
   format: SummaryFormat;
+  noProject: boolean;
 }
 
 export interface WorkTimeTable {
@@ -71,13 +72,18 @@ export function buildWorkTimeTable(
 export function formatWorkTimeTable(
   table: WorkTimeTable,
   separator: string,
+  noProject = false,
 ): string {
   const lines = [
-    ["Project", ...table.headers].join(separator),
+    (noProject ? table.headers : ["Project", ...table.headers]).join(
+      separator,
+    ),
   ];
 
   for (const [index, row] of table.rows.entries()) {
-    lines.push([table.projectNames[index], ...row].join(separator));
+    lines.push(
+      (noProject ? row : [table.projectNames[index], ...row]).join(separator),
+    );
   }
 
   return lines.join("\n");
@@ -86,8 +92,9 @@ export function formatWorkTimeTable(
 export function outputWorkTimeTable(
   table: WorkTimeTable,
   separator: string,
+  noProject = false,
 ): void {
-  console.log(formatWorkTimeTable(table, separator));
+  console.log(formatWorkTimeTable(table, separator, noProject));
 }
 
 export function formatTimeEntriesJson(
@@ -106,7 +113,7 @@ export async function runSummaryCommand(
   cmd: SummaryCommand,
   toggl: TogglClient,
 ): Promise<void> {
-  const { startDay, endDay, separator, format } = cmd;
+  const { startDay, endDay, separator, format, noProject } = cmd;
 
   const config = await loadConfig();
   const dateEntries = await toggl.getTimeEntriesForDays(
@@ -131,5 +138,5 @@ export async function runSummaryCommand(
     endDay,
   );
 
-  outputWorkTimeTable(table, separator);
+  outputWorkTimeTable(table, separator, noProject);
 }

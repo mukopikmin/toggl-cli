@@ -69,6 +69,7 @@ Options:
   -s, --separator <text> Set the output delimiter (default: tab)
   -f, --format <format>  Set the output format: csv or json (default: csv)
   -h, --help             Show this help
+      --no-project       Omit the project column from CSV output
       --version          Show the version`,
   );
 });
@@ -91,6 +92,7 @@ Deno.test("parseCliArgs parses the explicit summary command", () => {
   if (command.name !== "summary") throw new Error("expected summary command");
   assertEquals(command.format, "json");
   assertEquals(command.separator, "\t");
+  assertEquals(command.noProject, false);
   assertEquals(
     [command.startDay.year, command.startDay.month, command.startDay.day],
     [2026, 5, 1],
@@ -109,10 +111,21 @@ Deno.test("parseCliArgs applies summary options and the previous month", () => {
 
   if (command.name !== "summary") throw new Error("expected summary command");
   assertEquals(command.separator, ",");
+  assertEquals(command.noProject, false);
   assertEquals(
     [command.startDay.year, command.startDay.month, command.startDay.day],
     [2025, 12, 1],
   );
+});
+
+Deno.test("parseCliArgs parses summary without the project column", () => {
+  const command = parseCliArgs(
+    ["summary", "--no-project", "1", "15"],
+    datetime({ year: 2026, month: 5, day: 10 }),
+  );
+
+  if (command.name !== "summary") throw new Error("expected summary command");
+  assertEquals(command.noProject, true);
 });
 
 Deno.test("parseCliArgs validates summary format and dates", () => {
@@ -677,6 +690,42 @@ Deno.test("formatWorkTimeTable renders a single TSV table for spreadsheet paste"
       "Project\t2026-05-01\t2026-05-02\t2026-05-03\t2026-05-04\t2026-05-05\t2026-05-06\t2026-05-07\t2026-05-08\t2026-05-09\t2026-05-10",
       "Client A\t5\t\t\t\t\t\t\t\t\t",
       "Internal\t\t\t\t\t\t\t\t\t\t123.45",
+    ].join("\n"),
+  );
+});
+
+Deno.test("formatWorkTimeTable can omit the project column", () => {
+  const table = buildWorkTimeTable(
+    [
+      {
+        id: 100,
+        name: "Client work",
+        displayName: "Client A",
+        active: true,
+        hidden: false,
+      },
+      {
+        id: 200,
+        name: "Internal",
+        displayName: "Internal",
+        active: true,
+        hidden: false,
+      },
+    ],
+    {
+      "2026-05-01": { 100: 5 },
+      "2026-05-02": { 200: 30 },
+    },
+    Temporal.PlainDate.from("2026-05-01"),
+    Temporal.PlainDate.from("2026-05-02"),
+  );
+
+  assertEquals(
+    formatWorkTimeTable(table, "\t", true),
+    [
+      "2026-05-01\t2026-05-02",
+      "5\t",
+      "\t30",
     ].join("\n"),
   );
 });
