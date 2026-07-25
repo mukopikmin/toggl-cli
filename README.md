@@ -263,6 +263,16 @@ target.
 For native targets, the release build runs the compiled binary with `--version`
 to verify that the requested release version was embedded.
 
+Pushing a semantic-version tag, with or without a leading `v` (for example,
+`v0.1.0` or `0.1.0`), publishes all three archives and their checksum files as a
+GitHub release. Release notes start at the previous stable release; the
+`release-notes-baseline` tag is used when there is no previous stable release.
+
+After the `Test` workflow succeeds on `main`, the tested commit is also
+published as the `v<stable-version>-nightly` prerelease. This moving Nightly
+release is rebuilt from the latest stable version, and older Nightly releases
+and tags are removed automatically.
+
 ## Development
 
 When running from a checkout without installing the executable, use
