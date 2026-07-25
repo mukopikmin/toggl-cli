@@ -5,6 +5,8 @@
     "build": "deno task compile --output out/toggl",
     "compile": "DENO_NO_PACKAGE_JSON=1 deno run --allow-read --allow-write --allow-run=deno scripts/compile.ts",
     "dist": "DENO_NO_PACKAGE_JSON=1 deno run --allow-read --allow-write --allow-run scripts/build_release.ts",
+    "release:check": "deno run --allow-run=git,gh scripts/release.ts check",
+    "release:notes": "deno run --allow-run=git,gh --allow-write scripts/release.ts notes",
     "migrate-config": "deno run --allow-read --allow-write --allow-env scripts/migrate_config.ts",
     "install": "deno run --allow-read --allow-write --allow-run=deno --allow-env=HOME scripts/install.ts"
   },
