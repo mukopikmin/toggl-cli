@@ -268,10 +268,12 @@ Pushing a semantic-version tag, with or without a leading `v` (for example,
 GitHub release. Release notes start at the previous stable release; the
 `release-notes-baseline` tag is used when there is no previous stable release.
 
-After the `Test` workflow succeeds on `main`, the tested commit is also
-published as the `v<stable-version>-nightly` prerelease. This moving Nightly
-release is rebuilt from the latest stable version, and older Nightly releases
-and tags are removed automatically.
+After the `Test` workflow succeeds on `main`, the tested commit is published as
+the `nightly` prerelease. Its moving `nightly` tag and assets are replaced on
+each successful run independently of stable releases. Nightly binaries report
+their version as `nightly`, and archives use names such as
+`toggl-cli-vnightly-linux-x64.tar.gz`. Legacy versioned Nightly releases and
+tags are removed automatically.
 
 ## Development
 

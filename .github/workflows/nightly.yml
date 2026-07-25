@@ -33,38 +33,54 @@ jobs:
         with:
           deno-version: v2.8.0
 
-      - name: Derive nightly version
-        id: version
+      - name: Build nightly archives
+        run: deno task dist --version nightly
+
+      - name: Move nightly tag
+        env:
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          git tag --force nightly "$HEAD_SHA"
+          git push origin refs/tags/nightly --force
+
+      - name: Create or update nightly release
         env:
           GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
-          stable_tag="$(gh release list \
-            --exclude-drafts \
-            --exclude-pre-releases \
-            --limit 1 \
-            --json tagName \
-            --jq '.[0].tagName')"
-          stable_version="${stable_tag#v}"
-          if [[ ! "$stable_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Latest stable release '$stable_tag' is not a semantic version." >&2
-            exit 1
+          if gh release view nightly >/dev/null 2>&1; then
+            gh release edit nightly \
+              --title "Nightly" \
+              --notes "Latest tested build from main ($HEAD_SHA)." \
+              --prerelease \
+              --latest=false
+            gh release upload nightly \
+              dist/*.tar.gz \
+              dist/*.zip \
+              dist/*.sha256 \
+              dist/checksums.txt \
+              --clobber
+          else
+            gh release create nightly \
+              dist/*.tar.gz \
+              dist/*.zip \
+              dist/*.sha256 \
+              dist/checksums.txt \
+              --verify-tag \
+              --title "Nightly" \
+              --notes "Latest tested build from main ($HEAD_SHA)." \
+              --prerelease \
+              --latest=false
           fi
-          nightly_version="${stable_version}-nightly"
-          echo "version=$nightly_version" >> "$GITHUB_OUTPUT"
-          echo "tag=v$nightly_version" >> "$GITHUB_OUTPUT"
-
-      - name: Build nightly archives
-        run: deno task dist --version "${{ steps.version.outputs.version }}"
 
       - name: Remove obsolete nightly releases and tags
         env:
           GH_TOKEN: ${{ github.token }}
-          CURRENT_TAG: ${{ steps.version.outputs.tag }}
         run: |
           gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
             --jq '.[] | select(.prerelease and (.tag_name | test("^v?[0-9]+\\.[0-9]+\\.[0-9]+-nightly$"))) | .tag_name' |
           while IFS= read -r tag; do
-            if [[ -n "$tag" && "$tag" != "$CURRENT_TAG" ]]; then
+            if [[ -n "$tag" ]]; then
               gh release delete "$tag" --cleanup-tag --yes
             fi
           done
@@ -72,46 +88,8 @@ jobs:
           gh api --paginate "repos/$GITHUB_REPOSITORY/git/matching-refs/tags?per_page=100" \
             --jq '.[].ref | sub("^refs/tags/"; "") | select(test("^v?[0-9]+\\.[0-9]+\\.[0-9]+-nightly$"))' |
           while IFS= read -r tag; do
-            if [[ -n "$tag" && "$tag" != "$CURRENT_TAG" ]]; then
+            if [[ -n "$tag" ]]; then
               encoded_tag="${tag//\//%2F}"
               gh api --method DELETE "repos/$GITHUB_REPOSITORY/git/refs/tags/$encoded_tag"
             fi
           done
-
-      - name: Create or update nightly release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          NIGHTLY_TAG: ${{ steps.version.outputs.tag }}
-          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
-        run: |
-          if gh release view "$NIGHTLY_TAG" >/dev/null 2>&1; then
-            encoded_tag="${NIGHTLY_TAG//\//%2F}"
-            gh api \
-              --method PATCH \
-              "repos/$GITHUB_REPOSITORY/git/refs/tags/$encoded_tag" \
-              -f sha="$HEAD_SHA" \
-              -F force=true
-            gh release edit "$NIGHTLY_TAG" \
-              --title "Nightly (${{ steps.version.outputs.version }})" \
-              --prerelease
-            gh release upload "$NIGHTLY_TAG" \
-              dist/*.tar.gz \
-              dist/*.zip \
-              dist/*.sha256 \
-              dist/checksums.txt \
-              --clobber
-          else
-            gh api \
-              --method DELETE \
-              "repos/$GITHUB_REPOSITORY/git/refs/tags/$NIGHTLY_TAG" \
-              >/dev/null 2>&1 || true
-            gh release create "$NIGHTLY_TAG" \
-              dist/*.tar.gz \
-              dist/*.zip \
-              dist/*.sha256 \
-              dist/checksums.txt \
-              --target "$HEAD_SHA" \
-              --title "Nightly (${{ steps.version.outputs.version }})" \
-              --notes "Automated nightly build from $HEAD_SHA." \
-              --prerelease
-          fi
