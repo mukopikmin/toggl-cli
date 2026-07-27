@@ -1,3 +1,4 @@
+import { ClipboardUnavailableError } from "./clipboard.ts";
 import { CliUsageError, HELP_TEXT, parseCliArgs } from "./cli.ts";
 import { runConfigCommand } from "./command/config.ts";
 import { runInitCommand } from "./command/init.ts";
@@ -60,7 +61,13 @@ export async function main(args: string[]): Promise<number> {
       await runProjectsSyncCommand(togglClient);
       return 0;
     case "summary":
-      await runSummaryCommand(command, togglClient);
+      try {
+        await runSummaryCommand(command, togglClient);
+      } catch (error) {
+        if (!(error instanceof ClipboardUnavailableError)) throw error;
+        console.error(`Error: ${error.message}`);
+        return 1;
+      }
       return 0;
     case "time-entries":
       await runTimeEntriesCommand(command, togglClient);

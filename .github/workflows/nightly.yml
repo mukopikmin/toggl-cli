@@ -1,0 +1,95 @@
+name: Nightly
+
+on:
+  workflow_run:
+    workflows:
+      - Test
+    branches:
+      - main
+    types:
+      - completed
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nightly-release
+  cancel-in-progress: false
+
+jobs:
+  nightly:
+    name: Publish nightly
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout tested commit
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: v2.8.0
+
+      - name: Build nightly archives
+        run: deno task dist --version nightly
+
+      - name: Move nightly tag
+        env:
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          git tag --force nightly "$HEAD_SHA"
+          git push origin refs/tags/nightly --force
+
+      - name: Create or update nightly release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          if gh release view nightly >/dev/null 2>&1; then
+            gh release edit nightly \
+              --title "Nightly" \
+              --notes "Latest tested build from main ($HEAD_SHA)." \
+              --prerelease \
+              --latest=false
+            gh release upload nightly \
+              dist/*.tar.gz \
+              dist/*.zip \
+              dist/*.sha256 \
+              dist/checksums.txt \
+              --clobber
+          else
+            gh release create nightly \
+              dist/*.tar.gz \
+              dist/*.zip \
+              dist/*.sha256 \
+              dist/checksums.txt \
+              --verify-tag \
+              --title "Nightly" \
+              --notes "Latest tested build from main ($HEAD_SHA)." \
+              --prerelease \
+              --latest=false
+          fi
+
+      - name: Remove obsolete nightly releases and tags
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq '.[] | select(.prerelease and (.tag_name | test("^v?[0-9]+\\.[0-9]+\\.[0-9]+-nightly$"))) | .tag_name' |
+          while IFS= read -r tag; do
+            if [[ -n "$tag" ]]; then
+              gh release delete "$tag" --cleanup-tag --yes
+            fi
+          done
+
+          gh api --paginate "repos/$GITHUB_REPOSITORY/git/matching-refs/tags?per_page=100" \
+            --jq '.[].ref | sub("^refs/tags/"; "") | select(test("^v?[0-9]+\\.[0-9]+\\.[0-9]+-nightly$"))' |
+          while IFS= read -r tag; do
+            if [[ -n "$tag" ]]; then
+              encoded_tag="${tag//\//%2F}"
+              gh api --method DELETE "repos/$GITHUB_REPOSITORY/git/refs/tags/$encoded_tag"
+            fi
+          done
