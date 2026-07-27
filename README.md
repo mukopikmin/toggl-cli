@@ -271,6 +271,18 @@ target.
 For native targets, the release build runs the compiled binary with `--version`
 to verify that the requested release version was embedded.
 
+Pushing a semantic-version tag, with or without a leading `v` (for example,
+`v0.1.0` or `0.1.0`), publishes all three archives and their checksum files as a
+GitHub release. Release notes start at the previous stable release; the
+`release-notes-baseline` tag is used when there is no previous stable release.
+
+After the `Test` workflow succeeds on `main`, the tested commit is published as
+the `nightly` prerelease. Its moving `nightly` tag and assets are replaced on
+each successful run independently of stable releases. Nightly binaries report
+their version as `nightly`, and archives use names such as
+`toggl-cli-vnightly-linux-x64.tar.gz`. Legacy versioned Nightly releases and
+tags are removed automatically.
+
 ## Install
 
 On Linux and macOS, build in a temporary directory and install the executable to
