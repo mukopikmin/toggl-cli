@@ -106,6 +106,7 @@ const parseVersion = (args: string[]): string => {
   }
 
   if (
+    version !== "nightly" &&
     !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(version)
   ) {
     console.error(`Invalid version: ${version}`);

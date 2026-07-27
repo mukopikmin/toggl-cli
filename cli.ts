@@ -22,6 +22,7 @@ Options:
   -l, --lastMonth        Aggregate the previous month
   -s, --separator <text> Set the output delimiter (default: tab)
   -f, --format <format>  Set the output format: csv or json (default: csv)
+      --clipboard        Copy the output to the clipboard as well as stdout
   -h, --help             Show this help
       --no-project       Omit the project column from CSV output
       --version          Show the version`;
@@ -43,6 +44,7 @@ export type CliCommand =
     separator: string;
     format: SummaryFormat;
     noProject: boolean;
+    clipboard: boolean;
   };
 
 export class CliUsageError extends Error {}
@@ -97,6 +99,7 @@ function parseSummaryArgs(args: string[], now: DateTime): CliCommand {
       separator: { type: "string", short: "s", default: "\t" },
       format: { type: "string", short: "f", default: "csv" },
       "no-project": { type: "boolean", default: false },
+      clipboard: { type: "boolean", default: false },
     },
     allowPositionals: true,
     strict: true,
@@ -152,6 +155,7 @@ function parseSummaryArgs(args: string[], now: DateTime): CliCommand {
     separator: parsed.values.separator ?? "\t",
     format: parseFormat(parsed.values.format),
     noProject: parsed.values["no-project"] ?? false,
+    clipboard: parsed.values.clipboard ?? false,
   };
 }
 

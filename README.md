@@ -116,7 +116,7 @@ Specify the start and end days as day numbers in the current month. The end day
 is included in the aggregation.
 
 ```sh
-toggl summary 1 15
+deno task run -- summary 1 15
 ```
 
 By default, the command outputs a single tab-separated table with projects in
@@ -127,13 +127,13 @@ applications such as Excel.
 Use `--lastMonth` or `-l` to aggregate the previous month:
 
 ```sh
-toggl summary --lastMonth 1 31
+deno task run -- summary --lastMonth 1 31
 ```
 
 Use `--separator` or `-s` to change the delimiter:
 
 ```sh
-toggl summary --separator "," 1 15
+deno task run -- summary --separator "," 1 15
 ```
 
 Use `--no-project` to omit the project column from CSV output:
@@ -145,7 +145,14 @@ toggl summary --no-project 1 15
 Use `--format json` or `-f json` to output JSON:
 
 ```sh
-toggl summary --format json 1 15
+deno task run -- summary --format json 1 15
+```
+
+Use `--clipboard` to print the summary and copy the same output to the
+clipboard:
+
+```sh
+deno task run -- summary --clipboard 1 15
 ```
 
 The JSON output maps each date to project IDs and their work time in minutes:
@@ -163,26 +170,26 @@ The JSON output maps each date to project IDs and their work time in minutes:
 List the display names of all active, visible projects:
 
 ```sh
-toggl projects
+deno task run -- projects
 ```
 
 Project information can also be output as JSON:
 
 ```sh
-toggl projects --format json
+deno task run -- --format json projects
 ```
 
 Print the CLI version:
 
 ```sh
-toggl --version
+deno task run -- --version
 ```
 
 To add all active Toggl projects that are not yet in the configuration file,
 run:
 
 ```sh
-toggl projects sync
+deno task run -- projects sync
 ```
 
 Each new project is appended with its Toggl project name as a comment and with
@@ -194,13 +201,13 @@ are left unchanged.
 Show the loaded configuration values:
 
 ```sh
-toggl config
+deno task run -- config
 ```
 
 Configuration can also be output as JSON:
 
 ```sh
-toggl config --format json
+deno task run -- config --format json
 ```
 
 The `TOKEN` setting is never printed.
@@ -224,6 +231,7 @@ Run the compiled executable as follows:
 
 ```sh
 ./out/toggl summary 1 15
+./out/toggl summary --clipboard 1 15
 ./out/toggl summary --lastMonth 1 31
 ./out/toggl summary --no-project 1 15
 ./out/toggl projects
@@ -270,6 +278,61 @@ target.
 
 For native targets, the release build runs the compiled binary with `--version`
 to verify that the requested release version was embedded.
+
+Before creating a stable release, verify the local checkout and the successful
+GitHub `Test` workflow for the commit on `main`:
+
+```sh
+deno task release:check --version 1.0.0
+```
+
+The check requires a clean `main` branch that exactly matches `origin/main`, an
+unused version tag and GitHub release, and a successful workflow run for the
+target commit. For the first stable release, create the `release-notes-baseline`
+tag on the repository root commit. Later releases use the latest non-draft,
+non-prerelease stable release and ignore Nightly tags.
+
+Preview GitHub's generated title and notes as reviewable JSON on standard
+output, or write them to a file:
+
+```sh
+deno task release:notes --version 1.0.0
+deno task release:notes --version 1.0.0 --output /tmp/release-notes.json
+```
+
+Pushing a semantic-version tag, with or without a leading `v` (for example,
+`v0.1.0` or `0.1.0`), publishes all three archives and their checksum files as a
+GitHub release. Release notes start at the previous stable release; the
+`release-notes-baseline` tag is used when there is no previous stable release.
+
+After the `Test` workflow succeeds on `main`, the tested commit is published as
+the `nightly` prerelease. Its moving `nightly` tag and assets are replaced on
+each successful run independently of stable releases. Nightly binaries report
+their version as `nightly`, and archives use names such as
+`toggl-cli-vnightly-linux-x64.tar.gz`. Legacy versioned Nightly releases and
+tags are removed automatically.
+
+## Install
+
+On Linux and macOS, build in a temporary directory and install the executable to
+`$HOME/.local/bin/toggl`:
+
+```sh
+deno task install --version 0.1.0
+```
+
+Make sure `$HOME/.local/bin` is included in your `PATH`, then run the installed
+command as follows:
+
+```sh
+toggl summary 1 15
+toggl summary --clipboard 1 15
+toggl projects
+toggl config
+```
+
+On Windows, download the `windows-x64` release archive, extract `toggl.exe`, and
+place it in a directory included in your `PATH`.
 
 ## Development
 

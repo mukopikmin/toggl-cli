@@ -1,0 +1,4 @@
+interface:
+  display_name: "Release Toggl CLI"
+  short_description: "Propose and safely publish a Toggl CLI release"
+  default_prompt: "Use $toggl-cli-release to propose the next semantic version and safely prepare and publish the release."

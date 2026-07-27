@@ -19,7 +19,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Setup Deno
-        uses: denoland/setup-deno@667a34cdef165d8d2b2e98dde39547c9daac7282 # v2.0.4
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
           deno-version: v2.8.0
 
@@ -27,10 +27,10 @@ jobs:
         run: deno fmt --check
 
       - name: Type check
-        run: deno check --lock=deno.lock main.ts main_test.ts scripts/install.ts toggl/date_range_test.ts
+        run: deno check --lock=deno.lock main.ts main_test.ts scripts/install.ts scripts/release.ts scripts/release_test.ts toggl/date_range_test.ts
 
       - name: Test
-        run: deno test
+        run: deno test main_test.ts scripts/release_test.ts toggl/date_range_test.ts
 
       - name: Compile
-        run: deno compile --allow-net --allow-read --allow-env --output /tmp/toggl-cli main.ts
+        run: deno compile --quiet --allow-net --allow-read --allow-write --allow-run=pbcopy,wl-copy,xclip,xsel,clip,powershell.exe,powershell --allow-env --output /tmp/toggl-cli main.ts
