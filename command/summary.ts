@@ -1,3 +1,4 @@
+import { writeClipboardText } from "../clipboard.ts";
 import { loadConfig } from "../config.ts";
 import {
   createProjects,
@@ -13,6 +14,12 @@ interface SummaryOptions {
   separator: string;
   format: SummaryFormat;
   noProject: boolean;
+  clipboard: boolean;
+}
+
+export interface SummaryOutput {
+  writeStdout(text: string): void;
+  writeClipboard(text: string): Promise<void>;
 }
 
 export type SummaryDateRange = {
@@ -135,11 +142,31 @@ export function resolveSummaryDateRange(
   };
 }
 
+const defaultSummaryOutput: SummaryOutput = {
+  writeStdout(text: string): void {
+    console.log(text);
+  },
+  writeClipboard: writeClipboardText,
+};
+
+export async function outputSummaryText(
+  text: string,
+  clipboard: boolean,
+  output: SummaryOutput = defaultSummaryOutput,
+): Promise<void> {
+  output.writeStdout(text);
+
+  if (clipboard) {
+    await output.writeClipboard(text);
+  }
+}
+
 export async function runSummaryCommand(
   cmd: SummaryCommand,
   toggl: TogglClient,
+  output: SummaryOutput = defaultSummaryOutput,
 ): Promise<void> {
-  const { separator, format, noProject } = cmd;
+  const { separator, format, noProject, clipboard } = cmd;
 
   const config = await loadConfig();
   const { startDay, endDay } = resolveSummaryDateRange(cmd, config.TIMEZONE);
@@ -150,7 +177,11 @@ export async function runSummaryCommand(
   );
 
   if (format === "json") {
-    outputTimeEntriesJson(dateEntries);
+    await outputSummaryText(
+      formatTimeEntriesJson(dateEntries),
+      clipboard,
+      output,
+    );
     return;
   }
 
@@ -165,5 +196,9 @@ export async function runSummaryCommand(
     endDay,
   );
 
-  outputWorkTimeTable(table, separator, noProject);
+  await outputSummaryText(
+    formatWorkTimeTable(table, separator, noProject),
+    clipboard,
+    output,
+  );
 }
