@@ -1,5 +1,5 @@
-import { assertEquals, assertThrows } from "@std/assert";
-import { datetime } from "ptera";
+import { assertEquals, assertRejects, assertThrows } from "@std/assert";
+import { ClipboardUnavailableError } from "./clipboard.ts";
 import {
   CliUsageError,
   createHelpText,
@@ -21,6 +21,7 @@ import {
   buildWorkTimeTable,
   formatTimeEntriesJson,
   formatWorkTimeTable,
+  outputSummaryText,
 } from "./command/summary.ts";
 import { parseConfigToml, parseProjectsConfig } from "./config.ts";
 import {
@@ -44,6 +45,7 @@ Deno.test("parseCliArgs returns help for the root command", () => {
   assertEquals(HELP_TEXT.includes("toggl summary"), true);
   assertEquals(HELP_TEXT.includes("toggl config"), true);
   assertEquals(HELP_TEXT.includes("-h, --help"), true);
+  assertEquals(HELP_TEXT.includes("--clipboard"), true);
 });
 
 Deno.test("createHelpText describes commands and options", () => {
@@ -65,6 +67,7 @@ Commands:
 Options:
   -s, --separator <text> Set the output delimiter (default: tab)
   -f, --format <format>  Set the output format: csv or json (default: csv)
+      --clipboard        Copy the output to the clipboard as well as stdout
   -h, --help             Show this help
       --no-project       Omit the project column from CSV output
       --version          Show the version`,
@@ -89,6 +92,7 @@ Deno.test("parseCliArgs parses the explicit summary command", () => {
   assertEquals(command.format, "json");
   assertEquals(command.separator, "\t");
   assertEquals(command.noProject, false);
+  assertEquals(command.clipboard, false);
   assertEquals(
     [command.startDay.year, command.startDay.month, command.startDay.day],
     [2026, 5, 1],
@@ -101,12 +105,20 @@ Deno.test("parseCliArgs parses the explicit summary command", () => {
 
 Deno.test("parseCliArgs accepts a summary range across years", () => {
   const command = parseCliArgs(
-    ["summary", "--separator", ",", "2025-12-31", "2026-01-01"],
+    [
+      "summary",
+      "--separator",
+      ",",
+      "--clipboard",
+      "2025-12-31",
+      "2026-01-01",
+    ],
   );
 
   if (command.name !== "summary") throw new Error("expected summary command");
   assertEquals(command.separator, ",");
   assertEquals(command.noProject, false);
+  assertEquals(command.clipboard, true);
   assertEquals(
     [command.startDay.year, command.startDay.month, command.startDay.day],
     [2025, 12, 31],
@@ -157,6 +169,66 @@ Deno.test("parseCliArgs accepts leap-day summary boundaries", () => {
   if (command.name !== "summary") throw new Error("expected summary command");
   assertEquals(command.startDay.toString(), "2024-02-01");
   assertEquals(command.endDay.toString(), "2024-02-29");
+});
+
+Deno.test("outputSummaryText writes to stdout only by default", async () => {
+  const stdout: string[] = [];
+  const clipboard: string[] = [];
+
+  await outputSummaryText("summary output", false, {
+    writeStdout(text) {
+      stdout.push(text);
+    },
+    writeClipboard(text) {
+      clipboard.push(text);
+      return Promise.resolve();
+    },
+  });
+
+  assertEquals(stdout, ["summary output"]);
+  assertEquals(clipboard, []);
+});
+
+Deno.test("outputSummaryText writes to stdout and clipboard", async () => {
+  const stdout: string[] = [];
+  const clipboard: string[] = [];
+
+  await outputSummaryText("summary output", true, {
+    writeStdout(text) {
+      stdout.push(text);
+    },
+    writeClipboard(text) {
+      clipboard.push(text);
+      return Promise.resolve();
+    },
+  });
+
+  assertEquals(stdout, ["summary output"]);
+  assertEquals(clipboard, ["summary output"]);
+});
+
+Deno.test("outputSummaryText reports clipboard failure without command details", async () => {
+  const stdout: string[] = [];
+
+  await assertRejects(
+    () =>
+      outputSummaryText("summary output", true, {
+        writeStdout(text) {
+          stdout.push(text);
+        },
+        writeClipboard() {
+          throw new ClipboardUnavailableError();
+        },
+      }),
+    ClipboardUnavailableError,
+    "Could not copy output to the clipboard.",
+  );
+
+  assertEquals(stdout, ["summary output"]);
+  assertEquals(
+    new ClipboardUnavailableError().message.includes("not found"),
+    false,
+  );
 });
 
 Deno.test("parseCliArgs rejects the removed root summary syntax", () => {

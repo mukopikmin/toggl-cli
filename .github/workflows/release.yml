@@ -1,0 +1,85 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+      - "[0-9]*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Publish release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: v2.8.0
+
+      - name: Validate release version
+        id: version
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          version="${TAG_NAME#v}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Tag '$TAG_NAME' does not contain a supported semantic version." >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [[ "$version" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build release archives
+        run: deno task dist --version "${{ steps.version.outputs.version }}"
+
+      - name: Find release notes baseline
+        id: notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CURRENT_TAG: ${{ github.ref_name }}
+        run: |
+          previous_tag=""
+          while IFS= read -r tag; do
+            if [[ "$tag" != "$CURRENT_TAG" ]]; then
+              previous_tag="$tag"
+              break
+            fi
+          done < <(gh release list \
+            --exclude-drafts \
+            --exclude-pre-releases \
+            --limit 100 \
+            --json tagName \
+            --jq '.[].tagName')
+          echo "tag=${previous_tag:-release-notes-baseline}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IS_PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        run: |
+          release_options=(
+            --verify-tag
+            --title "${{ github.ref_name }}"
+            --generate-notes
+            --notes-start-tag "${{ steps.notes.outputs.tag }}"
+          )
+          if [[ "$IS_PRERELEASE" == "true" ]]; then
+            release_options+=(--prerelease)
+          fi
+          gh release create "${{ github.ref_name }}" \
+            dist/*.tar.gz \
+            dist/*.zip \
+            dist/*.sha256 \
+            dist/checksums.txt \
+            "${release_options[@]}"
