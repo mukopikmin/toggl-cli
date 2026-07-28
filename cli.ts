@@ -25,6 +25,7 @@ Options:
       --clipboard        Copy the output to the clipboard as well as stdout
   -h, --help             Show this help
       --no-project       Omit the project column from CSV output
+      --no-date          Omit the date header row from CSV output
       --version          Show the version`;
 }
 
@@ -42,6 +43,7 @@ export type CliCommand =
     separator: string;
     format: SummaryFormat;
     noProject: boolean;
+    noDate: boolean;
     clipboard: boolean;
   }
     & (
@@ -113,6 +115,7 @@ function parseSummaryArgs(args: string[]): CliCommand {
       format: { type: "string", short: "f", default: "csv" },
       days: { type: "string", short: "d" },
       "no-project": { type: "boolean", default: false },
+      "no-date": { type: "boolean", default: false },
       clipboard: { type: "boolean", default: false },
     },
     allowPositionals: true,
@@ -124,6 +127,7 @@ function parseSummaryArgs(args: string[]): CliCommand {
     separator: parsed.values.separator ?? "\t",
     format: parseFormat(parsed.values.format),
     noProject: parsed.values["no-project"] ?? false,
+    noDate: parsed.values["no-date"] ?? false,
     clipboard: parsed.values.clipboard ?? false,
   } as const;
 

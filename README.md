@@ -108,6 +108,7 @@ deno task run -- --help
 | `--clipboard`              | Copy the output to the clipboard as well as stdout.             |
 | `-h`, `--help`             | Show command-line help.                                         |
 | `--no-project`             | Omit the project column from CSV output.                        |
+| `--no-date`                | Omit the date header row from CSV output.                       |
 | `--version`                | Show the CLI version.                                           |
 
 ### Aggregate time entries
@@ -144,6 +145,18 @@ Use `--no-project` to omit the project column from CSV output:
 
 ```sh
 deno task run -- summary --no-project 2026-06-01 2026-06-15
+```
+
+Use `--no-date` to omit the date header row from CSV output:
+
+```sh
+deno task run -- summary --no-date 2026-06-01 2026-06-15
+```
+
+The two options can be combined to output only the work-time values:
+
+```sh
+deno task run -- summary --no-project --no-date 2026-06-01 2026-06-15
 ```
 
 Use `--format json` or `-f json` to output JSON:

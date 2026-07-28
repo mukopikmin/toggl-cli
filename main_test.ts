@@ -73,6 +73,7 @@ Options:
       --clipboard        Copy the output to the clipboard as well as stdout
   -h, --help             Show this help
       --no-project       Omit the project column from CSV output
+      --no-date          Omit the date header row from CSV output
       --version          Show the version`,
   );
 });
@@ -97,6 +98,7 @@ Deno.test("parseCliArgs parses the explicit summary command", () => {
   assertEquals(command.format, "json");
   assertEquals(command.separator, "\t");
   assertEquals(command.noProject, false);
+  assertEquals(command.noDate, false);
   assertEquals(command.clipboard, false);
   assertEquals(
     [command.startDay.year, command.startDay.month, command.startDay.day],
@@ -125,6 +127,7 @@ Deno.test("parseCliArgs accepts a summary range across years", () => {
   }
   assertEquals(command.separator, ",");
   assertEquals(command.noProject, false);
+  assertEquals(command.noDate, false);
   assertEquals(command.clipboard, true);
   assertEquals(
     [command.startDay.year, command.startDay.month, command.startDay.day],
@@ -140,6 +143,15 @@ Deno.test("parseCliArgs parses summary without the project column", () => {
 
   if (command.name !== "summary") throw new Error("expected summary command");
   assertEquals(command.noProject, true);
+});
+
+Deno.test("parseCliArgs parses summary without the date header row", () => {
+  const command = parseCliArgs(
+    ["summary", "--no-date", "2026-05-01", "2026-05-15"],
+  );
+
+  if (command.name !== "summary") throw new Error("expected summary command");
+  assertEquals(command.noDate, true);
 });
 
 Deno.test("parseCliArgs parses long and short summary days options", () => {
@@ -248,6 +260,7 @@ Deno.test("resolveSummaryDateRange uses the configured timezone", () => {
     separator: "\t",
     format: "csv" as const,
     noProject: false,
+    noDate: false,
     clipboard: false,
   };
   const now = Temporal.Instant.from("2026-01-01T00:30:00Z");
@@ -269,6 +282,7 @@ Deno.test("resolveSummaryDateRange defaults to UTC and accepts zero days", () =>
       separator: "\t",
       format: "csv",
       noProject: false,
+      noDate: false,
       clipboard: false,
     },
     undefined,
@@ -900,6 +914,23 @@ Deno.test("formatWorkTimeTable can omit the project column", () => {
       "5\t",
       "\t30",
     ].join("\n"),
+  );
+});
+
+Deno.test("formatWorkTimeTable can omit dates and projects", () => {
+  const table = {
+    projectNames: ["Client A", "Internal"],
+    headers: ["2026-05-01", "2026-05-02"],
+    rows: [["5", ""], ["", "30"]],
+  };
+
+  assertEquals(
+    formatWorkTimeTable(table, "\t", false, true),
+    ["Client A\t5\t", "Internal\t\t30"].join("\n"),
+  );
+  assertEquals(
+    formatWorkTimeTable(table, "\t", true, true),
+    ["5\t", "\t30"].join("\n"),
   );
 });
 
