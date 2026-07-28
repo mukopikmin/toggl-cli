@@ -14,6 +14,7 @@ interface SummaryOptions {
   separator: string;
   format: SummaryFormat;
   noProject: boolean;
+  noDate: boolean;
   clipboard: boolean;
 }
 
@@ -90,12 +91,17 @@ export function formatWorkTimeTable(
   table: WorkTimeTable,
   separator: string,
   noProject = false,
+  noDate = false,
 ): string {
-  const lines = [
-    (noProject ? table.headers : ["Project", ...table.headers]).join(
-      separator,
-    ),
-  ];
+  const lines: string[] = [];
+
+  if (!noDate) {
+    lines.push(
+      (noProject ? table.headers : ["Project", ...table.headers]).join(
+        separator,
+      ),
+    );
+  }
 
   for (const [index, row] of table.rows.entries()) {
     lines.push(
@@ -110,8 +116,9 @@ export function outputWorkTimeTable(
   table: WorkTimeTable,
   separator: string,
   noProject = false,
+  noDate = false,
 ): void {
-  console.log(formatWorkTimeTable(table, separator, noProject));
+  console.log(formatWorkTimeTable(table, separator, noProject, noDate));
 }
 
 export function formatTimeEntriesJson(
@@ -166,7 +173,7 @@ export async function runSummaryCommand(
   toggl: TogglClient,
   output: SummaryOutput = defaultSummaryOutput,
 ): Promise<void> {
-  const { separator, format, noProject, clipboard } = cmd;
+  const { separator, format, noProject, noDate, clipboard } = cmd;
 
   const config = await loadConfig();
   const { startDay, endDay } = resolveSummaryDateRange(cmd, config.TIMEZONE);
@@ -197,7 +204,7 @@ export async function runSummaryCommand(
   );
 
   await outputSummaryText(
-    formatWorkTimeTable(table, separator, noProject),
+    formatWorkTimeTable(table, separator, noProject, noDate),
     clipboard,
     output,
   );
