@@ -363,7 +363,7 @@ deno task run -- projects
 
 ```sh
 deno fmt --check
-deno check --lock=deno.lock main.ts main_test.ts scripts/install.ts toggl/date_range_test.ts
+deno check --lock=deno.lock main.ts main_test.ts scripts/install.ts scripts/install_test.ts scripts/release.ts scripts/release_test.ts toggl/date_range_test.ts
 deno test
-deno compile --allow-net --allow-read --allow-env --output /tmp/toggl-cli main.ts
+deno compile --allow-net --allow-read --allow-write --allow-run=pbcopy,wl-copy,xclip,xsel,clip,powershell.exe,powershell --allow-env --output /tmp/toggl-cli main.ts
 ```
