@@ -26,6 +26,9 @@ jobs:
       - name: Check formatting
         run: deno fmt --check
 
+      - name: Check installer syntax
+        run: sh -n install.sh
+
       - name: Type check
         run: deno check --lock=deno.lock main.ts main_test.ts scripts/install.ts scripts/release.ts scripts/release_test.ts toggl/date_range_test.ts
 
