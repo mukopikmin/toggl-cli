@@ -10,9 +10,7 @@ import type { TogglClient } from "../toggl/api.ts";
 
 export type SummaryFormat = "csv" | "json";
 
-export interface SummaryCommand {
-  startDay: Temporal.PlainDate;
-  endDay: Temporal.PlainDate;
+interface SummaryOptions {
   separator: string;
   format: SummaryFormat;
   noProject: boolean;
@@ -23,6 +21,18 @@ export interface SummaryOutput {
   writeStdout(text: string): void;
   writeClipboard(text: string): Promise<void>;
 }
+
+export type SummaryDateRange = {
+  startDay: Temporal.PlainDate;
+  endDay: Temporal.PlainDate;
+};
+
+export type SummaryCommand =
+  & SummaryOptions
+  & (
+    | SummaryDateRange
+    | { days: number }
+  );
 
 export interface WorkTimeTable {
   projectNames: string[];
@@ -116,6 +126,22 @@ export function outputTimeEntriesJson(
   console.log(formatTimeEntriesJson(dateEntries));
 }
 
+export function resolveSummaryDateRange(
+  cmd: SummaryCommand,
+  timeZone: string | undefined,
+  now: Temporal.Instant = Temporal.Now.instant(),
+): SummaryDateRange {
+  if (!("days" in cmd)) {
+    return { startDay: cmd.startDay, endDay: cmd.endDay };
+  }
+
+  const endDay = now.toZonedDateTimeISO(timeZone ?? "UTC").toPlainDate();
+  return {
+    startDay: endDay.subtract({ days: cmd.days }),
+    endDay,
+  };
+}
+
 const defaultSummaryOutput: SummaryOutput = {
   writeStdout(text: string): void {
     console.log(text);
@@ -140,16 +166,10 @@ export async function runSummaryCommand(
   toggl: TogglClient,
   output: SummaryOutput = defaultSummaryOutput,
 ): Promise<void> {
-  const {
-    startDay,
-    endDay,
-    separator,
-    format,
-    noProject,
-    clipboard,
-  } = cmd;
+  const { separator, format, noProject, clipboard } = cmd;
 
   const config = await loadConfig();
+  const { startDay, endDay } = resolveSummaryDateRange(cmd, config.TIMEZONE);
   const dateEntries = await toggl.getTimeEntriesForDays(
     config,
     startDay,

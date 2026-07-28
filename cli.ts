@@ -6,7 +6,8 @@ import type { TimeEntriesFormat } from "./command/time_entries.ts";
 
 export function createHelpText(): string {
   return `Usage:
-  toggl summary <start-day> <end-day> [options]
+  toggl summary <start-date> <end-date> [options]
+  toggl summary --days <days> [options]
   toggl time-entries <start-day> <end-day> [options]
   toggl projects [options]
   toggl projects sync
@@ -21,9 +22,9 @@ Commands:
   time-entries  List individual time entries for a range of days
 
 Options:
-  -l, --lastMonth        Aggregate the previous month (summary only)
   -s, --separator <text> Set the output delimiter (default: tab)
   -f, --format <format>  Set the output format: csv or json (default: csv)
+  -d, --days <days>      Aggregate from this many days ago through today
       --clipboard        Copy the output to the clipboard as well as stdout
   -h, --help             Show this help
       --no-project       Omit the project column (summary CSV only)
@@ -41,13 +42,15 @@ export type CliCommand =
   | { name: "projects-sync" }
   | {
     name: "summary";
-    startDay: DateTime;
-    endDay: DateTime;
     separator: string;
     format: SummaryFormat;
     noProject: boolean;
     clipboard: boolean;
   }
+    & (
+      | { startDay: Temporal.PlainDate; endDay: Temporal.PlainDate }
+      | { days: number }
+    )
   | {
     name: "time-entries";
     startDay: DateTime;
@@ -100,13 +103,25 @@ function parseConfigArgs(args: string[]): CliCommand {
   return { name: "config", format: parseFormat(parsed.values.format) };
 }
 
-function parseSummaryArgs(args: string[], now: DateTime): CliCommand {
+function parseIsoDate(value: string): Temporal.PlainDate {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new CliUsageError("start and end date must use YYYY-MM-DD");
+  }
+
+  try {
+    return Temporal.PlainDate.from(value);
+  } catch {
+    throw new CliUsageError("start and end date must be valid dates");
+  }
+}
+
+function parseSummaryArgs(args: string[]): CliCommand {
   const parsed = parseArgs({
     args,
     options: {
-      lastMonth: { type: "boolean", short: "l", default: false },
       separator: { type: "string", short: "s", default: "\t" },
       format: { type: "string", short: "f", default: "csv" },
+      days: { type: "string", short: "d" },
       "no-project": { type: "boolean", default: false },
       clipboard: { type: "boolean", default: false },
     },
@@ -114,58 +129,44 @@ function parseSummaryArgs(args: string[], now: DateTime): CliCommand {
     strict: true,
   });
 
-  if (parsed.positionals.length !== 2) {
-    throw new CliUsageError("summary requires start and end day");
-  }
-
-  const startDayNum = Number(parsed.positionals[0]);
-  const endDayNum = Number(parsed.positionals[1]);
-  if (isNaN(startDayNum) || isNaN(endDayNum)) {
-    throw new CliUsageError("start and end day must be valid numbers");
-  }
-
-  let targetYear = now.year;
-  let targetMonth = now.month;
-  if (parsed.values.lastMonth) {
-    targetMonth -= 1;
-    if (targetMonth === 0) {
-      targetMonth = 12;
-      targetYear -= 1;
-    }
-  }
-
-  const startDay = datetime({
-    year: targetYear,
-    month: targetMonth,
-    day: startDayNum,
-    hour: 0,
-    minute: 0,
-    second: 0,
-    millisecond: 0,
-  });
-  const endDay = datetime({
-    year: targetYear,
-    month: targetMonth,
-    day: endDayNum,
-    hour: 0,
-    minute: 0,
-    second: 0,
-    millisecond: 0,
-  });
-
-  if (!startDay.isValid() || !endDay.isValid() || startDay.isAfter(endDay)) {
-    throw new CliUsageError("start and end day must be valid dates");
-  }
-
-  return {
+  const common = {
     name: "summary",
-    startDay,
-    endDay,
     separator: parsed.values.separator ?? "\t",
     format: parseFormat(parsed.values.format),
     noProject: parsed.values["no-project"] ?? false,
     clipboard: parsed.values.clipboard ?? false,
-  };
+  } as const;
+
+  if (parsed.values.days !== undefined) {
+    if (parsed.positionals.length > 0) {
+      throw new CliUsageError(
+        "summary accepts either start and end date or --days, not both",
+      );
+    }
+
+    if (!/^\d+$/.test(parsed.values.days)) {
+      throw new CliUsageError("days must be a non-negative integer");
+    }
+    const days = Number(parsed.values.days);
+    if (!Number.isSafeInteger(days)) {
+      throw new CliUsageError("days must be a non-negative integer");
+    }
+
+    return { ...common, days };
+  }
+
+  if (parsed.positionals.length !== 2) {
+    throw new CliUsageError("summary requires start and end date or --days");
+  }
+
+  const startDay = parseIsoDate(parsed.positionals[0]);
+  const endDay = parseIsoDate(parsed.positionals[1]);
+
+  if (Temporal.PlainDate.compare(startDay, endDay) > 0) {
+    throw new CliUsageError("start date must not be after end date");
+  }
+
+  return { ...common, startDay, endDay };
 }
 
 function parseTimeEntriesArgs(args: string[], now: DateTime): CliCommand {
@@ -262,7 +263,7 @@ export function parseCliArgs(
       case "config":
         return parseConfigArgs(commandArgs);
       case "summary":
-        return parseSummaryArgs(commandArgs, now);
+        return parseSummaryArgs(commandArgs);
       case "time-entries":
         return parseTimeEntriesArgs(commandArgs, now);
       default:

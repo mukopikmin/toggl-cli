@@ -23,6 +23,7 @@ import {
   formatTimeEntriesJson,
   formatWorkTimeTable,
   outputSummaryText,
+  resolveSummaryDateRange,
 } from "./command/summary.ts";
 import {
   formatTimeEntriesCsv as formatIndividualTimeEntriesCsv,
@@ -30,7 +31,6 @@ import {
   prepareTimeEntries,
 } from "./command/time_entries.ts";
 import { parseConfigToml, parseProjectsConfig } from "./config.ts";
-import { resolveTargetMonth } from "./main.ts";
 import {
   createProject,
   sortProjectsByDisplayOrder,
@@ -63,7 +63,8 @@ Deno.test("createHelpText describes commands and options", () => {
   assertEquals(
     createHelpText(),
     `Usage:
-  toggl summary <start-day> <end-day> [options]
+  toggl summary <start-date> <end-date> [options]
+  toggl summary --days <days> [options]
   toggl time-entries <start-day> <end-day> [options]
   toggl projects [options]
   toggl projects sync
@@ -78,9 +79,9 @@ Commands:
   time-entries  List individual time entries for a range of days
 
 Options:
-  -l, --lastMonth        Aggregate the previous month (summary only)
   -s, --separator <text> Set the output delimiter (default: tab)
   -f, --format <format>  Set the output format: csv or json (default: csv)
+  -d, --days <days>      Aggregate from this many days ago through today
       --clipboard        Copy the output to the clipboard as well as stdout
   -h, --help             Show this help
       --no-project       Omit the project column (summary CSV only)
@@ -99,11 +100,12 @@ Deno.test("parseCliArgs parses the version option", () => {
 
 Deno.test("parseCliArgs parses the explicit summary command", () => {
   const command = parseCliArgs(
-    ["summary", "--format", "json", "1", "31"],
-    datetime({ year: 2026, month: 5, day: 10 }),
+    ["summary", "--format", "json", "2026-05-01", "2026-05-31"],
   );
 
-  if (command.name !== "summary") throw new Error("expected summary command");
+  if (command.name !== "summary" || !("startDay" in command)) {
+    throw new Error("expected summary date range");
+  }
   assertEquals(command.format, "json");
   assertEquals(command.separator, "\t");
   assertEquals(command.noProject, false);
@@ -118,47 +120,175 @@ Deno.test("parseCliArgs parses the explicit summary command", () => {
   );
 });
 
-Deno.test("parseCliArgs applies summary options and the previous month", () => {
+Deno.test("parseCliArgs accepts a summary range across years", () => {
   const command = parseCliArgs(
-    ["summary", "--lastMonth", "--separator", ",", "--clipboard", "1", "31"],
-    datetime({ year: 2026, month: 1, day: 10 }),
+    [
+      "summary",
+      "--separator",
+      ",",
+      "--clipboard",
+      "2025-12-31",
+      "2026-01-01",
+    ],
   );
 
-  if (command.name !== "summary") throw new Error("expected summary command");
+  if (command.name !== "summary" || !("startDay" in command)) {
+    throw new Error("expected summary date range");
+  }
   assertEquals(command.separator, ",");
   assertEquals(command.noProject, false);
   assertEquals(command.clipboard, true);
   assertEquals(
     [command.startDay.year, command.startDay.month, command.startDay.day],
-    [2025, 12, 1],
+    [2025, 12, 31],
   );
+  assertEquals(command.endDay.toString(), "2026-01-01");
 });
 
 Deno.test("parseCliArgs parses summary without the project column", () => {
   const command = parseCliArgs(
-    ["summary", "--no-project", "1", "15"],
-    datetime({ year: 2026, month: 5, day: 10 }),
+    ["summary", "--no-project", "2026-05-01", "2026-05-15"],
   );
 
   if (command.name !== "summary") throw new Error("expected summary command");
   assertEquals(command.noProject, true);
 });
 
+Deno.test("parseCliArgs parses long and short summary days options", () => {
+  for (const option of ["--days", "-d"]) {
+    const command = parseCliArgs([
+      "summary",
+      option,
+      "7",
+      "--format",
+      "json",
+    ]);
+
+    if (command.name !== "summary" || !("days" in command)) {
+      throw new Error("expected relative summary range");
+    }
+    assertEquals(command.days, 7);
+    assertEquals(command.format, "json");
+  }
+});
+
+Deno.test("parseCliArgs accepts zero summary days", () => {
+  const command = parseCliArgs(["summary", "--days", "0"]);
+  if (command.name !== "summary" || !("days" in command)) {
+    throw new Error("expected relative summary range");
+  }
+  assertEquals(command.days, 0);
+});
+
+Deno.test("parseCliArgs rejects invalid or ambiguous summary days", () => {
+  assertThrows(
+    () => parseCliArgs(["summary", "--days", "-1"]),
+    CliUsageError,
+  );
+  for (const days of ["1.5", "seven", "9007199254740992"]) {
+    assertThrows(
+      () => parseCliArgs(["summary", "--days", days]),
+      CliUsageError,
+      "days must be a non-negative integer",
+    );
+  }
+  assertThrows(
+    () =>
+      parseCliArgs([
+        "summary",
+        "--days",
+        "7",
+        "2026-05-01",
+        "2026-05-31",
+      ]),
+    CliUsageError,
+    "summary accepts either start and end date or --days, not both",
+  );
+  assertThrows(
+    () => parseCliArgs(["summary"]),
+    CliUsageError,
+    "summary requires start and end date or --days",
+  );
+  assertThrows(
+    () => parseCliArgs(["summary", "--days"]),
+    CliUsageError,
+    "argument missing",
+  );
+});
+
 Deno.test("parseCliArgs validates summary format and dates", () => {
   assertThrows(
-    () => parseCliArgs(["summary", "--format", "xml", "1", "2"]),
+    () =>
+      parseCliArgs(["summary", "--format", "xml", "2026-05-01", "2026-05-02"]),
     CliUsageError,
     "format must be csv or json",
   );
   assertThrows(
-    () =>
-      parseCliArgs(
-        ["summary", "31", "1"],
-        datetime({ year: 2026, month: 5, day: 10 }),
-      ),
+    () => parseCliArgs(["summary", "2026-05-31", "2026-05-01"]),
     CliUsageError,
-    "start and end day must be valid dates",
+    "start date must not be after end date",
   );
+  assertThrows(
+    () => parseCliArgs(["summary", "2026-02-29", "2026-03-01"]),
+    CliUsageError,
+    "start and end date must be valid dates",
+  );
+  assertThrows(
+    () => parseCliArgs(["summary", "1", "15"]),
+    CliUsageError,
+    "start and end date must use YYYY-MM-DD",
+  );
+  assertThrows(
+    () => parseCliArgs(["summary", "--lastMonth", "2026-05-01", "2026-05-31"]),
+    CliUsageError,
+    "Unknown option",
+  );
+});
+
+Deno.test("parseCliArgs accepts leap-day summary boundaries", () => {
+  const command = parseCliArgs(["summary", "2024-02-01", "2024-02-29"]);
+  if (command.name !== "summary" || !("startDay" in command)) {
+    throw new Error("expected summary date range");
+  }
+  assertEquals(command.startDay.toString(), "2024-02-01");
+  assertEquals(command.endDay.toString(), "2024-02-29");
+});
+
+Deno.test("resolveSummaryDateRange uses the configured timezone", () => {
+  const command = {
+    days: 7,
+    separator: "\t",
+    format: "csv" as const,
+    noProject: false,
+    clipboard: false,
+  };
+  const now = Temporal.Instant.from("2026-01-01T00:30:00Z");
+
+  assertEquals(resolveSummaryDateRange(command, "UTC", now), {
+    startDay: Temporal.PlainDate.from("2025-12-25"),
+    endDay: Temporal.PlainDate.from("2026-01-01"),
+  });
+  assertEquals(resolveSummaryDateRange(command, "America/Los_Angeles", now), {
+    startDay: Temporal.PlainDate.from("2025-12-24"),
+    endDay: Temporal.PlainDate.from("2025-12-31"),
+  });
+});
+
+Deno.test("resolveSummaryDateRange defaults to UTC and accepts zero days", () => {
+  const range = resolveSummaryDateRange(
+    {
+      days: 0,
+      separator: "\t",
+      format: "csv",
+      noProject: false,
+      clipboard: false,
+    },
+    undefined,
+    Temporal.Instant.from("2026-05-10T23:30:00Z"),
+  );
+
+  assertEquals(range.startDay, Temporal.PlainDate.from("2026-05-10"));
+  assertEquals(range.endDay, Temporal.PlainDate.from("2026-05-10"));
 });
 
 Deno.test("outputSummaryText writes to stdout only by default", async () => {
@@ -693,27 +823,6 @@ hidden = false`;
       [{ id: 10, name: "Project Ten", active: true }],
     ),
     { text: configText, addedCount: 0 },
-  );
-});
-
-Deno.test("resolveTargetMonth returns December in previous year for January last month", () => {
-  assertEquals(
-    resolveTargetMonth({ year: 2026, month: 1 }, true),
-    { year: 2025, month: 12 },
-  );
-});
-
-Deno.test("resolveTargetMonth returns previous month in the same year", () => {
-  assertEquals(
-    resolveTargetMonth({ year: 2026, month: 5 }, true),
-    { year: 2026, month: 4 },
-  );
-});
-
-Deno.test("resolveTargetMonth returns current month when lastMonth is false", () => {
-  assertEquals(
-    resolveTargetMonth({ year: 2026, month: 5 }, false),
-    { year: 2026, month: 5 },
   );
 });
 
