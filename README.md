@@ -11,15 +11,21 @@ can be output as delimiter-separated values or JSON.
 
 ## Installation
 
-On Linux and macOS, run the install script:
+On Linux x64 and macOS arm64, install the latest release binary to
+`$HOME/.local/bin/toggl` without cloning the repository:
 
 ```sh
-deno task install --version 0.1.0
+curl -fsSL https://raw.githubusercontent.com/mukopikmin/toggl-cli/main/install.sh | sh
 ```
 
-This builds the executable in a temporary directory and installs it to
-`$HOME/.local/bin/toggl`. Make sure `$HOME/.local/bin` is included in your
-`PATH`, then run the installed command as `toggl`.
+To install the latest tested nightly build instead:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/mukopikmin/toggl-cli/main/install.sh | sh -s -- --nightly
+```
+
+Make sure `$HOME/.local/bin` is included in your `PATH`, then run the installed
+command as `toggl`.
 
 On Windows, download the `windows-x64` release archive, extract `toggl.exe`, and
 place it in a directory included in your `PATH`.
@@ -330,8 +336,19 @@ tags are removed automatically.
 
 ## Install
 
-On Linux and macOS, build in a temporary directory and install the executable to
-`$HOME/.local/bin/toggl`:
+On Linux x64 and macOS arm64, download and install the latest release binary:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/mukopikmin/toggl-cli/main/install.sh | sh
+```
+
+To install the latest tested nightly build instead:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/mukopikmin/toggl-cli/main/install.sh | sh -s -- --nightly
+```
+
+To build and install from a checkout, clone the repository and run:
 
 ```sh
 deno task install --version 0.1.0
