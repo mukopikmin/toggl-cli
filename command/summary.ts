@@ -7,6 +7,7 @@ import {
 } from "../model/project.ts";
 import type { Project } from "../model/project.ts";
 import type { TogglClient } from "../toggl/api.ts";
+import { resolveTimeZone } from "../toggl/date.ts";
 
 export type SummaryFormat = "csv" | "json";
 
@@ -137,12 +138,15 @@ export function resolveSummaryDateRange(
   cmd: SummaryCommand,
   timeZone: string | undefined,
   now: Temporal.Instant = Temporal.Now.instant(),
+  systemTimeZone?: string,
 ): SummaryDateRange {
   if (!("days" in cmd)) {
     return { startDay: cmd.startDay, endDay: cmd.endDay };
   }
 
-  const endDay = now.toZonedDateTimeISO(timeZone ?? "UTC").toPlainDate();
+  const endDay = now.toZonedDateTimeISO(
+    resolveTimeZone(timeZone, systemTimeZone),
+  ).toPlainDate();
   return {
     startDay: endDay.subtract({ days: cmd.days }),
     endDay,

@@ -65,7 +65,7 @@ with `display_order` are shown first in ascending numeric order, and projects
 without `display_order` keep their Toggl API order after the ordered projects.
 
 The optional `timezone` setting is used to calculate the Toggl time entry query
-range. When it is omitted, the CLI preserves the existing UTC-based behavior.
+range. When it is omitted, the CLI uses the execution environment's timezone.
 
 To migrate an old `~/.toggl_config` file, run:
 
@@ -122,8 +122,8 @@ deno task run -- summary 2026-06-01 2026-06-15
 
 Alternatively, use `--days` or `-d` to aggregate from the specified number of
 days ago through today. Today is determined using the configured `timezone`, or
-UTC when no timezone is configured. Both endpoints are included, so `--days 7`
-outputs eight days including today.
+the execution environment's timezone when no timezone is configured. Both
+endpoints are included, so `--days 7` outputs eight days including today.
 
 ```sh
 deno task run -- summary --days 7
