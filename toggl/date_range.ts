@@ -1,3 +1,5 @@
+import { resolveTimeZone } from "./date.ts";
+
 export interface TimeEntriesDateRange {
   startDate: string;
   endDate: string;
@@ -15,18 +17,13 @@ export function buildTimeEntriesDateRange(
   toDay: Temporal.PlainDate,
   timeZone?: string,
 ): TimeEntriesDateRange {
-  if (!timeZone) {
-    return {
-      startDate: fromDay.toZonedDateTime("UTC").toInstant().toString({
-        fractionalSecondDigits: 3,
-      }),
-      endDate: toDay.add({ days: 1 }).toZonedDateTime("UTC").toInstant()
-        .toString({ fractionalSecondDigits: 3 }),
-    };
-  }
+  const resolvedTimeZone = resolveTimeZone(timeZone);
 
   return {
-    startDate: startOfDayInTimeZoneUtcIso(fromDay, timeZone),
-    endDate: startOfDayInTimeZoneUtcIso(toDay.add({ days: 1 }), timeZone),
+    startDate: startOfDayInTimeZoneUtcIso(fromDay, resolvedTimeZone),
+    endDate: startOfDayInTimeZoneUtcIso(
+      toDay.add({ days: 1 }),
+      resolvedTimeZone,
+    ),
   };
 }

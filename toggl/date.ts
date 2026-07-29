@@ -1,18 +1,18 @@
+export function resolveTimeZone(
+  configuredTimeZone?: string,
+  systemTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone,
+): string {
+  return configuredTimeZone ?? systemTimeZone;
+}
+
 export function formatTimeEntryDate(
   start: string,
   timeZone?: string,
 ): string {
   const startDate = new Date(start);
 
-  if (!timeZone) {
-    const yStr = String(startDate.getUTCFullYear());
-    const mStr = String(startDate.getUTCMonth() + 1).padStart(2, "0");
-    const dStr = String(startDate.getUTCDate()).padStart(2, "0");
-    return `${yStr}-${mStr}-${dStr}`;
-  }
-
   const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone,
+    timeZone: resolveTimeZone(timeZone),
     year: "numeric",
     month: "2-digit",
     day: "2-digit",

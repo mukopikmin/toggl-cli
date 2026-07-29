@@ -34,7 +34,7 @@ import { getProjects } from "./toggl/projects.ts";
 import { getSummaryTimeEntries } from "./toggl/summary.ts";
 import { getTimeEntriesForDays } from "./toggl/time_entries.ts";
 import { apiEndpoint, reportsApiEndpoint } from "./toggl/api.ts";
-import { formatTimeEntryDate } from "./toggl/date.ts";
+import { formatTimeEntryDate, resolveTimeZone } from "./toggl/date.ts";
 
 const config = {
   WORKSPACE: "workspace-id",
@@ -275,7 +275,7 @@ Deno.test("resolveSummaryDateRange uses the configured timezone", () => {
   });
 });
 
-Deno.test("resolveSummaryDateRange defaults to UTC and accepts zero days", () => {
+Deno.test("resolveSummaryDateRange uses the system timezone and accepts zero days", () => {
   const range = resolveSummaryDateRange(
     {
       days: 0,
@@ -287,10 +287,11 @@ Deno.test("resolveSummaryDateRange defaults to UTC and accepts zero days", () =>
     },
     undefined,
     Temporal.Instant.from("2026-05-10T23:30:00Z"),
+    "Asia/Tokyo",
   );
 
-  assertEquals(range.startDay, Temporal.PlainDate.from("2026-05-10"));
-  assertEquals(range.endDay, Temporal.PlainDate.from("2026-05-10"));
+  assertEquals(range.startDay, Temporal.PlainDate.from("2026-05-11"));
+  assertEquals(range.endDay, Temporal.PlainDate.from("2026-05-11"));
 });
 
 Deno.test("outputSummaryText writes to stdout only by default", async () => {
@@ -1058,7 +1059,15 @@ Deno.test("formatTimeEntryDate converts the same instant to configured timezone 
   assertEquals(formatTimeEntryDate(start, "America/New_York"), "2026-05-01");
 });
 
-Deno.test("getTimeEntriesForDays fetches range without configured timezone", async () => {
+Deno.test("resolveTimeZone falls back to the system timezone", () => {
+  assertEquals(
+    resolveTimeZone("America/New_York", "Asia/Tokyo"),
+    "America/New_York",
+  );
+  assertEquals(resolveTimeZone(undefined, "Asia/Tokyo"), "Asia/Tokyo");
+});
+
+Deno.test("getTimeEntriesForDays fetches range in configured UTC timezone", async () => {
   const originalFetch = globalThis.fetch;
   let requestedUrl = "";
 
@@ -1072,17 +1081,21 @@ Deno.test("getTimeEntriesForDays fetches range without configured timezone", asy
   const toDay = Temporal.PlainDate.from("2026-05-02");
 
   try {
-    const entries = await getTimeEntriesForDays(config, fromDay, toDay);
+    const entries = await getTimeEntriesForDays(
+      { ...config, TIMEZONE: "UTC" },
+      fromDay,
+      toDay,
+    );
     const url = new URL(requestedUrl);
 
     assertEquals(url.origin + url.pathname, `${apiEndpoint}/me/time_entries`);
     assertEquals(
       url.searchParams.get("start_date"),
-      "2026-05-01T00:00:00.000Z",
+      "2026-05-01T00:00:00Z",
     );
     assertEquals(
       url.searchParams.get("end_date"),
-      "2026-05-03T00:00:00.000Z",
+      "2026-05-03T00:00:00Z",
     );
     assertEquals(entries, {});
   } finally {
