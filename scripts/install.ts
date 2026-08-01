@@ -1,51 +1,64 @@
 const supportsUnixInstall = Deno.build.os === "darwin" ||
   Deno.build.os === "linux";
 
-if (!supportsUnixInstall) {
-  console.error("This installer supports only macOS and Linux.");
-  Deno.exit(1);
-}
-
-const home = Deno.env.get("HOME");
-if (!home) {
-  console.error("HOME is not set.");
-  Deno.exit(1);
-}
-
-const run = async (args: string[]): Promise<void> => {
-  const result = await new Deno.Command("deno", {
-    args,
-    stdout: "inherit",
-    stderr: "inherit",
-  }).output();
-
-  if (!result.success) {
-    Deno.exit(result.code);
-  }
-};
-
-const installDir = `${home}/.local/bin`;
-const installPath = `${installDir}/toggl`;
-const buildDir = await Deno.makeTempDir({ prefix: "toggl-" });
-const buildPath = `${buildDir}/toggl`;
-
-try {
-  await run([
+export function compileArgs(
+  args: string[],
+  outputPath: string,
+): string[] {
+  return [
     "compile",
     "--allow-net",
     "--allow-read",
+    "--allow-write",
+    "--allow-run=pbcopy,wl-copy,xclip,xsel,clip,powershell.exe,powershell",
     "--allow-env",
-    ...Deno.args,
+    ...args,
     "--output",
-    buildPath,
+    outputPath,
     "main.ts",
-  ]);
-
-  await Deno.mkdir(installDir, { recursive: true });
-  await Deno.copyFile(buildPath, installPath);
-  await Deno.chmod(installPath, 0o755);
-
-  console.log(`Installed toggl to ${installPath}`);
-} finally {
-  await Deno.remove(buildDir, { recursive: true }).catch(() => undefined);
+  ];
 }
+
+async function install(): Promise<void> {
+  if (!supportsUnixInstall) {
+    console.error("This installer supports only macOS and Linux.");
+    Deno.exit(1);
+  }
+
+  const home = Deno.env.get("HOME");
+  if (!home) {
+    console.error("HOME is not set.");
+    Deno.exit(1);
+  }
+
+  const run = async (args: string[]): Promise<void> => {
+    const result = await new Deno.Command("deno", {
+      args,
+      stdout: "inherit",
+      stderr: "inherit",
+    }).output();
+
+    if (!result.success) {
+      Deno.exit(result.code);
+    }
+  };
+
+  const installDir = `${home}/.local/bin`;
+  const installPath = `${installDir}/toggl`;
+  const buildDir = await Deno.makeTempDir({ prefix: "toggl-" });
+  const buildPath = `${buildDir}/toggl`;
+
+  try {
+    await run(compileArgs(Deno.args, buildPath));
+
+    await Deno.mkdir(installDir, { recursive: true });
+    await Deno.copyFile(buildPath, installPath);
+    await Deno.chmod(installPath, 0o755);
+
+    console.log(`Installed toggl to ${installPath}`);
+  } finally {
+    await Deno.remove(buildDir, { recursive: true }).catch(() => undefined);
+  }
+}
+
+if (import.meta.main) await install();

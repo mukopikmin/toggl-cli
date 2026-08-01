@@ -17,7 +17,7 @@ cleanup() {
 }
 
 fail() {
-  echo "toggl-cli installer: $*" >&2
+  echo "toggl installer: $*" >&2
   exit 1
 }
 
@@ -81,11 +81,11 @@ else
 fi
 archive="${archive_root}.tar.gz"
 download_url="$repository/releases/download/$tag"
-temporary_dir="$(mktemp -d "${TMPDIR:-/tmp}/toggl-cli-install.XXXXXX")"
+temporary_dir="$(mktemp -d "${TMPDIR:-/tmp}/toggl-install.XXXXXX")"
 archive_path="$temporary_dir/$archive"
 checksum_path="$archive_path.sha256"
 
-echo "Downloading toggl-cli $version for $target..."
+echo "Downloading toggl $version for $target..."
 curl -fsSL -o "$archive_path" "$download_url/$archive" ||
   fail "could not download $archive"
 curl -fsSL -o "$checksum_path" "$download_url/$archive.sha256" ||
@@ -118,7 +118,7 @@ chmod 755 "$staged_binary"
 mv "$staged_binary" "$install_dir/toggl"
 staged_binary=""
 
-echo "Installed toggl-cli $version to $install_dir/toggl"
+echo "Installed toggl $version to $install_dir/toggl"
 case ":${PATH:-}:" in
   *":$install_dir:"*) ;;
   *) echo "Add $install_dir to your PATH to run toggl." ;;

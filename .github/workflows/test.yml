@@ -16,7 +16,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Deno
         uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
@@ -26,11 +26,14 @@ jobs:
       - name: Check formatting
         run: deno fmt --check
 
+      - name: Check installer syntax
+        run: sh -n install.sh
+
       - name: Type check
-        run: deno check --lock=deno.lock main.ts main_test.ts scripts/install.ts scripts/install_release_test.ts scripts/release.ts scripts/release_test.ts toggl/date_range_test.ts
+        run: deno check --lock=deno.lock main.ts main_test.ts scripts/install.ts scripts/install_release_test.ts scripts/install_test.ts scripts/release.ts scripts/release_test.ts toggl/date_range_test.ts
 
       - name: Test
-        run: deno test --allow-read --allow-write --allow-run=sh,tar --allow-env=HOME,PATH main_test.ts scripts/install_release_test.ts scripts/release_test.ts toggl/date_range_test.ts
+        run: deno test --allow-read --allow-write --allow-run=sh,tar --allow-env=HOME,PATH main_test.ts scripts/install_release_test.ts scripts/install_test.ts scripts/release_test.ts toggl/date_range_test.ts
 
       - name: Compile
         run: deno compile --quiet --allow-net --allow-read --allow-write --allow-run=pbcopy,wl-copy,xclip,xsel,clip,powershell.exe,powershell --allow-env --output /tmp/toggl-cli main.ts

@@ -34,7 +34,7 @@ import { getProjects } from "./toggl/projects.ts";
 import { getSummaryTimeEntries } from "./toggl/summary.ts";
 import { getTimeEntriesForDays } from "./toggl/time_entries.ts";
 import { apiEndpoint, reportsApiEndpoint } from "./toggl/api.ts";
-import { formatTimeEntryDate } from "./toggl/date.ts";
+import { formatTimeEntryDate, resolveTimeZone } from "./toggl/date.ts";
 
 const config = {
   WORKSPACE: "workspace-id",
@@ -73,6 +73,7 @@ Options:
       --clipboard        Copy the output to the clipboard as well as stdout
   -h, --help             Show this help
       --no-project       Omit the project column from CSV output
+      --no-date          Omit the date header row from CSV output
       --version          Show the version`,
   );
 });
@@ -97,6 +98,7 @@ Deno.test("parseCliArgs parses the explicit summary command", () => {
   assertEquals(command.format, "json");
   assertEquals(command.separator, "\t");
   assertEquals(command.noProject, false);
+  assertEquals(command.noDate, false);
   assertEquals(command.clipboard, false);
   assertEquals(
     [command.startDay.year, command.startDay.month, command.startDay.day],
@@ -125,6 +127,7 @@ Deno.test("parseCliArgs accepts a summary range across years", () => {
   }
   assertEquals(command.separator, ",");
   assertEquals(command.noProject, false);
+  assertEquals(command.noDate, false);
   assertEquals(command.clipboard, true);
   assertEquals(
     [command.startDay.year, command.startDay.month, command.startDay.day],
@@ -140,6 +143,15 @@ Deno.test("parseCliArgs parses summary without the project column", () => {
 
   if (command.name !== "summary") throw new Error("expected summary command");
   assertEquals(command.noProject, true);
+});
+
+Deno.test("parseCliArgs parses summary without the date header row", () => {
+  const command = parseCliArgs(
+    ["summary", "--no-date", "2026-05-01", "2026-05-15"],
+  );
+
+  if (command.name !== "summary") throw new Error("expected summary command");
+  assertEquals(command.noDate, true);
 });
 
 Deno.test("parseCliArgs parses long and short summary days options", () => {
@@ -248,6 +260,7 @@ Deno.test("resolveSummaryDateRange uses the configured timezone", () => {
     separator: "\t",
     format: "csv" as const,
     noProject: false,
+    noDate: false,
     clipboard: false,
   };
   const now = Temporal.Instant.from("2026-01-01T00:30:00Z");
@@ -262,21 +275,23 @@ Deno.test("resolveSummaryDateRange uses the configured timezone", () => {
   });
 });
 
-Deno.test("resolveSummaryDateRange defaults to UTC and accepts zero days", () => {
+Deno.test("resolveSummaryDateRange uses the system timezone and accepts zero days", () => {
   const range = resolveSummaryDateRange(
     {
       days: 0,
       separator: "\t",
       format: "csv",
       noProject: false,
+      noDate: false,
       clipboard: false,
     },
     undefined,
     Temporal.Instant.from("2026-05-10T23:30:00Z"),
+    "Asia/Tokyo",
   );
 
-  assertEquals(range.startDay, Temporal.PlainDate.from("2026-05-10"));
-  assertEquals(range.endDay, Temporal.PlainDate.from("2026-05-10"));
+  assertEquals(range.startDay, Temporal.PlainDate.from("2026-05-11"));
+  assertEquals(range.endDay, Temporal.PlainDate.from("2026-05-11"));
 });
 
 Deno.test("outputSummaryText writes to stdout only by default", async () => {
@@ -903,6 +918,23 @@ Deno.test("formatWorkTimeTable can omit the project column", () => {
   );
 });
 
+Deno.test("formatWorkTimeTable can omit dates and projects", () => {
+  const table = {
+    projectNames: ["Client A", "Internal"],
+    headers: ["2026-05-01", "2026-05-02"],
+    rows: [["5", ""], ["", "30"]],
+  };
+
+  assertEquals(
+    formatWorkTimeTable(table, "\t", false, true),
+    ["Client A\t5\t", "Internal\t\t30"].join("\n"),
+  );
+  assertEquals(
+    formatWorkTimeTable(table, "\t", true, true),
+    ["5\t", "\t30"].join("\n"),
+  );
+});
+
 Deno.test("formatTimeEntriesJson returns explicit JSON output for time entry data", () => {
   const json = formatTimeEntriesJson({
     "2026-05-07": {
@@ -1027,7 +1059,15 @@ Deno.test("formatTimeEntryDate converts the same instant to configured timezone 
   assertEquals(formatTimeEntryDate(start, "America/New_York"), "2026-05-01");
 });
 
-Deno.test("getTimeEntriesForDays fetches range without configured timezone", async () => {
+Deno.test("resolveTimeZone falls back to the system timezone", () => {
+  assertEquals(
+    resolveTimeZone("America/New_York", "Asia/Tokyo"),
+    "America/New_York",
+  );
+  assertEquals(resolveTimeZone(undefined, "Asia/Tokyo"), "Asia/Tokyo");
+});
+
+Deno.test("getTimeEntriesForDays fetches range in configured UTC timezone", async () => {
   const originalFetch = globalThis.fetch;
   let requestedUrl = "";
 
@@ -1041,17 +1081,21 @@ Deno.test("getTimeEntriesForDays fetches range without configured timezone", asy
   const toDay = Temporal.PlainDate.from("2026-05-02");
 
   try {
-    const entries = await getTimeEntriesForDays(config, fromDay, toDay);
+    const entries = await getTimeEntriesForDays(
+      { ...config, TIMEZONE: "UTC" },
+      fromDay,
+      toDay,
+    );
     const url = new URL(requestedUrl);
 
     assertEquals(url.origin + url.pathname, `${apiEndpoint}/me/time_entries`);
     assertEquals(
       url.searchParams.get("start_date"),
-      "2026-05-01T00:00:00.000Z",
+      "2026-05-01T00:00:00Z",
     );
     assertEquals(
       url.searchParams.get("end_date"),
-      "2026-05-03T00:00:00.000Z",
+      "2026-05-03T00:00:00Z",
     );
     assertEquals(entries, {});
   } finally {

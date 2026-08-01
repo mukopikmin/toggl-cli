@@ -127,7 +127,7 @@ Deno.test("installs the latest release for Linux x64", async () => {
     const installed = join(result.home, ".local", "bin", "toggl");
     assertEquals(await Deno.readTextFile(installed), "toggl 1.2.3\n");
     assertEquals((await Deno.stat(installed)).mode! & 0o777, 0o755);
-    assertStringIncludes(result.stdout, "Installed toggl-cli 1.2.3");
+    assertStringIncludes(result.stdout, "Installed toggl 1.2.3");
   } finally {
     await Deno.remove(result.root, { recursive: true });
   }

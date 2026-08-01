@@ -77,7 +77,7 @@ with `display_order` are shown first in ascending numeric order, and projects
 without `display_order` keep their Toggl API order after the ordered projects.
 
 The optional `timezone` setting is used to calculate the Toggl time entry query
-range. When it is omitted, the CLI preserves the existing UTC-based behavior.
+range. When it is omitted, the CLI uses the execution environment's timezone.
 
 To migrate an old `~/.toggl_config` file, run:
 
@@ -120,6 +120,7 @@ deno task run -- --help
 | `--clipboard`              | Copy the output to the clipboard as well as stdout.             |
 | `-h`, `--help`             | Show command-line help.                                         |
 | `--no-project`             | Omit the project column from CSV output.                        |
+| `--no-date`                | Omit the date header row from CSV output.                       |
 | `--version`                | Show the CLI version.                                           |
 
 ### Aggregate time entries
@@ -133,8 +134,8 @@ deno task run -- summary 2026-06-01 2026-06-15
 
 Alternatively, use `--days` or `-d` to aggregate from the specified number of
 days ago through today. Today is determined using the configured `timezone`, or
-UTC when no timezone is configured. Both endpoints are included, so `--days 7`
-outputs eight days including today.
+the execution environment's timezone when no timezone is configured. Both
+endpoints are included, so `--days 7` outputs eight days including today.
 
 ```sh
 deno task run -- summary --days 7
@@ -156,6 +157,18 @@ Use `--no-project` to omit the project column from CSV output:
 
 ```sh
 deno task run -- summary --no-project 2026-06-01 2026-06-15
+```
+
+Use `--no-date` to omit the date header row from CSV output:
+
+```sh
+deno task run -- summary --no-date 2026-06-01 2026-06-15
+```
+
+The two options can be combined to output only the work-time values:
+
+```sh
+deno task run -- summary --no-project --no-date 2026-06-01 2026-06-15
 ```
 
 Use `--format json` or `-f json` to output JSON:
@@ -351,7 +364,8 @@ deno task run -- projects
 
 ```sh
 deno fmt --check
-deno check --lock=deno.lock main.ts main_test.ts scripts/install.ts scripts/install_release_test.ts scripts/release.ts scripts/release_test.ts toggl/date_range_test.ts
-deno test --allow-read --allow-write --allow-run=sh,tar --allow-env=HOME,PATH main_test.ts scripts/install_release_test.ts scripts/release_test.ts toggl/date_range_test.ts
+sh -n install.sh
+deno check --lock=deno.lock main.ts main_test.ts scripts/install.ts scripts/install_release_test.ts scripts/install_test.ts scripts/release.ts scripts/release_test.ts toggl/date_range_test.ts
+deno test --allow-read --allow-write --allow-run=sh,tar --allow-env=HOME,PATH main_test.ts scripts/install_release_test.ts scripts/install_test.ts scripts/release_test.ts toggl/date_range_test.ts
 deno compile --quiet --allow-net --allow-read --allow-write --allow-run=pbcopy,wl-copy,xclip,xsel,clip,powershell.exe,powershell --allow-env --output /tmp/toggl-cli main.ts
 ```
