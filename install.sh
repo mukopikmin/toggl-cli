@@ -69,12 +69,17 @@ fi
 
 case "$tag" in
   nightly) ;;
-  v[0-9]*.[0-9]*.[0-9]*) ;;
+  v[0-9]*.[0-9]*.[0-9]* | [0-9]*.[0-9]*.[0-9]*) ;;
   *) fail "invalid release tag: $tag" ;;
 esac
 
 version="${tag#v}"
-archive="toggl-cli-v${version}-${target}.tar.gz"
+if [ "$version" = "nightly" ]; then
+  archive_root="toggl-cli-nightly-${target}"
+else
+  archive_root="toggl-cli-v${version}-${target}"
+fi
+archive="${archive_root}.tar.gz"
 download_url="$repository/releases/download/$tag"
 temporary_dir="$(mktemp -d "${TMPDIR:-/tmp}/toggl-install.XXXXXX")"
 archive_path="$temporary_dir/$archive"
@@ -103,7 +108,7 @@ fi
 [ "$actual_checksum" = "$expected_checksum" ] || fail "SHA-256 checksum mismatch"
 
 tar -xzf "$archive_path" -C "$temporary_dir" || fail "could not extract $archive"
-binary_path="$temporary_dir/toggl-cli-v${version}-${target}/toggl"
+binary_path="$temporary_dir/${archive_root}/toggl"
 [ -f "$binary_path" ] || fail "release archive does not contain toggl"
 
 mkdir -p "$install_dir"
