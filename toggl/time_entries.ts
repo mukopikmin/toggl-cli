@@ -6,11 +6,11 @@ import { formatTimeEntryDate } from "./date.ts";
 interface TimeEntryResponse {
   id: number;
   workspace_id: number;
-  project_id: number;
+  project_id: number | null;
   task_id: number;
   billable: boolean;
   start: string;
-  stop: string;
+  stop: string | null;
   duration: number;
   description: string;
   duronly: boolean;
@@ -19,7 +19,7 @@ interface TimeEntryResponse {
   user_id: number;
   uid: number;
   wid: number;
-  pid: number;
+  pid: number | null;
   client_name: string;
   project_name: string;
   project_color: string;
@@ -29,12 +29,11 @@ interface TimeEntryResponse {
   user_avatar_url: string;
 }
 
-// TODO: Fix for all locales
-export async function getTimeEntriesForDays(
+export async function getTimeEntries(
   config: TogglConfig,
   fromDay: Temporal.PlainDate,
   toDay: Temporal.PlainDate,
-): Promise<Record<string, Record<number, number>>> {
+): Promise<TimeEntry[]> {
   const { startDate, endDate } = buildTimeEntriesDateRange(
     fromDay,
     toDay,
@@ -62,21 +61,28 @@ export async function getTimeEntriesForDays(
   const entries = await response.json() as TimeEntryResponse[];
 
   // Map to TimeEntry
-  const timeEntries: TimeEntry[] = entries.map((e) => ({
+  return entries.map((e) => ({
     id: e.id,
-    project_id: e.project_id ?? e.pid,
+    project_id: e.project_id ?? e.pid ?? null,
     start: e.start,
-    stop: e.stop,
+    stop: e.stop ?? null,
     duration: e.duration,
     description: e.description,
   }));
+}
 
+export function aggregateTimeEntriesForDays(
+  timeEntries: TimeEntry[],
+  timezone?: string,
+  now = Date.now(),
+): Record<string, Record<number, number>> {
   // Aggregation
   // Group by YYYY-MM-DD -> Project -> Sum Duration
   const result: Record<string, Record<number, number>> = {};
 
   for (const entry of timeEntries) {
-    const dateStr = formatTimeEntryDate(entry.start, config.TIMEZONE);
+    if (entry.project_id === null) continue;
+    const dateStr = formatTimeEntryDate(entry.start, timezone);
 
     if (!result[dateStr]) {
       result[dateStr] = {};
@@ -89,10 +95,22 @@ export async function getTimeEntriesForDays(
     // Duration is in seconds, convert to minutes
     let dur = entry.duration;
     if (dur < 0) {
-      dur = Math.floor(Date.now() / 1000) + dur;
+      dur = Math.floor(now / 1000) + dur;
     }
     result[dateStr][entry.project_id] += dur / 60;
   }
 
   return result;
+}
+
+// TODO: Fix for all locales
+export async function getTimeEntriesForDays(
+  config: TogglConfig,
+  fromDay: Temporal.PlainDate,
+  toDay: Temporal.PlainDate,
+): Promise<Record<string, Record<number, number>>> {
+  return aggregateTimeEntriesForDays(
+    await getTimeEntries(config, fromDay, toDay),
+    config.TIMEZONE,
+  );
 }

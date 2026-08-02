@@ -1,8 +1,9 @@
 import { getProjects } from "./projects.ts";
 import { getSummaryTimeEntries } from "./summary.ts";
-import { getTimeEntriesForDays } from "./time_entries.ts";
+import { getTimeEntries, getTimeEntriesForDays } from "./time_entries.ts";
 import {
   SummaryTimeEntriesResponse,
+  TimeEntry,
   TogglConfig,
   TogglProject,
 } from "./types.ts";
@@ -22,10 +23,16 @@ export interface TogglClient {
     fromDay: Temporal.PlainDate,
     toDay: Temporal.PlainDate,
   ) => Promise<Record<string, Record<number, number>>>;
+  getTimeEntries: (
+    config: TogglConfig,
+    fromDay: Temporal.PlainDate,
+    toDay: Temporal.PlainDate,
+  ) => Promise<TimeEntry[]>;
 }
 
 export const togglClient: TogglClient = {
   getProjects: getProjects,
   getSummaryTimeEntries: getSummaryTimeEntries,
   getTimeEntriesForDays: getTimeEntriesForDays,
+  getTimeEntries: getTimeEntries,
 };

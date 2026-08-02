@@ -12,9 +12,9 @@ export interface TogglProject {
 
 export interface TimeEntry {
   id: number;
-  project_id: number;
+  project_id: number | null;
   start: string;
-  stop: string;
+  stop: string | null;
   duration: number;
   description: string;
 }
