@@ -146,12 +146,17 @@ const sha256 = async (path: string): Promise<string> => {
   ).join("");
 };
 
+const archiveRoot = (version: string, target: string): string =>
+  version === "nightly"
+    ? `toggl-cli-nightly-${target}`
+    : `toggl-cli-v${version}-${target}`;
+
 const archive = async (
   target: Target,
   version: string,
   binaryPath: string,
 ): Promise<string> => {
-  const root = `toggl-cli-v${version}-${target.id}`;
+  const root = archiveRoot(version, target.id);
   const stagingDir = await Deno.makeTempDir({
     prefix: `toggl-cli-release-${target.id}-`,
   });
@@ -169,8 +174,7 @@ const archive = async (
       await Deno.copyFile("LICENSE", join(rootDir, "LICENSE"));
     }
 
-    const archiveName =
-      `toggl-cli-v${version}-${target.id}.${target.archiveType}`;
+    const archiveName = `${root}.${target.archiveType}`;
     const archivePath = join(Deno.cwd(), "dist", archiveName);
     if (target.archiveType === "zip") {
       await run("zip", ["-qr", archivePath, root], stagingDir);

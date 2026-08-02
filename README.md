@@ -5,21 +5,33 @@ can be output as delimiter-separated values or JSON.
 
 ## Requirements
 
-- Deno 2.8 or later
 - A Toggl Track API token
 - The ID of the target workspace
 
+Building from source additionally requires Deno 2.8 or later.
+
 ## Installation
 
-On Linux and macOS, run the install script:
+On Linux x64 and macOS arm64, install the latest release binary to
+`$HOME/.local/bin/toggl` without cloning the repository:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/mukopikmin/toggl-cli/main/install.sh | sh
+```
+
+To install the latest tested nightly build instead:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/mukopikmin/toggl-cli/main/install.sh | sh -s -- --nightly
+```
+
+Make sure `$HOME/.local/bin` is included in your `PATH`.
+
+To build and install from source, clone the repository and run:
 
 ```sh
 deno task install --version 0.1.0
 ```
-
-This builds the executable in a temporary directory and installs it to
-`$HOME/.local/bin/toggl`. Make sure `$HOME/.local/bin` is included in your
-`PATH`, then run the installed command as `toggl`.
 
 On Windows, download the `windows-x64` release archive, extract `toggl.exe`, and
 place it in a directory included in your `PATH`.
@@ -65,7 +77,7 @@ with `display_order` are shown first in ascending numeric order, and projects
 without `display_order` keep their Toggl API order after the ordered projects.
 
 The optional `timezone` setting is used to calculate the Toggl time entry query
-range. When it is omitted, the CLI preserves the existing UTC-based behavior.
+range. When it is omitted, the CLI uses the execution environment's timezone.
 
 To migrate an old `~/.toggl_config` file, run:
 
@@ -109,6 +121,7 @@ deno task run -- --help
 | `--clipboard`              | Copy the output to the clipboard as well as stdout.             |
 | `-h`, `--help`             | Show command-line help.                                         |
 | `--no-project`             | Omit the project column from `summary` CSV output.              |
+| `--no-date`                | Omit the date header row from CSV output.                       |
 | `--version`                | Show the CLI version.                                           |
 
 ### Aggregate time entries
@@ -122,8 +135,8 @@ deno task run -- summary 2026-06-01 2026-06-15
 
 Alternatively, use `--days` or `-d` to aggregate from the specified number of
 days ago through today. Today is determined using the configured `timezone`, or
-UTC when no timezone is configured. Both endpoints are included, so `--days 7`
-outputs eight days including today.
+the execution environment's timezone when no timezone is configured. Both
+endpoints are included, so `--days 7` outputs eight days including today.
 
 ```sh
 deno task run -- summary --days 7
@@ -145,6 +158,18 @@ Use `--no-project` to omit the project column from CSV output:
 
 ```sh
 deno task run -- summary --no-project 2026-06-01 2026-06-15
+```
+
+Use `--no-date` to omit the date header row from CSV output:
+
+```sh
+deno task run -- summary --no-date 2026-06-01 2026-06-15
+```
+
+The two options can be combined to output only the work-time values:
+
+```sh
+deno task run -- summary --no-project --no-date 2026-06-01 2026-06-15
 ```
 
 Use `--format json` or `-f json` to output JSON:
@@ -356,20 +381,12 @@ After the `Test` workflow succeeds on `main`, the tested commit is published as
 the `nightly` prerelease. Its moving `nightly` tag and assets are replaced on
 each successful run independently of stable releases. Nightly binaries report
 their version as `nightly`, and archives use names such as
-`toggl-cli-vnightly-linux-x64.tar.gz`. Legacy versioned Nightly releases and
-tags are removed automatically.
+`toggl-cli-nightly-linux-x64.tar.gz`. Legacy versioned Nightly releases and tags
+are removed automatically.
 
-## Install
+## Running the Installed Command
 
-On Linux and macOS, build in a temporary directory and install the executable to
-`$HOME/.local/bin/toggl`:
-
-```sh
-deno task install --version 0.1.0
-```
-
-Make sure `$HOME/.local/bin` is included in your `PATH`, then run the installed
-command as follows:
+Run the installed command as follows:
 
 ```sh
 toggl summary 2026-06-01 2026-06-15
@@ -377,9 +394,6 @@ toggl summary --clipboard 2026-06-01 2026-06-15
 toggl projects
 toggl config
 ```
-
-On Windows, download the `windows-x64` release archive, extract `toggl.exe`, and
-place it in a directory included in your `PATH`.
 
 ## Development
 
@@ -395,7 +409,8 @@ deno task run -- projects
 
 ```sh
 deno fmt --check
-deno check --lock=deno.lock main.ts main_test.ts scripts/install.ts toggl/date_range_test.ts
-deno test
-deno compile --allow-net --allow-read --allow-env --output /tmp/toggl-cli main.ts
+sh -n install.sh
+deno check --lock=deno.lock main.ts main_test.ts scripts/install.ts scripts/install_release_test.ts scripts/install_test.ts scripts/release.ts scripts/release_test.ts toggl/date_range_test.ts
+deno test --allow-read --allow-write --allow-run=sh,tar --allow-env=HOME,PATH main_test.ts scripts/install_release_test.ts scripts/install_test.ts scripts/release_test.ts toggl/date_range_test.ts
+deno compile --quiet --allow-net --allow-read --allow-write --allow-run=pbcopy,wl-copy,xclip,xsel,clip,powershell.exe,powershell --allow-env --output /tmp/toggl-cli main.ts
 ```
