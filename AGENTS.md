@@ -19,6 +19,9 @@
   Avoid mixing languages in repository and GitHub communication.
 - Do not add tool-specific prefixes such as `[codex]` to pull request titles.
   Write titles that describe the change directly.
+- When work was started for the purpose of resolving an issue, include
+  `Closes #<issue_number>` or an equivalent closing keyword in the pull request
+  description so that merging the pull request closes the issue.
 
 ## Tool Usage
 
