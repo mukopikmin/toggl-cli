@@ -11,12 +11,14 @@ export function createHelpText(): string {
   toggl projects sync
   toggl config [options]
   toggl init
+  toggl update [--channel stable|nightly]
 
 Commands:
   init      Create the configuration file
   projects  List projects
   config    Show configuration values
   summary   Summarize time entries for a range of days
+  update    Update the installed Toggl CLI binary
 
 Options:
   -s, --separator <text> Set the output delimiter (default: tab)
@@ -35,6 +37,7 @@ export type CliCommand =
   | { name: "help" }
   | { name: "version" }
   | { name: "init" }
+  | { name: "update"; channel?: "stable" | "nightly" }
   | { name: "projects"; format: ProjectsFormat }
   | { name: "config"; format: ProjectsFormat }
   | { name: "projects-sync" }
@@ -93,6 +96,23 @@ function parseConfigArgs(args: string[]): CliCommand {
   }
 
   return { name: "config", format: parseFormat(parsed.values.format) };
+}
+
+function parseUpdateArgs(args: string[]): CliCommand {
+  const parsed = parseArgs({
+    args,
+    options: { channel: { type: "string" } },
+    allowPositionals: true,
+    strict: true,
+  });
+  if (parsed.positionals.length > 0) {
+    throw new CliUsageError("update does not accept positional arguments");
+  }
+  const channel = parsed.values.channel;
+  if (channel !== undefined && channel !== "stable" && channel !== "nightly") {
+    throw new CliUsageError("channel must be stable or nightly");
+  }
+  return { name: "update", channel };
 }
 
 function parseIsoDate(value: string): Temporal.PlainDate {
@@ -200,6 +220,8 @@ export function parseCliArgs(
         return parseConfigArgs(commandArgs);
       case "summary":
         return parseSummaryArgs(commandArgs);
+      case "update":
+        return parseUpdateArgs(commandArgs);
       default:
         throw new CliUsageError(`unknown command: ${command}`);
     }
