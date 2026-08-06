@@ -17,10 +17,10 @@ const ok = (stdout = "") => ({
 
 async function fixture(
   overrides: Partial<UpdateDependencies> = {},
-  options: { version?: string; archive?: Uint8Array } = {},
+  options: { version?: string; archive?: Uint8Array<ArrayBuffer> } = {},
 ) {
   const archive = options.archive ?? encoder.encode("archive");
-  const digest = await crypto.subtle.digest("SHA-256", archive);
+  const digest = await crypto.subtle.digest("SHA-256", archive.buffer);
   const checksum = [...new Uint8Array(digest)].map((value) =>
     value.toString(16).padStart(2, "0")
   ).join("");
@@ -37,7 +37,7 @@ async function fixture(
       if (url.endsWith(".sha256")) {
         return Promise.resolve(new Response(`${checksum}\n`));
       }
-      return Promise.resolve(new Response(archive));
+      return Promise.resolve(new Response(archive.buffer));
     },
     os: "linux",
     arch: "x86_64",
