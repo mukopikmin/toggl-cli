@@ -59,12 +59,14 @@ Deno.test("createHelpText describes commands and options", () => {
   toggl projects sync
   toggl config [options]
   toggl init
+  toggl update [--channel stable|nightly]
 
 Commands:
   init      Create the configuration file
   projects  List projects
   config    Show configuration values
   summary   Summarize time entries for a range of days
+  update    Update the installed Toggl CLI binary
 
 Options:
   -s, --separator <text> Set the output delimiter (default: tab)

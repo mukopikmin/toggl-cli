@@ -7,6 +7,7 @@ import {
   runProjectsSyncCommand,
 } from "./command/projects.ts";
 import { runSummaryCommand } from "./command/summary.ts";
+import { runUpdateCommand } from "./command/update.ts";
 import { togglClient } from "./toggl/api.ts";
 import { version } from "./version.ts";
 
@@ -48,6 +49,18 @@ export async function main(args: string[]): Promise<number> {
         return 1;
       }
       return 0;
+    case "update": {
+      const result = await runUpdateCommand({
+        channel: command.channel,
+        currentVersion: version,
+      });
+      console.log(
+        result.status === "updated"
+          ? `Updated to ${result.version}.`
+          : `Already up to date (${result.version}).`,
+      );
+      return 0;
+    }
   }
 }
 

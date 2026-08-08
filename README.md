@@ -103,12 +103,13 @@ deno task run -- --help
 
 ### Commands
 
-| Command                           | Description                                            |
-| --------------------------------- | ------------------------------------------------------ |
-| `summary <start-date> <end-date>` | Aggregate time entries for a date range.               |
-| `projects`                        | List active, visible projects.                         |
-| `projects sync`                   | Add missing active projects to the configuration file. |
-| `init`                            | Create the configuration file.                         |
+| Command                              | Description                                            |
+| ------------------------------------ | ------------------------------------------------------ |
+| `summary <start-date> <end-date>`    | Aggregate time entries for a date range.               |
+| `projects`                           | List active, visible projects.                         |
+| `projects sync`                      | Add missing active projects to the configuration file. |
+| `init`                               | Create the configuration file.                         |
+| `update [--channel stable\|nightly]` | Update the installed compiled binary.                  |
 
 ### Options
 
@@ -122,6 +123,28 @@ deno task run -- --help
 | `--no-project`             | Omit the project column from CSV output.                        |
 | `--no-date`                | Omit the date header row from CSV output.                       |
 | `--version`                | Show the CLI version.                                           |
+
+### Update the CLI
+
+Update the current compiled executable in place:
+
+```sh
+toggl update
+toggl update --channel nightly
+toggl update --channel stable
+```
+
+Versions named `nightly-YYYYMMDD-<sha>` use the Nightly channel by default; all
+other versions use the latest stable GitHub release. An explicit `--channel`
+overrides that selection. Self-update supports Linux x64 and macOS arm64,
+matching the published `.tar.gz` artifacts. Windows and other architectures must
+be updated manually.
+
+The updater verifies the downloaded SHA-256 checksum and binary version before
+atomically replacing the running executable. It therefore needs `tar` on `PATH`
+and write permission for the executable's directory. A failure leaves the
+existing binary unchanged. Self-update is unavailable under `deno task run` (or
+another source execution); install a compiled release binary first.
 
 ### Aggregate time entries
 
