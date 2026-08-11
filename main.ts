@@ -11,8 +11,54 @@ import { runUpdateCommand } from "./command/update.ts";
 import { togglClient } from "./toggl/api.ts";
 import { TogglApiError } from "./toggl/error.ts";
 import { version } from "./version.ts";
+import {
+  ConfigFileNotFoundError,
+  ConfigFileReadError,
+  ConfigValidationError,
+  HomeNotSetError,
+} from "./config.ts";
 
-export async function main(args: string[]): Promise<number> {
+function reportConfigError(error: unknown): boolean {
+  if (error instanceof ConfigValidationError) {
+    const details = [
+      ...(error.missingKeys.length
+        ? [`Missing required configuration: ${error.missingKeys.join(", ")}`]
+        : []),
+      ...(error.invalidProjects.length
+        ? [`Invalid project configuration: ${error.invalidProjects.join(", ")}`]
+        : []),
+    ].join("; ");
+    console.error(`Error: ${details}`);
+    return true;
+  }
+  if (error instanceof ConfigFileNotFoundError) {
+    console.error(`Error: ${error.message}`);
+    console.error(
+      "Please create ~/.config/toggl-cli/config.toml with the following format:",
+    );
+    console.error('workspace = "your_workspace_id"');
+    console.error('token = "your_api_token"');
+    return true;
+  }
+  if (
+    error instanceof HomeNotSetError || error instanceof ConfigFileReadError
+  ) {
+    console.error(`Error: ${error.message}`);
+    return true;
+  }
+  return false;
+}
+
+export interface MainDependencies {
+  runConfigCommand: typeof runConfigCommand;
+}
+
+const defaultMainDependencies: MainDependencies = { runConfigCommand };
+
+export async function main(
+  args: string[],
+  dependencies: MainDependencies = defaultMainDependencies,
+): Promise<number> {
   let command;
   try {
     command = parseCliArgs(args);
@@ -37,7 +83,7 @@ export async function main(args: string[]): Promise<number> {
         await runProjectsCommand({ format: command.format }, togglClient);
         return 0;
       case "config":
-        await runConfigCommand(command.format);
+        await dependencies.runConfigCommand(command.format);
         return 0;
       case "projects-sync":
         await runProjectsSyncCommand(togglClient);
@@ -59,6 +105,7 @@ export async function main(args: string[]): Promise<number> {
       }
     }
   } catch (error) {
+    if (reportConfigError(error)) return 1;
     if (
       !(error instanceof ClipboardUnavailableError) &&
       !(error instanceof TogglApiError)
