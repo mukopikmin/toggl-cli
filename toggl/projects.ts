@@ -1,4 +1,5 @@
 import { apiEndpoint } from "./api.ts";
+import { TogglApiError } from "./error.ts";
 import type { TogglConfig, TogglProject } from "./types.ts";
 
 /**
@@ -45,8 +46,12 @@ export async function getProjects(
   });
 
   if (!response.ok) {
-    console.error(`Failed to fetch projects: ${response.statusText}`);
-    Deno.exit(1);
+    throw new TogglApiError(
+      "fetch projects",
+      response.status,
+      url,
+      response.statusText,
+    );
   }
 
   const projects = await response.json() as ProjectResponse[];

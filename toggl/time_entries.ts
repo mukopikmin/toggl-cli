@@ -2,6 +2,7 @@ import { apiEndpoint } from "./api.ts";
 import type { TimeEntry, TogglConfig } from "./types.ts";
 import { buildTimeEntriesDateRange } from "./date_range.ts";
 import { formatTimeEntryDate } from "./date.ts";
+import { TogglApiError } from "./error.ts";
 
 interface TimeEntryResponse {
   id: number;
@@ -55,8 +56,12 @@ export async function getTimeEntriesForDays(
   });
 
   if (!response.ok) {
-    console.error(`Failed to fetch time entries: ${response.statusText}`);
-    Deno.exit(1);
+    throw new TogglApiError(
+      "fetch time entries",
+      response.status,
+      url,
+      response.statusText,
+    );
   }
 
   const entries = await response.json() as TimeEntryResponse[];

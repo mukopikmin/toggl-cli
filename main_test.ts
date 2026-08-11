@@ -35,6 +35,7 @@ import { getSummaryTimeEntries } from "./toggl/summary.ts";
 import { getTimeEntriesForDays } from "./toggl/time_entries.ts";
 import { apiEndpoint, reportsApiEndpoint } from "./toggl/api.ts";
 import { formatTimeEntryDate, resolveTimeZone } from "./toggl/date.ts";
+import { TogglApiError } from "./toggl/error.ts";
 
 const config = {
   WORKSPACE: "workspace-id",
@@ -997,6 +998,30 @@ Deno.test("getProjects fetches active projects with Toggl auth", async () => {
   }
 });
 
+Deno.test("getProjects throws a typed error for a non-success response", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (() =>
+    Promise.resolve(
+      new Response(null, { status: 401, statusText: "Unauthorized" }),
+    )) as typeof fetch;
+
+  try {
+    const error = await assertRejects(
+      () => getProjects(config),
+      TogglApiError,
+      "Failed to fetch projects: HTTP 401 Unauthorized",
+    );
+    assertEquals(error.operation, "fetch projects");
+    assertEquals(error.status, 401);
+    assertEquals(
+      error.url,
+      `${apiEndpoint}/workspaces/${config.WORKSPACE}/projects`,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 Deno.test("getSummaryTimeEntries posts summary request with Toggl auth", async () => {
   const originalFetch = globalThis.fetch;
   let requestedUrl = "";
@@ -1054,6 +1079,32 @@ Deno.test("getSummaryTimeEntries posts summary request with Toggl auth", async (
   }
 });
 
+Deno.test("getSummaryTimeEntries throws a typed error for a non-success response", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (() =>
+    Promise.resolve(
+      new Response(null, { status: 429, statusText: "Too Many Requests" }),
+    )) as typeof fetch;
+  const fromDay = Temporal.PlainDate.from("2026-05-01");
+  const toDay = Temporal.PlainDate.from("2026-05-31");
+
+  try {
+    const error = await assertRejects(
+      () => getSummaryTimeEntries(config, fromDay, toDay),
+      TogglApiError,
+      "Failed to fetch summary time entries: HTTP 429 Too Many Requests",
+    );
+    assertEquals(error.operation, "fetch summary time entries");
+    assertEquals(error.status, 429);
+    assertEquals(
+      error.url,
+      `${reportsApiEndpoint}/workspace/${config.WORKSPACE}/summary/time_entries`,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 Deno.test("formatTimeEntryDate converts the same instant to configured timezone dates", () => {
   const start = "2026-05-01T15:30:00Z";
 
@@ -1100,6 +1151,33 @@ Deno.test("getTimeEntriesForDays fetches range in configured UTC timezone", asyn
       "2026-05-03T00:00:00Z",
     );
     assertEquals(entries, {});
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("getTimeEntriesForDays throws a typed error for a non-success response", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (() =>
+    Promise.resolve(
+      new Response(null, { status: 503, statusText: "Service Unavailable" }),
+    )) as typeof fetch;
+  const fromDay = Temporal.PlainDate.from("2026-05-01");
+  const toDay = Temporal.PlainDate.from("2026-05-02");
+
+  try {
+    const error = await assertRejects(
+      () =>
+        getTimeEntriesForDays({ ...config, TIMEZONE: "UTC" }, fromDay, toDay),
+      TogglApiError,
+      "Failed to fetch time entries: HTTP 503 Service Unavailable",
+    );
+    assertEquals(error.operation, "fetch time entries");
+    assertEquals(error.status, 503);
+    assertEquals(
+      new URL(error.url).origin + new URL(error.url).pathname,
+      `${apiEndpoint}/me/time_entries`,
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }
