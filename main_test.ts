@@ -1285,7 +1285,7 @@ Deno.test("getTimeEntries throws a typed error for a non-success response", asyn
   }
 });
 
-Deno.test("getTimeEntries fetches a range and maps response DTOs", async () => {
+Deno.test("getTimeEntries maps response DTOs to domain models", async () => {
   const configWithTimezone = {
     ...config,
     TIMEZONE: "Asia/Tokyo",
@@ -1380,7 +1380,7 @@ Deno.test("getTimeEntries fetches a range and maps response DTOs", async () => {
   }
 });
 
-Deno.test("getTimeEntries returns entry timestamps without aggregating them", async () => {
+Deno.test("getTimeEntries returns domain entries without aggregating them", async () => {
   const configWithTimezone = {
     ...config,
     TIMEZONE: "Asia/Tokyo",

@@ -30,6 +30,17 @@ interface TimeEntryDto {
   user_avatar_url: string;
 }
 
+function toTimeEntry(entry: TimeEntryDto): TimeEntry {
+  return {
+    id: entry.id,
+    projectId: entry.project_id ?? entry.pid,
+    start: entry.start,
+    stop: entry.stop,
+    durationSeconds: entry.duration,
+    description: entry.description,
+  };
+}
+
 // TODO: Fix for all locales
 export async function getTimeEntries(
   config: TogglConfig,
@@ -66,13 +77,5 @@ export async function getTimeEntries(
 
   const entries = await response.json() as TimeEntryDto[];
 
-  // Map to TimeEntry
-  return entries.map((e) => ({
-    id: e.id,
-    projectId: e.project_id ?? e.pid,
-    start: e.start,
-    stop: e.stop,
-    durationSeconds: e.duration,
-    description: e.description,
-  }));
+  return entries.map(toTimeEntry);
 }

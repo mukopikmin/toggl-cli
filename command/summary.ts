@@ -8,7 +8,10 @@ import {
 import type { Project } from "../model/project.ts";
 import type { TogglClient } from "../toggl/api.ts";
 import { resolveTimeZone } from "../model/date.ts";
-import { summarizeTimeEntries } from "../model/time_entry_summary.ts";
+import {
+  summarizeTimeEntries,
+  type TimeEntrySummary,
+} from "../model/time_entry_summary.ts";
 
 export type SummaryFormat = "csv" | "json";
 
@@ -66,7 +69,7 @@ function daysBetween(
 
 export function buildWorkTimeTable(
   projects: Project[],
-  dateEntries: Record<string, Record<number, number>>,
+  dateEntries: TimeEntrySummary,
   startDay: Temporal.PlainDate,
   endDay: Temporal.PlainDate,
 ): WorkTimeTable {
@@ -124,13 +127,13 @@ export function outputWorkTimeTable(
 }
 
 export function formatTimeEntriesJson(
-  dateEntries: Record<string, Record<number, number>>,
+  dateEntries: TimeEntrySummary,
 ): string {
   return JSON.stringify(dateEntries, null, 2);
 }
 
 export function outputTimeEntriesJson(
-  dateEntries: Record<string, Record<number, number>>,
+  dateEntries: TimeEntrySummary,
 ): void {
   console.log(formatTimeEntriesJson(dateEntries));
 }
