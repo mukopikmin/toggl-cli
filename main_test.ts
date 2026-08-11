@@ -949,9 +949,24 @@ Deno.test("buildWorkTimeTable enumerates dates across a year boundary", () => {
     "2025-12-31",
     "2026-01-01",
     "2026-01-02",
-  ]);
-});
-
+    const projects = await getProjects(config, {
+      1: { displayName: "Customer work", hidden: false, displayOrder: 2 },
+    });
+      {
+        id: 1,
+        name: "Client work",
+        displayName: "Customer work",
+        active: true,
+        hidden: false,
+        displayOrder: 2,
+      },
+      {
+        id: 3,
+        name: "Legacy shape",
+        displayName: "Legacy shape",
+        active: true,
+        hidden: false,
+      },
 Deno.test("formatWorkTimeTable renders a single TSV table for spreadsheet paste", () => {
   const table = buildWorkTimeTable(
     [

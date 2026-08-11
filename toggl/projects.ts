@@ -1,31 +1,32 @@
 import { apiEndpoint } from "./api.ts";
 import { TogglApiError } from "./error.ts";
-    throw new TogglApiError(
-      "fetch projects",
-      response.status,
-      url,
-      response.statusText,
+import type {
+  Project,
+  ProjectDisplaySettings,
+} from "../model/project.ts";
+import type { TogglConfig } from "./types.ts";
+export function mapProjectResponse(
+  project: ProjectResponse,
+  settings?: ProjectDisplaySettings,
+): Project {
+  const name = project.name ?? project.project_name;
+  return {
+    id: project.id,
+    name,
+    displayName: settings?.displayName ?? name,
+    active: project.active ?? project.project_active,
+    hidden: settings?.hidden ?? false,
+    ...(settings?.displayOrder === undefined
+      ? {}
+      : { displayOrder: settings.displayOrder }),
+  };
+}
+
+  settingsByProjectId: Record<number, ProjectDisplaySettings> = {},
+): Promise<Project[]> {
+    .map((project) =>
+      mapProjectResponse(project, settingsByProjectId[project.id])
     );
-
-/**
- * https://engineering.toggl.com/docs/api/projects/
- */
-
-interface ProjectResponse {
-  id: number;
-  workspace_id: number;
-  project_id: number;
-  task_id: number;
-  billable: boolean;
-  start: string;
-  stop: string;
-  duration: number;
-  description: string;
-  duronly: boolean;
-  at: string;
-  server_deleted_at: string;
-  user_id: number;
-  uid: number;
   wid: number;
   pid: number;
   project_name: string;

@@ -4,10 +4,4 @@ export interface TogglConfig {
   TIMEZONE?: string;
 }
 
-export interface TogglProject {
-  id: number;
-  name: string;
-  active: boolean;
-}
-
 export type SummaryTimeEntriesResponse = Record<string, unknown>;

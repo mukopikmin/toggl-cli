@@ -1,13 +1,11 @@
 import { stringify } from "@std/toml";
 import { loadConfig, loadConfigDocument } from "../config.ts";
-import { mapTogglProjects } from "../toggl/project_adapter.ts";
 import {
   sortProjectsByDisplayOrder,
   visibleProjects,
 } from "../model/project.ts";
 import type { Project } from "../model/project.ts";
 import type { TogglClient } from "../toggl/api.ts";
-import type { TogglProject } from "../toggl/types.ts";
 
 export type ProjectsFormat = "csv" | "json";
 
@@ -39,10 +37,7 @@ export async function runProjectsCommand(
   toggl: TogglClient,
 ): Promise<void> {
   const config = await loadConfig();
-  const projects = mapTogglProjects(
-    await toggl.getProjects(config),
-    config.PROJECTS,
-  );
+  const projects = await toggl.getProjects(config, config.PROJECTS);
 
   outputProjects(
     sortProjectsByDisplayOrder(visibleProjects(projects)),
@@ -53,7 +48,7 @@ export async function runProjectsCommand(
 export function appendMissingProjects(
   configText: string,
   configuredProjectIds: number[],
-  projects: TogglProject[],
+  projects: Pick<Project, "id" | "name">[],
 ): { text: string; addedCount: number } {
   const configuredIds = new Set(configuredProjectIds);
   const missingProjects = projects
@@ -91,7 +86,10 @@ export async function runProjectsSyncCommand(
   toggl: TogglClient,
 ): Promise<void> {
   const document = await loadConfigDocument();
-  const projects = await toggl.getProjects(document.config);
+  const projects = await toggl.getProjects(
+    document.config,
+    document.config.PROJECTS,
+  );
   const result = appendMissingProjects(
     document.text,
     Object.keys(document.config.PROJECTS).map(Number),

@@ -388,7 +388,7 @@ deno task run -- projects
 ```sh
 deno fmt --check
 sh -n install.sh
-deno check --lock=deno.lock main.ts main_test.ts scripts/install.ts scripts/install_release_test.ts scripts/install_test.ts scripts/release.ts scripts/release_test.ts toggl/date_range_test.ts
-deno test --allow-read --allow-write --allow-run=sh,tar --allow-env=HOME,PATH main_test.ts scripts/install_release_test.ts scripts/install_test.ts scripts/release_test.ts toggl/date_range_test.ts
-deno compile --quiet --allow-net --allow-read --allow-write --allow-run=pbcopy,wl-copy,xclip,xsel,clip,powershell.exe,powershell --allow-env --output /tmp/toggl-cli main.ts
+deno check --lock=deno.lock main.ts main_test.ts toggl/projects_test.ts command/update_test.ts model/project_test.ts scripts/install.ts scripts/install_release_test.ts scripts/install_test.ts scripts/release.ts scripts/release_test.ts toggl/date_range_test.ts model/time_entry_summary_test.ts
+deno test --allow-read --allow-write --allow-run=sh,tar --allow-env=HOME,PATH main_test.ts toggl/projects_test.ts command/update_test.ts model/project_test.ts scripts/install_release_test.ts scripts/install_test.ts scripts/release_test.ts toggl/date_range_test.ts model/time_entry_summary_test.ts
+deno compile --quiet --allow-net=api.github.com,github.com --allow-read --allow-write --allow-run --allow-env --output /tmp/toggl-cli main.ts
 ```

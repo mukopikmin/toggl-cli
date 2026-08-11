@@ -1,6 +1,5 @@
 import { writeClipboardText } from "../clipboard.ts";
 import { loadConfig } from "../config.ts";
-import { mapTogglProjects } from "../toggl/project_adapter.ts";
 import {
   sortProjectsByDisplayOrder,
   visibleProjects,
@@ -202,10 +201,7 @@ export async function runSummaryCommand(
     return;
   }
 
-  const projects = mapTogglProjects(
-    await toggl.getProjects(config),
-    config.PROJECTS,
-  );
+  const projects = await toggl.getProjects(config, config.PROJECTS);
   const table = buildWorkTimeTable(
     sortProjectsByDisplayOrder(visibleProjects(projects)),
     dateEntries,

@@ -3,8 +3,14 @@ import { getSummaryTimeEntries } from "./summary.ts";
 import { getTimeEntries } from "./time_entries.ts";
 import type { TimeEntry } from "../model/time_entry.ts";
 import type {
-  getTimeEntries: (
-  ) => Promise<TimeEntry[]>;
+  Project,
+  ProjectDisplaySettings,
+} from "../model/project.ts";
+import type {
+  getProjects: (
+    config: TogglConfig,
+    settingsByProjectId?: Record<number, ProjectDisplaySettings>,
+  ) => Promise<Project[]>;
   getTimeEntries: getTimeEntries,
   TogglProject,
 } from "./types.ts";

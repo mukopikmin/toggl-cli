@@ -7,6 +7,12 @@ export interface Project {
   displayOrder?: number;
 }
 
+export interface ProjectDisplaySettings {
+  displayName?: string;
+  hidden: boolean;
+  displayOrder?: number;
+}
+
 export function visibleProjects(projects: Project[]): Project[] {
   return projects.filter((project) => !project.hidden);
 }
