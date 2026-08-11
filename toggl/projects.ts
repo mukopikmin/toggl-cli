@@ -1,6 +1,11 @@
 import { apiEndpoint } from "./api.ts";
 import { TogglApiError } from "./error.ts";
-import type { TogglConfig, TogglProject } from "./types.ts";
+    throw new TogglApiError(
+      "fetch projects",
+      response.status,
+      url,
+      response.statusText,
+    );
 
 /**
  * https://engineering.toggl.com/docs/api/projects/

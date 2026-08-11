@@ -1,10 +1,11 @@
 import { getProjects } from "./projects.ts";
 import { getSummaryTimeEntries } from "./summary.ts";
-import { aggregateTimeEntries } from "./time_entry_aggregation.ts";
 import { getTimeEntries } from "./time_entries.ts";
-import {
-  SummaryTimeEntriesResponse,
-  TogglConfig,
+import type { TimeEntry } from "../model/time_entry.ts";
+import type {
+  getTimeEntries: (
+  ) => Promise<TimeEntry[]>;
+  getTimeEntries: getTimeEntries,
   TogglProject,
 } from "./types.ts";
 

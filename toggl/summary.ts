@@ -1,7 +1,10 @@
 import { reportsApiEndpoint } from "./api.ts";
 import { TogglApiError } from "./error.ts";
-import type { SummaryTimeEntriesResponse, TogglConfig } from "./types.ts";
-
+    throw new TogglApiError(
+      "fetch summary time entries",
+      response.status,
+      url,
+      response.statusText,
 function formatDate(day: Temporal.PlainDate): string {
   return day.toString();
 }

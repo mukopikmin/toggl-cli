@@ -7,7 +7,11 @@ import {
 } from "../model/project.ts";
 import type { Project } from "../model/project.ts";
 import type { TogglClient } from "../toggl/api.ts";
-import { resolveTimeZone } from "../toggl/date.ts";
+import { resolveTimeZone } from "../model/date.ts";
+import {
+  summarizeTimeEntries,
+  type TimeEntrySummary,
+} from "../model/time_entry_summary.ts";
 
 export type SummaryFormat = "csv" | "json";
 
@@ -65,7 +69,7 @@ function daysBetween(
 
 export function buildWorkTimeTable(
   projects: Project[],
-  dateEntries: Record<string, Record<number, number>>,
+  dateEntries: TimeEntrySummary,
   startDay: Temporal.PlainDate,
   endDay: Temporal.PlainDate,
 ): WorkTimeTable {
@@ -123,13 +127,13 @@ export function outputWorkTimeTable(
 }
 
 export function formatTimeEntriesJson(
-  dateEntries: Record<string, Record<number, number>>,
+  dateEntries: TimeEntrySummary,
 ): string {
   return JSON.stringify(dateEntries, null, 2);
 }
 
 export function outputTimeEntriesJson(
-  dateEntries: Record<string, Record<number, number>>,
+  dateEntries: TimeEntrySummary,
 ): void {
   console.log(formatTimeEntriesJson(dateEntries));
 }
@@ -176,16 +180,18 @@ export async function runSummaryCommand(
   cmd: SummaryCommand,
   toggl: TogglClient,
   output: SummaryOutput = defaultSummaryOutput,
+  now: Temporal.Instant = Temporal.Now.instant(),
 ): Promise<void> {
   const { separator, format, noProject, noDate, clipboard } = cmd;
 
   const config = await loadConfig();
   const { startDay, endDay } = resolveSummaryDateRange(cmd, config.TIMEZONE);
-  const dateEntries = await toggl.getTimeEntriesForDays(
+  const timeEntries = await toggl.getTimeEntries(
     config,
     startDay,
     endDay,
   );
+  const dateEntries = summarizeTimeEntries(timeEntries, config.TIMEZONE, now);
 
   if (format === "json") {
     await outputSummaryText(

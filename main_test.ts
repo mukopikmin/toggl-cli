@@ -31,6 +31,13 @@ import {
   parseProjectsConfig,
 } from "./config.ts";
 import { main } from "./main.ts";
+import { getTimeEntries } from "./toggl/time_entries.ts";
+import { formatTimeEntryDate, resolveTimeZone } from "./model/date.ts";
+import { TogglApiError } from "./toggl/error.ts";
+  parseConfigToml,
+  parseProjectsConfig,
+} from "./config.ts";
+import { main } from "./main.ts";
 import { getProjects } from "./toggl/projects.ts";
 import { getSummaryTimeEntries } from "./toggl/summary.ts";
 import {
@@ -453,6 +460,103 @@ Deno.test("parseProjectsConfig returns per-project settings", () => {
       "789012": { hidden: true },
       invalid: { display_name: "Ignored" },
       345678: "ignored",
+Deno.test("parseConfigToml reports missing required keys", () => {
+  const error = assertThrows(
+    () => parseConfigToml('timezone = "UTC"'),
+    ConfigValidationError,
+  );
+  assertEquals(error.missingKeys, ["workspace", "token"]);
+  assertEquals(error.invalidProjects, []);
+});
+
+Deno.test("parseConfigToml reports invalid project settings", () => {
+  const error = assertThrows(
+    () =>
+      parseConfigToml(`
+workspace = "workspace-id"
+token = "test-token"
+
+[projects.invalid]
+hidden = "yes"
+`),
+    ConfigValidationError,
+  );
+  assertEquals(error.missingKeys, []);
+  assertEquals(error.invalidProjects, ["projects.invalid"]);
+});
+
+Deno.test("loadConfigDocument uses injected environment and file access", async () => {
+  const requestedPaths: string[] = [];
+  const document = await loadConfigDocument({
+    getHome: () => "/home/tester",
+    readTextFile: (path) => {
+      requestedPaths.push(path);
+      return Promise.resolve('workspace = "w"\ntoken = "t"\n');
+    },
+    isNotFound: () => false,
+  });
+
+  assertEquals(requestedPaths, ["/home/tester/.config/toggl-cli/config.toml"]);
+  assertEquals(document.config.WORKSPACE, "w");
+});
+
+async function captureConfigBoundaryError(
+  adapter: Parameters<typeof loadConfigDocument>[0],
+) {
+  const messages: string[] = [];
+  const originalError = console.error;
+  console.error = (...values: unknown[]) => messages.push(values.join(" "));
+  try {
+    const exitCode = await main(["config"], {
+      runConfigCommand: async () => {
+        await loadConfigDocument(adapter);
+      },
+    });
+    return { exitCode, messages };
+  } finally {
+    console.error = originalError;
+  }
+}
+
+Deno.test("main reports a missing config file and returns exit code 1", async () => {
+  const result = await captureConfigBoundaryError({
+    getHome: () => "/home/tester",
+    readTextFile: () => Promise.reject(new Error("missing")),
+    isNotFound: () => true,
+  });
+  assertEquals(result.exitCode, 1);
+  assertEquals(result.messages, [
+    "Error: ~/.config/toggl-cli/config.toml file not found",
+    "Please create ~/.config/toggl-cli/config.toml with the following format:",
+    'workspace = "your_workspace_id"',
+    'token = "your_api_token"',
+  ]);
+});
+
+Deno.test("main reports an unset HOME and returns exit code 1", async () => {
+  const result = await captureConfigBoundaryError({
+    getHome: () => undefined,
+    readTextFile: () => Promise.reject(new Error("must not read")),
+    isNotFound: () => false,
+  });
+  assertEquals(result, {
+    exitCode: 1,
+    messages: ["Error: HOME environment variable not set"],
+  });
+});
+
+Deno.test("main reports config read errors and returns exit code 1", async () => {
+  const result = await captureConfigBoundaryError({
+    getHome: () => "/home/tester",
+    readTextFile: () => Promise.reject(new Error("permission denied")),
+    isNotFound: () => false,
+  });
+  assertEquals(result, {
+    exitCode: 1,
+    messages: ["Error: Unable to read ~/.config/toggl-cli/config.toml"],
+  });
+});
+
     }),
     {
       123456: { displayName: "Client A", hidden: false, displayOrder: 10 },
@@ -865,6 +969,30 @@ Deno.test("formatWorkTimeTable renders a single TSV table for spreadsheet paste"
         active: true,
         hidden: false,
       },
+Deno.test("getProjects throws a typed error for a non-success response", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (() =>
+    Promise.resolve(
+      new Response(null, { status: 401, statusText: "Unauthorized" }),
+    )) as typeof fetch;
+
+  try {
+    const error = await assertRejects(
+      () => getProjects(config),
+      TogglApiError,
+      "Failed to fetch projects: HTTP 401 Unauthorized",
+    );
+    assertEquals(error.operation, "fetch projects");
+    assertEquals(error.status, 401);
+    assertEquals(
+      error.url,
+      `${apiEndpoint}/workspaces/${config.WORKSPACE}/projects`,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
     ],
     {
       "2026-05-01": { 100: 5 },
@@ -922,21 +1050,100 @@ Deno.test("formatWorkTimeTable can omit the project column", () => {
 
 Deno.test("formatWorkTimeTable can omit dates and projects", () => {
   const table = {
-    projectNames: ["Client A", "Internal"],
-    headers: ["2026-05-01", "2026-05-02"],
-    rows: [["5", ""], ["", "30"]],
-  };
+Deno.test("getSummaryTimeEntries throws a typed error for a non-success response", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (() =>
+    Promise.resolve(
+      new Response(null, { status: 429, statusText: "Too Many Requests" }),
+    )) as typeof fetch;
+  const fromDay = Temporal.PlainDate.from("2026-05-01");
+  const toDay = Temporal.PlainDate.from("2026-05-31");
 
-  assertEquals(
-    formatWorkTimeTable(table, "\t", false, true),
-    ["Client A\t5\t", "Internal\t\t30"].join("\n"),
-  );
-  assertEquals(
-    formatWorkTimeTable(table, "\t", true, true),
-    ["5\t", "\t30"].join("\n"),
-  );
+  try {
+    const error = await assertRejects(
+      () => getSummaryTimeEntries(config, fromDay, toDay),
+      TogglApiError,
+      "Failed to fetch summary time entries: HTTP 429 Too Many Requests",
+    );
+    assertEquals(error.operation, "fetch summary time entries");
+    assertEquals(error.status, 429);
+    assertEquals(
+      error.url,
+      `${reportsApiEndpoint}/workspace/${config.WORKSPACE}/summary/time_entries`,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
+Deno.test("getTimeEntries fetches range in configured UTC timezone", async () => {
+    const entries = await getTimeEntries(
+    assertEquals(entries, []);
+Deno.test("getTimeEntries throws a typed error for a non-success response", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (() =>
+    Promise.resolve(
+      new Response(null, { status: 503, statusText: "Service Unavailable" }),
+    )) as typeof fetch;
+  const fromDay = Temporal.PlainDate.from("2026-05-01");
+  const toDay = Temporal.PlainDate.from("2026-05-02");
+
+  try {
+    const error = await assertRejects(
+      () => getTimeEntries({ ...config, TIMEZONE: "UTC" }, fromDay, toDay),
+      TogglApiError,
+      "Failed to fetch time entries: HTTP 503 Service Unavailable",
+    );
+    assertEquals(error.operation, "fetch time entries");
+    assertEquals(error.status, 503);
+    assertEquals(
+      new URL(error.url).origin + new URL(error.url).pathname,
+      `${apiEndpoint}/me/time_entries`,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("getTimeEntries maps response DTOs to domain models", async () => {
+
+    const entries = await getTimeEntries(
+    assertEquals(entries, [
+      {
+        id: 10,
+        projectId: 100,
+        start: "2026-05-01T12:00:00Z",
+        stop: "2026-05-01T12:30:00Z",
+        durationSeconds: 1800,
+        description: "first block",
+      },
+      {
+        id: 11,
+        projectId: 100,
+        start: "2026-05-01T13:00:00Z",
+        stop: "2026-05-01T13:15:00Z",
+        durationSeconds: 900,
+        description: "second block",
+      },
+      {
+        id: 12,
+        projectId: 200,
+        start: "2026-05-02T12:00:00Z",
+        stop: "2026-05-02T13:00:00Z",
+        durationSeconds: 3600,
+        description: "legacy project id",
+      },
+    ]);
+Deno.test("getTimeEntries returns domain entries without aggregating them", async () => {
+    const entries = await getTimeEntries(
+    assertEquals(entries, [{
+      id: 20,
+      projectId: 300,
+      start: "2026-05-01T15:30:00Z",
+      stop: "2026-05-01T16:00:00Z",
+      durationSeconds: 1800,
+      description: "crosses configured timezone date",
+    }]);
 Deno.test("formatTimeEntriesJson returns explicit JSON output for time entry data", () => {
   const json = formatTimeEntriesJson({
     "2026-05-07": {

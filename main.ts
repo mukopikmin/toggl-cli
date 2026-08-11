@@ -10,14 +10,12 @@ import { runSummaryCommand } from "./command/summary.ts";
 import { runUpdateCommand } from "./command/update.ts";
 import { togglClient } from "./toggl/api.ts";
 import { TogglApiError } from "./toggl/error.ts";
-import { version } from "./version.ts";
 import {
   ConfigFileNotFoundError,
   ConfigFileReadError,
   ConfigValidationError,
   HomeNotSetError,
 } from "./config.ts";
-
 function reportConfigError(error: unknown): boolean {
   if (error instanceof ConfigValidationError) {
     const details = [
@@ -47,6 +45,61 @@ function reportConfigError(error: unknown): boolean {
     return true;
   }
   return false;
+}
+
+export interface MainDependencies {
+  runConfigCommand: typeof runConfigCommand;
+}
+
+const defaultMainDependencies: MainDependencies = { runConfigCommand };
+
+export async function main(
+  args: string[],
+  dependencies: MainDependencies = defaultMainDependencies,
+): Promise<number> {
+  try {
+    switch (command.name) {
+      case "help":
+        console.log(HELP_TEXT);
+        return 0;
+      case "version":
+        console.log(version);
+        return 0;
+      case "init":
+        await runInitCommand();
+        return 0;
+      case "projects":
+        await runProjectsCommand({ format: command.format }, togglClient);
+        return 0;
+      case "config":
+        await dependencies.runConfigCommand(command.format);
+        return 0;
+      case "projects-sync":
+        await runProjectsSyncCommand(togglClient);
+        return 0;
+      case "summary":
+        return 0;
+      case "update": {
+        const result = await runUpdateCommand({
+          channel: command.channel,
+          currentVersion: version,
+        });
+        console.log(
+          result.status === "updated"
+            ? `Updated to ${result.version}.`
+            : `Already up to date (${result.version}).`,
+        );
+        return 0;
+  } catch (error) {
+    if (reportConfigError(error)) return 1;
+    if (
+      !(error instanceof ClipboardUnavailableError) &&
+      !(error instanceof TogglApiError)
+    ) {
+      throw error;
+    }
+    console.error(`Error: ${error.message}`);
+    return 1;
 }
 
 export interface MainDependencies {
