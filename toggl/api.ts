@@ -1,4 +1,5 @@
-import { getProjects } from "./projects.ts";
+import { getProjects as fetchProjects } from "./projects.ts";
+import { mapProjectResponse } from "./projects.ts";
 import { getSummaryTimeEntries } from "./summary.ts";
 import { getTimeEntries } from "./time_entries.ts";
 import type { TimeEntry } from "../model/time_entry.ts";
@@ -46,7 +47,17 @@ export interface TogglClient {
 }
 
 export const togglClient: TogglClient = {
-  getProjects: getProjects,
+  getProjects: async (config, settingsByProjectId = {}) => {
+    const projects = await fetchProjects(config);
+    return projects.map((project) => ({
+      ...project,
+      displayName: settingsByProjectId[project.id]?.displayName ?? project.name,
+      hidden: settingsByProjectId[project.id]?.hidden ?? false,
+      ...(settingsByProjectId[project.id]?.displayOrder === undefined
+        ? {}
+        : { displayOrder: settingsByProjectId[project.id].displayOrder }),
+    }));
+  },
   getSummaryTimeEntries: getSummaryTimeEntries,
   getTimeEntries: getTimeEntries,
   getTimeEntriesForDays: getTimeEntriesForDays,

@@ -48,7 +48,10 @@ export async function runProjectsCommand(
 export function appendMissingProjects(
   configText: string,
   configuredProjectIds: number[],
-  projects: Pick<Project, "id" | "name">[],
+  projects: (
+    & Pick<Project, "id" | "name">
+    & Partial<Pick<Project, "active">>
+  )[],
 ): { text: string; addedCount: number } {
   const configuredIds = new Set(configuredProjectIds);
   const missingProjects = projects

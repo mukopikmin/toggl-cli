@@ -1,43 +1,50 @@
 import { apiEndpoint } from "./api.ts";
 import { TogglApiError } from "./error.ts";
-import type {
-  Project,
-  ProjectDisplaySettings,
-} from "../model/project.ts";
-import type { TogglConfig } from "./types.ts";
+import type { Project, ProjectDisplaySettings } from "../model/project.ts";
+import type { TogglConfig, TogglProject } from "./types.ts";
+
+interface ProjectResponse {
+  id: number;
+  project_name?: string;
+  project_active?: boolean;
+  workspace_id?: number;
+  project_id?: number;
+  task_id?: number;
+  billable?: boolean;
+  start?: string;
+  stop?: string;
+  duration?: number;
+  description?: string;
+  duronly?: boolean;
+  at?: string;
+  server_deleted_at?: string;
+  user_id?: number;
+  uid?: number;
+  wid?: number;
+  pid?: number;
+  project_color?: string;
+  project_billable?: boolean;
+  user_name?: string;
+  user_avatar_url?: string;
+  name?: string;
+  active?: boolean;
+}
+
 export function mapProjectResponse(
   project: ProjectResponse,
   settings?: ProjectDisplaySettings,
 ): Project {
-  const name = project.name ?? project.project_name;
+  const name = project.name ?? project.project_name ?? "";
   return {
     id: project.id,
     name,
     displayName: settings?.displayName ?? name,
-    active: project.active ?? project.project_active,
+    active: project.active ?? project.project_active ?? false,
     hidden: settings?.hidden ?? false,
     ...(settings?.displayOrder === undefined
       ? {}
       : { displayOrder: settings.displayOrder }),
   };
-}
-
-  settingsByProjectId: Record<number, ProjectDisplaySettings> = {},
-): Promise<Project[]> {
-    .map((project) =>
-      mapProjectResponse(project, settingsByProjectId[project.id])
-    );
-  wid: number;
-  pid: number;
-  project_name: string;
-  project_color: string;
-  project_active: boolean;
-  project_billable: boolean;
-  user_name: string;
-  user_avatar_url: string;
-  // Fallbacks matching app.rb
-  name?: string;
-  active?: boolean;
 }
 
 export async function getProjects(
@@ -61,12 +68,11 @@ export async function getProjects(
   }
 
   const projects = await response.json() as ProjectResponse[];
-
   return projects
     .filter((p) => p.active ?? p.project_active)
     .map((p) => ({
       id: p.id,
-      name: p.name ?? p.project_name,
-      active: p.active ?? p.project_active,
+      name: p.name ?? p.project_name ?? "",
+      active: p.active ?? p.project_active ?? false,
     }));
 }

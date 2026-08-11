@@ -13,6 +13,34 @@ export interface ProjectDisplaySettings {
   displayOrder?: number;
 }
 
+export function createProject(
+  project: import("../toggl/types.ts").TogglProject,
+  projectConfigs: Record<
+    number,
+    import("../config.ts").ProjectConfig
+  >,
+): Project {
+  const config = projectConfigs[project.id];
+  return {
+    ...project,
+    displayName: config?.displayName ?? project.name,
+    hidden: config?.hidden ?? false,
+    ...(config?.displayOrder === undefined
+      ? {}
+      : { displayOrder: config.displayOrder }),
+  };
+}
+
+export function createProjects(
+  projects: import("../toggl/types.ts").TogglProject[],
+  projectConfigs: Record<
+    number,
+    import("../config.ts").ProjectConfig
+  >,
+): Project[] {
+  return projects.map((project) => createProject(project, projectConfigs));
+}
+
 export function visibleProjects(projects: Project[]): Project[] {
   return projects.filter((project) => !project.hidden);
 }
