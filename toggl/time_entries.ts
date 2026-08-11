@@ -1,7 +1,6 @@
 import { apiEndpoint } from "./api.ts";
 import type { TimeEntry, TogglConfig } from "./types.ts";
 import { buildTimeEntriesDateRange } from "./date_range.ts";
-import { formatTimeEntryDate } from "./date.ts";
 import { TogglApiError } from "./error.ts";
 
 interface TimeEntryResponse {
@@ -31,11 +30,11 @@ interface TimeEntryResponse {
 }
 
 // TODO: Fix for all locales
-export async function getTimeEntriesForDays(
+export async function getTimeEntries(
   config: TogglConfig,
   fromDay: Temporal.PlainDate,
   toDay: Temporal.PlainDate,
-): Promise<Record<string, Record<number, number>>> {
+): Promise<TimeEntry[]> {
   const { startDate, endDate } = buildTimeEntriesDateRange(
     fromDay,
     toDay,
@@ -67,7 +66,7 @@ export async function getTimeEntriesForDays(
   const entries = await response.json() as TimeEntryResponse[];
 
   // Map to TimeEntry
-  const timeEntries: TimeEntry[] = entries.map((e) => ({
+  return entries.map((e) => ({
     id: e.id,
     project_id: e.project_id ?? e.pid,
     start: e.start,
@@ -75,29 +74,4 @@ export async function getTimeEntriesForDays(
     duration: e.duration,
     description: e.description,
   }));
-
-  // Aggregation
-  // Group by YYYY-MM-DD -> Project -> Sum Duration
-  const result: Record<string, Record<number, number>> = {};
-
-  for (const entry of timeEntries) {
-    const dateStr = formatTimeEntryDate(entry.start, config.TIMEZONE);
-
-    if (!result[dateStr]) {
-      result[dateStr] = {};
-    }
-
-    if (!result[dateStr][entry.project_id]) {
-      result[dateStr][entry.project_id] = 0;
-    }
-
-    // Duration is in seconds, convert to minutes
-    let dur = entry.duration;
-    if (dur < 0) {
-      dur = Math.floor(Date.now() / 1000) + dur;
-    }
-    result[dateStr][entry.project_id] += dur / 60;
-  }
-
-  return result;
 }

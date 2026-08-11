@@ -38,8 +38,11 @@ import {
 } from "./model/project.ts";
 import { getProjects } from "./toggl/projects.ts";
 import { getSummaryTimeEntries } from "./toggl/summary.ts";
-import { getTimeEntriesForDays } from "./toggl/time_entries.ts";
-import { apiEndpoint, reportsApiEndpoint } from "./toggl/api.ts";
+import {
+  apiEndpoint,
+  getTimeEntriesForDays,
+  reportsApiEndpoint,
+} from "./toggl/api.ts";
 import { formatTimeEntryDate, resolveTimeZone } from "./toggl/date.ts";
 import { TogglApiError } from "./toggl/error.ts";
 
