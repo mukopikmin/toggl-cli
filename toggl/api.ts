@@ -2,16 +2,11 @@ import { getProjects } from "./projects.ts";
 import { getSummaryTimeEntries } from "./summary.ts";
 import { getTimeEntries } from "./time_entries.ts";
 import type { TimeEntry } from "../model/time_entry.ts";
+import { summarizeTimeEntries } from "../model/time_entry_summary.ts";
+import type { Project, ProjectDisplaySettings } from "../model/project.ts";
 import type {
-  Project,
-  ProjectDisplaySettings,
-} from "../model/project.ts";
-import type {
-  getProjects: (
-    config: TogglConfig,
-    settingsByProjectId?: Record<number, ProjectDisplaySettings>,
-  ) => Promise<Project[]>;
-  getTimeEntries: getTimeEntries,
+  SummaryTimeEntriesResponse,
+  TogglConfig,
   TogglProject,
 } from "./types.ts";
 
@@ -25,16 +20,24 @@ export async function getTimeEntriesForDays(
   now: Temporal.Instant = Temporal.Now.instant(),
 ): Promise<Record<string, Record<number, number>>> {
   const entries = await getTimeEntries(config, fromDay, toDay);
-  return aggregateTimeEntries(entries, config.TIMEZONE, now);
+  return summarizeTimeEntries(entries, config.TIMEZONE, now);
 }
 
 export interface TogglClient {
-  getProjects: (config: TogglConfig) => Promise<TogglProject[]>;
+  getProjects: (
+    config: TogglConfig,
+    settingsByProjectId?: Record<number, ProjectDisplaySettings>,
+  ) => Promise<Project[]>;
   getSummaryTimeEntries: (
     config: TogglConfig,
     fromDay: Temporal.PlainDate,
     toDay: Temporal.PlainDate,
   ) => Promise<SummaryTimeEntriesResponse>;
+  getTimeEntries: (
+    config: TogglConfig,
+    fromDay: Temporal.PlainDate,
+    toDay: Temporal.PlainDate,
+  ) => Promise<TimeEntry[]>;
   getTimeEntriesForDays: (
     config: TogglConfig,
     fromDay: Temporal.PlainDate,
@@ -45,5 +48,6 @@ export interface TogglClient {
 export const togglClient: TogglClient = {
   getProjects: getProjects,
   getSummaryTimeEntries: getSummaryTimeEntries,
+  getTimeEntries: getTimeEntries,
   getTimeEntriesForDays: getTimeEntriesForDays,
 };

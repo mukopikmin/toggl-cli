@@ -73,5 +73,8 @@ export async function getTimeEntries(
       url,
       response.statusText,
     );
+  }
+
   const entries = await response.json() as TimeEntryDto[];
   return entries.map(toTimeEntry);
+}

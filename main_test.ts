@@ -40,12 +40,9 @@ import { TogglApiError } from "./toggl/error.ts";
 import { main } from "./main.ts";
 import { getProjects } from "./toggl/projects.ts";
 import { getSummaryTimeEntries } from "./toggl/summary.ts";
-import {
-  apiEndpoint,
-  getTimeEntriesForDays,
-  reportsApiEndpoint,
-} from "./toggl/api.ts";
-import { formatTimeEntryDate, resolveTimeZone } from "./toggl/date.ts";
+import { apiEndpoint, reportsApiEndpoint } from "./toggl/api.ts";
+import { getTimeEntries } from "./toggl/time_entries.ts";
+import { formatTimeEntryDate, resolveTimeZone } from "./model/date.ts";
 import { TogglApiError } from "./toggl/error.ts";
 
 const config = {
@@ -1341,7 +1338,7 @@ Deno.test("resolveTimeZone falls back to the system timezone", () => {
   assertEquals(resolveTimeZone(undefined, "Asia/Tokyo"), "Asia/Tokyo");
 });
 
-Deno.test("getTimeEntriesForDays fetches range in configured UTC timezone", async () => {
+Deno.test("getTimeEntries fetches range in configured UTC timezone", async () => {
   const originalFetch = globalThis.fetch;
   let requestedUrl = "";
 
@@ -1355,7 +1352,7 @@ Deno.test("getTimeEntriesForDays fetches range in configured UTC timezone", asyn
   const toDay = Temporal.PlainDate.from("2026-05-02");
 
   try {
-    const entries = await getTimeEntriesForDays(
+    const entries = await getTimeEntries(
       { ...config, TIMEZONE: "UTC" },
       fromDay,
       toDay,
@@ -1371,13 +1368,13 @@ Deno.test("getTimeEntriesForDays fetches range in configured UTC timezone", asyn
       url.searchParams.get("end_date"),
       "2026-05-03T00:00:00Z",
     );
-    assertEquals(entries, {});
+    assertEquals(entries, []);
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
 
-Deno.test("getTimeEntriesForDays throws a typed error for a non-success response", async () => {
+Deno.test("getTimeEntries throws a typed error for a non-success response", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (() =>
     Promise.resolve(
@@ -1388,8 +1385,7 @@ Deno.test("getTimeEntriesForDays throws a typed error for a non-success response
 
   try {
     const error = await assertRejects(
-      () =>
-        getTimeEntriesForDays({ ...config, TIMEZONE: "UTC" }, fromDay, toDay),
+      () => getTimeEntries({ ...config, TIMEZONE: "UTC" }, fromDay, toDay),
       TogglApiError,
       "Failed to fetch time entries: HTTP 503 Service Unavailable",
     );
@@ -1404,7 +1400,7 @@ Deno.test("getTimeEntriesForDays throws a typed error for a non-success response
   }
 });
 
-Deno.test("getTimeEntriesForDays fetches range and aggregates minutes by date and project", async () => {
+Deno.test("getTimeEntries maps response DTOs to domain models", async () => {
   const configWithTimezone = {
     ...config,
     TIMEZONE: "Asia/Tokyo",
@@ -1452,7 +1448,7 @@ Deno.test("getTimeEntriesForDays fetches range and aggregates minutes by date an
   const toDay = Temporal.PlainDate.from("2026-05-02");
 
   try {
-    const entries = await getTimeEntriesForDays(
+    const entries = await getTimeEntries(
       configWithTimezone,
       fromDay,
       toDay,
@@ -1468,16 +1464,38 @@ Deno.test("getTimeEntriesForDays fetches range and aggregates minutes by date an
       requestedHeaders.get("Authorization"),
       `Basic ${btoa(`${config.TOKEN}:api_token`)}`,
     );
-    assertEquals(entries, {
-      "2026-05-01": { 100: 45 },
-      "2026-05-02": { 200: 60 },
-    });
+    assertEquals(entries, [
+      {
+        id: 10,
+        projectId: 100,
+        start: "2026-05-01T12:00:00Z",
+        stop: "2026-05-01T12:30:00Z",
+        durationSeconds: 1800,
+        description: "first block",
+      },
+      {
+        id: 11,
+        projectId: 100,
+        start: "2026-05-01T13:00:00Z",
+        stop: "2026-05-01T13:15:00Z",
+        durationSeconds: 900,
+        description: "second block",
+      },
+      {
+        id: 12,
+        projectId: 200,
+        start: "2026-05-02T12:00:00Z",
+        stop: "2026-05-02T13:00:00Z",
+        durationSeconds: 3600,
+        description: "legacy project id",
+      },
+    ]);
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
 
-Deno.test("getTimeEntriesForDays aggregates entries by date in configured timezone", async () => {
+Deno.test("getTimeEntries returns domain entries without aggregating them", async () => {
   const configWithTimezone = {
     ...config,
     TIMEZONE: "Asia/Tokyo",
@@ -1501,15 +1519,20 @@ Deno.test("getTimeEntriesForDays aggregates entries by date in configured timezo
   const toDay = Temporal.PlainDate.from("2026-05-02");
 
   try {
-    const entries = await getTimeEntriesForDays(
+    const entries = await getTimeEntries(
       configWithTimezone,
       fromDay,
       toDay,
     );
 
-    assertEquals(entries, {
-      "2026-05-02": { 300: 30 },
-    });
+    assertEquals(entries, [{
+      id: 20,
+      projectId: 300,
+      start: "2026-05-01T15:30:00Z",
+      stop: "2026-05-01T16:00:00Z",
+      durationSeconds: 1800,
+      description: "crosses configured timezone date",
+    }]);
   } finally {
     globalThis.fetch = originalFetch;
   }
