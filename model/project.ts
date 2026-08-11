@@ -1,6 +1,3 @@
-import type { TogglProject } from "../toggl/types.ts";
-import type { ProjectConfig } from "../config.ts";
-
 export interface Project {
   id: number;
   name: string;
@@ -8,29 +5,6 @@ export interface Project {
   active: boolean;
   hidden: boolean;
   displayOrder?: number;
-}
-
-export function createProject(
-  project: TogglProject,
-  projectConfigs: Record<number, ProjectConfig>,
-): Project {
-  const config = projectConfigs[project.id];
-
-  return {
-    ...project,
-    displayName: config?.displayName ?? project.name,
-    hidden: config?.hidden ?? false,
-    ...(config?.displayOrder === undefined
-      ? {}
-      : { displayOrder: config.displayOrder }),
-  };
-}
-
-export function createProjects(
-  projects: TogglProject[],
-  projectConfigs: Record<number, ProjectConfig>,
-): Project[] {
-  return projects.map((project) => createProject(project, projectConfigs));
 }
 
 export function visibleProjects(projects: Project[]): Project[] {

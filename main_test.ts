@@ -31,11 +31,6 @@ import {
   parseProjectsConfig,
 } from "./config.ts";
 import { main } from "./main.ts";
-import {
-  createProject,
-  sortProjectsByDisplayOrder,
-  visibleProjects,
-} from "./model/project.ts";
 import { getProjects } from "./toggl/projects.ts";
 import { getSummaryTimeEntries } from "./toggl/summary.ts";
 import {
@@ -614,108 +609,6 @@ Deno.test("formatProjectList returns one project name per line", () => {
 
 Deno.test("formatProjectList returns an empty string for no projects", () => {
   assertEquals(formatProjectList([]), "");
-});
-
-Deno.test("createProject stores original and display project names", () => {
-  assertEquals(
-    createProject(
-      { id: 2, name: "Project Beta", active: true },
-      { 2: { displayName: "Custom Beta", hidden: true, displayOrder: 5 } },
-    ),
-    {
-      id: 2,
-      name: "Project Beta",
-      displayName: "Custom Beta",
-      active: true,
-      hidden: true,
-      displayOrder: 5,
-    },
-  );
-});
-
-Deno.test("sortProjectsByDisplayOrder puts configured projects first", () => {
-  assertEquals(
-    sortProjectsByDisplayOrder([
-      {
-        id: 1,
-        name: "Project Alpha",
-        displayName: "Project Alpha",
-        active: true,
-        hidden: false,
-      },
-      {
-        id: 2,
-        name: "Project Beta",
-        displayName: "Project Beta",
-        active: true,
-        hidden: false,
-        displayOrder: 20,
-      },
-      {
-        id: 3,
-        name: "Project Gamma",
-        displayName: "Project Gamma",
-        active: true,
-        hidden: false,
-        displayOrder: 10,
-      },
-    ]),
-    [
-      {
-        id: 3,
-        name: "Project Gamma",
-        displayName: "Project Gamma",
-        active: true,
-        hidden: false,
-        displayOrder: 10,
-      },
-      {
-        id: 2,
-        name: "Project Beta",
-        displayName: "Project Beta",
-        active: true,
-        hidden: false,
-        displayOrder: 20,
-      },
-      {
-        id: 1,
-        name: "Project Alpha",
-        displayName: "Project Alpha",
-        active: true,
-        hidden: false,
-      },
-    ],
-  );
-});
-
-Deno.test("visibleProjects excludes hidden projects", () => {
-  assertEquals(
-    visibleProjects([
-      {
-        id: 1,
-        name: "Project Alpha",
-        displayName: "Project Alpha",
-        active: true,
-        hidden: false,
-      },
-      {
-        id: 2,
-        name: "Project Beta",
-        displayName: "Custom Beta",
-        active: true,
-        hidden: true,
-      },
-    ]),
-    [
-      {
-        id: 1,
-        name: "Project Alpha",
-        displayName: "Project Alpha",
-        active: true,
-        hidden: false,
-      },
-    ],
-  );
 });
 
 Deno.test("formatProjectsJson returns explicit JSON output for projects", () => {

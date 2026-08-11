@@ -1,7 +1,7 @@
 import { writeClipboardText } from "../clipboard.ts";
 import { loadConfig } from "../config.ts";
+import { mapTogglProjects } from "../toggl/project_adapter.ts";
 import {
-  createProjects,
   sortProjectsByDisplayOrder,
   visibleProjects,
 } from "../model/project.ts";
@@ -196,7 +196,7 @@ export async function runSummaryCommand(
     return;
   }
 
-  const projects = createProjects(
+  const projects = mapTogglProjects(
     await toggl.getProjects(config),
     config.PROJECTS,
   );

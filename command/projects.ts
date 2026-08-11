@@ -1,7 +1,7 @@
 import { stringify } from "@std/toml";
 import { loadConfig, loadConfigDocument } from "../config.ts";
+import { mapTogglProjects } from "../toggl/project_adapter.ts";
 import {
-  createProjects,
   sortProjectsByDisplayOrder,
   visibleProjects,
 } from "../model/project.ts";
@@ -39,7 +39,7 @@ export async function runProjectsCommand(
   toggl: TogglClient,
 ): Promise<void> {
   const config = await loadConfig();
-  const projects = createProjects(
+  const projects = mapTogglProjects(
     await toggl.getProjects(config),
     config.PROJECTS,
   );
