@@ -8,6 +8,7 @@ import {
 import type { Project } from "../model/project.ts";
 import type { TogglClient } from "../toggl/api.ts";
 import { resolveTimeZone } from "../toggl/date.ts";
+import { aggregateTimeEntries } from "../toggl/time_entry_aggregation.ts";
 
 export type SummaryFormat = "csv" | "json";
 
@@ -176,16 +177,18 @@ export async function runSummaryCommand(
   cmd: SummaryCommand,
   toggl: TogglClient,
   output: SummaryOutput = defaultSummaryOutput,
+  now: Temporal.Instant = Temporal.Now.instant(),
 ): Promise<void> {
   const { separator, format, noProject, noDate, clipboard } = cmd;
 
   const config = await loadConfig();
   const { startDay, endDay } = resolveSummaryDateRange(cmd, config.TIMEZONE);
-  const dateEntries = await toggl.getTimeEntriesForDays(
+  const timeEntries = await toggl.getTimeEntries(
     config,
     startDay,
     endDay,
   );
+  const dateEntries = aggregateTimeEntries(timeEntries, config.TIMEZONE, now);
 
   if (format === "json") {
     await outputSummaryText(
