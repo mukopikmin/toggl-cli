@@ -1,6 +1,6 @@
 import { assertEquals } from "@std/assert";
-import { aggregateTimeEntries } from "./time_entry_aggregation.ts";
-import type { TimeEntry } from "./types.ts";
+import { summarizeTimeEntries } from "./time_entry_summary.ts";
+import type { TimeEntry } from "./time_entry.ts";
 
 function entry(
   id: number,
@@ -10,15 +10,15 @@ function entry(
 ): TimeEntry {
   return {
     id,
-    project_id: projectId,
+    projectId,
     start,
     stop: "",
-    duration,
+    durationSeconds: duration,
     description: "",
   };
 }
 
-Deno.test("aggregateTimeEntries sums normal entries by UTC date and project", () => {
+Deno.test("summarizeTimeEntries sums normal entries by UTC date and project", () => {
   const entries = [
     entry(1, 100, "2026-05-01T00:00:00Z", 1800),
     entry(2, 100, "2026-05-01T23:59:59Z", 900),
@@ -27,7 +27,7 @@ Deno.test("aggregateTimeEntries sums normal entries by UTC date and project", ()
   ];
 
   assertEquals(
-    aggregateTimeEntries(
+    summarizeTimeEntries(
       entries,
       "UTC",
       Temporal.Instant.from("2026-05-03T00:00:00Z"),
@@ -39,12 +39,12 @@ Deno.test("aggregateTimeEntries sums normal entries by UTC date and project", ()
   );
 });
 
-Deno.test("aggregateTimeEntries calculates a running entry from the supplied instant", () => {
+Deno.test("summarizeTimeEntries calculates a running entry from the supplied instant", () => {
   const start = Temporal.Instant.from("2026-05-01T10:00:00Z");
   const runningDuration = -Math.floor(start.epochMilliseconds / 1000);
 
   assertEquals(
-    aggregateTimeEntries(
+    summarizeTimeEntries(
       [entry(1, 100, start.toString(), runningDuration)],
       "UTC",
       Temporal.Instant.from("2026-05-01T10:45:00Z"),
@@ -53,7 +53,7 @@ Deno.test("aggregateTimeEntries calculates a running entry from the supplied ins
   );
 });
 
-Deno.test("aggregateTimeEntries uses the configured timezone at date and month boundaries", () => {
+Deno.test("summarizeTimeEntries uses the configured timezone at date and month boundaries", () => {
   const entries = [
     entry(1, 100, "2026-01-31T14:59:59Z", 60),
     entry(2, 100, "2026-01-31T15:00:00Z", 120),
@@ -62,11 +62,11 @@ Deno.test("aggregateTimeEntries uses the configured timezone at date and month b
   ];
   const now = Temporal.Instant.from("2026-02-02T00:00:00Z");
 
-  assertEquals(aggregateTimeEntries(entries, "Asia/Tokyo", now), {
+  assertEquals(summarizeTimeEntries(entries, "Asia/Tokyo", now), {
     "2026-01-31": { 100: 1 },
     "2026-02-01": { 100: 2, 200: 7 },
   });
-  assertEquals(aggregateTimeEntries(entries, "America/New_York", now), {
+  assertEquals(summarizeTimeEntries(entries, "America/New_York", now), {
     "2026-01-31": { 100: 3, 200: 3 },
     "2026-02-01": { 200: 4 },
   });

@@ -1,9 +1,9 @@
 import { getProjects } from "./projects.ts";
 import { getSummaryTimeEntries } from "./summary.ts";
 import { getTimeEntries } from "./time_entries.ts";
+import type { TimeEntry } from "../model/time_entry.ts";
 import type {
   SummaryTimeEntriesResponse,
-  TimeEntry,
   TogglConfig,
   TogglProject,
 } from "./types.ts";

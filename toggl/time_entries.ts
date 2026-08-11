@@ -1,12 +1,13 @@
 import { apiEndpoint } from "./api.ts";
-import type { TimeEntry, TogglConfig } from "./types.ts";
+import type { TimeEntry } from "../model/time_entry.ts";
+import type { TogglConfig } from "./types.ts";
 import { buildTimeEntriesDateRange } from "./date_range.ts";
 import { TogglApiError } from "./error.ts";
 
-interface TimeEntryResponse {
+interface TimeEntryDto {
   id: number;
   workspace_id: number;
-  project_id: number;
+  project_id: number | null;
   task_id: number;
   billable: boolean;
   start: string;
@@ -63,15 +64,15 @@ export async function getTimeEntries(
     );
   }
 
-  const entries = await response.json() as TimeEntryResponse[];
+  const entries = await response.json() as TimeEntryDto[];
 
   // Map to TimeEntry
   return entries.map((e) => ({
     id: e.id,
-    project_id: e.project_id ?? e.pid,
+    projectId: e.project_id ?? e.pid,
     start: e.start,
     stop: e.stop,
-    duration: e.duration,
+    durationSeconds: e.duration,
     description: e.description,
   }));
 }

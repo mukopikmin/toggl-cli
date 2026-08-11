@@ -40,7 +40,7 @@ import { getProjects } from "./toggl/projects.ts";
 import { getSummaryTimeEntries } from "./toggl/summary.ts";
 import { apiEndpoint, reportsApiEndpoint } from "./toggl/api.ts";
 import { getTimeEntries } from "./toggl/time_entries.ts";
-import { formatTimeEntryDate, resolveTimeZone } from "./toggl/date.ts";
+import { formatTimeEntryDate, resolveTimeZone } from "./model/date.ts";
 import { TogglApiError } from "./toggl/error.ts";
 
 const config = {
@@ -1352,26 +1352,26 @@ Deno.test("getTimeEntries fetches a range and maps response DTOs", async () => {
     assertEquals(entries, [
       {
         id: 10,
-        project_id: 100,
+        projectId: 100,
         start: "2026-05-01T12:00:00Z",
         stop: "2026-05-01T12:30:00Z",
-        duration: 1800,
+        durationSeconds: 1800,
         description: "first block",
       },
       {
         id: 11,
-        project_id: 100,
+        projectId: 100,
         start: "2026-05-01T13:00:00Z",
         stop: "2026-05-01T13:15:00Z",
-        duration: 900,
+        durationSeconds: 900,
         description: "second block",
       },
       {
         id: 12,
-        project_id: 200,
+        projectId: 200,
         start: "2026-05-02T12:00:00Z",
         stop: "2026-05-02T13:00:00Z",
-        duration: 3600,
+        durationSeconds: 3600,
         description: "legacy project id",
       },
     ]);
@@ -1412,10 +1412,10 @@ Deno.test("getTimeEntries returns entry timestamps without aggregating them", as
 
     assertEquals(entries, [{
       id: 20,
-      project_id: 300,
+      projectId: 300,
       start: "2026-05-01T15:30:00Z",
       stop: "2026-05-01T16:00:00Z",
-      duration: 1800,
+      durationSeconds: 1800,
       description: "crosses configured timezone date",
     }]);
   } finally {

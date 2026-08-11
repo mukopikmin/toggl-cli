@@ -7,8 +7,8 @@ import {
 } from "../model/project.ts";
 import type { Project } from "../model/project.ts";
 import type { TogglClient } from "../toggl/api.ts";
-import { resolveTimeZone } from "../toggl/date.ts";
-import { aggregateTimeEntries } from "../toggl/time_entry_aggregation.ts";
+import { resolveTimeZone } from "../model/date.ts";
+import { summarizeTimeEntries } from "../model/time_entry_summary.ts";
 
 export type SummaryFormat = "csv" | "json";
 
@@ -188,7 +188,7 @@ export async function runSummaryCommand(
     startDay,
     endDay,
   );
-  const dateEntries = aggregateTimeEntries(timeEntries, config.TIMEZONE, now);
+  const dateEntries = summarizeTimeEntries(timeEntries, config.TIMEZONE, now);
 
   if (format === "json") {
     await outputSummaryText(
