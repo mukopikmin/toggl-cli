@@ -1,36 +1,50 @@
 import { apiEndpoint } from "./api.ts";
+import { TogglApiError } from "./error.ts";
+import type { Project, ProjectDisplaySettings } from "../model/project.ts";
 import type { TogglConfig, TogglProject } from "./types.ts";
-
-/**
- * https://engineering.toggl.com/docs/api/projects/
- */
 
 interface ProjectResponse {
   id: number;
-  workspace_id: number;
-  project_id: number;
-  task_id: number;
-  billable: boolean;
-  start: string;
-  stop: string;
-  duration: number;
-  description: string;
-  duronly: boolean;
-  at: string;
-  server_deleted_at: string;
-  user_id: number;
-  uid: number;
-  wid: number;
-  pid: number;
-  project_name: string;
-  project_color: string;
-  project_active: boolean;
-  project_billable: boolean;
-  user_name: string;
-  user_avatar_url: string;
-  // Fallbacks matching app.rb
+  project_name?: string;
+  project_active?: boolean;
+  workspace_id?: number;
+  project_id?: number;
+  task_id?: number;
+  billable?: boolean;
+  start?: string;
+  stop?: string;
+  duration?: number;
+  description?: string;
+  duronly?: boolean;
+  at?: string;
+  server_deleted_at?: string;
+  user_id?: number;
+  uid?: number;
+  wid?: number;
+  pid?: number;
+  project_color?: string;
+  project_billable?: boolean;
+  user_name?: string;
+  user_avatar_url?: string;
   name?: string;
   active?: boolean;
+}
+
+export function mapProjectResponse(
+  project: ProjectResponse,
+  settings?: ProjectDisplaySettings,
+): Project {
+  const name = project.name ?? project.project_name ?? "";
+  return {
+    id: project.id,
+    name,
+    displayName: settings?.displayName ?? name,
+    active: project.active ?? project.project_active ?? false,
+    hidden: settings?.hidden ?? false,
+    ...(settings?.displayOrder === undefined
+      ? {}
+      : { displayOrder: settings.displayOrder }),
+  };
 }
 
 export async function getProjects(
@@ -45,17 +59,20 @@ export async function getProjects(
   });
 
   if (!response.ok) {
-    console.error(`Failed to fetch projects: ${response.statusText}`);
-    Deno.exit(1);
+    throw new TogglApiError(
+      "fetch projects",
+      response.status,
+      url,
+      response.statusText,
+    );
   }
 
   const projects = await response.json() as ProjectResponse[];
-
   return projects
     .filter((p) => p.active ?? p.project_active)
     .map((p) => ({
       id: p.id,
-      name: p.name ?? p.project_name,
-      active: p.active ?? p.project_active,
+      name: p.name ?? p.project_name ?? "",
+      active: p.active ?? p.project_active ?? false,
     }));
 }

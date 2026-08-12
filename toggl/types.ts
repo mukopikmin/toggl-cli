@@ -10,13 +10,4 @@ export interface TogglProject {
   active: boolean;
 }
 
-export interface TimeEntry {
-  id: number;
-  project_id: number;
-  start: string;
-  stop: string;
-  duration: number;
-  description: string;
-}
-
 export type SummaryTimeEntriesResponse = Record<string, unknown>;

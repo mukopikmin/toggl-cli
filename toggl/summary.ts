@@ -1,10 +1,10 @@
 import { reportsApiEndpoint } from "./api.ts";
+import { TogglApiError } from "./error.ts";
 import type { SummaryTimeEntriesResponse, TogglConfig } from "./types.ts";
 
 function formatDate(day: Temporal.PlainDate): string {
   return day.toString();
 }
-
 export async function getSummaryTimeEntries(
   config: TogglConfig,
   fromDay: Temporal.PlainDate,
@@ -26,10 +26,12 @@ export async function getSummaryTimeEntries(
   });
 
   if (!response.ok) {
-    console.error(
-      `Failed to fetch summary time entries: ${response.statusText}`,
+    throw new TogglApiError(
+      "fetch summary time entries",
+      response.status,
+      url,
+      response.statusText,
     );
-    Deno.exit(1);
   }
 
   return await response.json() as SummaryTimeEntriesResponse;
