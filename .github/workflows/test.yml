@@ -30,7 +30,7 @@ jobs:
         run: sh -n install.sh
 
       - name: Type check
-        run: deno check --lock=deno.lock main.ts main_test.ts toggl/projects_test.ts command/update_test.ts model/project_test.ts scripts/install.ts scripts/install_release_test.ts scripts/install_test.ts scripts/release.ts scripts/release_test.ts toggl/date_range_test.ts model/time_entry_summary_test.ts
+        run: deno task check
 
       - name: Test
         run: deno task test

@@ -392,7 +392,7 @@ instead of duplicating `--allow-*` flags.
 ```sh
 deno fmt --check
 sh -n install.sh
-deno check --lock=deno.lock main.ts main_test.ts toggl/projects_test.ts command/update_test.ts model/project_test.ts scripts/install.ts scripts/install_release_test.ts scripts/install_test.ts scripts/release.ts scripts/release_test.ts toggl/date_range_test.ts model/time_entry_summary_test.ts
+deno task check
 deno task test
 deno task compile --output /tmp/toggl-cli
 ```

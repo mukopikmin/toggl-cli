@@ -55,6 +55,7 @@
     "release:notes": "deno run --quiet -P=release-notes scripts/release.ts notes",
     "migrate-config": "deno run --quiet -P=migrate-config scripts/migrate_config.ts",
     "install": "deno run --quiet -P=install scripts/install.ts",
+    "check": "deno check --lock=deno.lock main.ts **/*_test.ts scripts/*.ts",
     "test": "deno test -P"
   },
   "imports": {
