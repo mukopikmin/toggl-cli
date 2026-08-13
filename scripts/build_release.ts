@@ -230,9 +230,8 @@ for (const target of releaseTargets) {
   try {
     await run(Deno.execPath(), [
       "run",
-      "--allow-read",
-      "--allow-write",
-      "--allow-run=deno",
+      "--quiet",
+      "-P=compile",
       "scripts/compile.ts",
       "--version",
       version,
