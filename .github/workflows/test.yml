@@ -30,10 +30,13 @@ jobs:
         run: sh -n install.sh
 
       - name: Type check
-        run: deno check --lock=deno.lock main.ts main_test.ts toggl/projects_test.ts command/update_test.ts model/project_test.ts scripts/install.ts scripts/install_release_test.ts scripts/install_test.ts scripts/release.ts scripts/release_test.ts toggl/date_range_test.ts model/time_entry_summary_test.ts
+        run: deno check --lock=deno.lock main.ts main_test.ts clipboard_test.ts toggl/projects_test.ts command/update_test.ts model/project_test.ts scripts/install.ts scripts/install_release_test.ts scripts/install_test.ts scripts/release.ts scripts/release_test.ts toggl/date_range_test.ts model/time_entry_summary_test.ts
 
       - name: Test
         run: deno test --allow-read --allow-write --allow-run=sh,tar --allow-env=HOME,PATH main_test.ts toggl/projects_test.ts command/update_test.ts model/project_test.ts scripts/install_release_test.ts scripts/install_test.ts scripts/release_test.ts toggl/date_range_test.ts model/time_entry_summary_test.ts
+
+      - name: Test clipboard fallback
+        run: deno test --allow-read --allow-run --allow-env=PATH clipboard_test.ts
 
       - name: Compile
         run: deno compile --quiet --allow-net=api.github.com,github.com --allow-read --allow-write --allow-run --allow-env --output /tmp/toggl-cli main.ts
