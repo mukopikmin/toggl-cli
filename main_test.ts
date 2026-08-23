@@ -11,7 +11,7 @@ import {
   appendMissingProjects,
   formatProjectList,
   formatProjectsJson,
-} from "./command/projects.ts";
+} from "./command/project.ts";
 import {
   formatConfigJson,
   formatConfigValues,
@@ -62,15 +62,15 @@ Deno.test("createHelpText describes commands and options", () => {
     `Usage:
   toggl summary <start-date> <end-date> [options]
   toggl summary --days <days> [options]
-  toggl projects [options]
-  toggl projects sync
+  toggl project list [options]
+  toggl project sync
   toggl config [options]
   toggl init
   toggl update [--channel stable|nightly]
 
 Commands:
   init      Create the configuration file
-  projects  List projects
+  project   List projects
   config    Show configuration values
   summary   Summarize time entries for a range of days
   update    Update the installed Toggl CLI binary
@@ -379,14 +379,14 @@ Deno.test("parseCliArgs rejects unknown commands", () => {
   assertEquals(error.message, "unknown command: foo");
 });
 
-Deno.test("parseCliArgs preserves init and projects routing", () => {
+Deno.test("parseCliArgs preserves init and project routing", () => {
   assertEquals(parseCliArgs(["init"]), { name: "init" });
-  assertEquals(parseCliArgs(["projects", "--format", "json"]), {
-    name: "projects",
+  assertEquals(parseCliArgs(["project", "list", "--format", "json"]), {
+    name: "project-list",
     format: "json",
   });
-  assertEquals(parseCliArgs(["projects", "sync"]), {
-    name: "projects-sync",
+  assertEquals(parseCliArgs(["project", "sync"]), {
+    name: "project-sync",
   });
   assertEquals(parseCliArgs(["config"]), {
     name: "config",
@@ -396,6 +396,20 @@ Deno.test("parseCliArgs preserves init and projects routing", () => {
     name: "config",
     format: "json",
   });
+});
+
+Deno.test("parseCliArgs requires a project subcommand", () => {
+  const missing = assertThrows(
+    () => parseCliArgs(["project"]),
+    CliUsageError,
+  );
+  assertEquals(missing.message, "project requires a subcommand: list or sync");
+
+  const unknown = assertThrows(
+    () => parseCliArgs(["project", "show"]),
+    CliUsageError,
+  );
+  assertEquals(unknown.message, "unknown project subcommand: show");
 });
 
 function jsonResponse(body: unknown): Response {

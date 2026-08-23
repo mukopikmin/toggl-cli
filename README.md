@@ -70,11 +70,12 @@ display_order = 20
 
 Display names are used when rendering project lists and summary CSV output. When
 `display_name` is omitted, the Toggl project name is used. When `hidden` is
-omitted, it defaults to `false`. Hidden projects are excluded from `projects`
-output and summary CSV output. The optional `display_order` setting controls the
-order of visible projects in `projects` output and summary CSV rows. Projects
-with `display_order` are shown first in ascending numeric order, and projects
-without `display_order` keep their Toggl API order after the ordered projects.
+omitted, it defaults to `false`. Hidden projects are excluded from
+`project list` output and summary CSV output. The optional `display_order`
+setting controls the order of visible projects in `project list` output and
+summary CSV rows. Projects with `display_order` are shown first in ascending
+numeric order, and projects without `display_order` keep their Toggl API order
+after the ordered projects.
 
 The optional `timezone` setting is used to calculate the Toggl time entry query
 range. When it is omitted, the CLI uses the execution environment's timezone.
@@ -106,8 +107,8 @@ deno task run -- --help
 | Command                              | Description                                            |
 | ------------------------------------ | ------------------------------------------------------ |
 | `summary <start-date> <end-date>`    | Aggregate time entries for a date range.               |
-| `projects`                           | List active, visible projects.                         |
-| `projects sync`                      | Add missing active projects to the configuration file. |
+| `project list`                       | List active, visible projects.                         |
+| `project sync`                       | Add missing active projects to the configuration file. |
 | `init`                               | Create the configuration file.                         |
 | `update [--channel stable\|nightly]` | Update the installed compiled binary.                  |
 
@@ -222,13 +223,13 @@ The JSON output maps each date to project IDs and their work time in minutes:
 List the display names of all active, visible projects:
 
 ```sh
-deno task run -- projects
+deno task run -- project list
 ```
 
 Project information can also be output as JSON:
 
 ```sh
-deno task run -- --format json projects
+deno task run -- project list --format json
 ```
 
 Print the CLI version:
@@ -241,7 +242,7 @@ To add all active Toggl projects that are not yet in the configuration file,
 run:
 
 ```sh
-deno task run -- projects sync
+deno task run -- project sync
 ```
 
 Each new project is appended with its Toggl project name as a comment and with
@@ -285,8 +286,8 @@ Run the compiled executable as follows:
 ./out/toggl summary 2026-06-01 2026-06-15
 ./out/toggl summary --no-project 2026-06-01 2026-06-15
 ./out/toggl summary --clipboard 2026-06-01 2026-06-15
-./out/toggl projects
-./out/toggl projects sync
+./out/toggl project list
+./out/toggl project sync
 ./out/toggl config
 ```
 
@@ -370,7 +371,7 @@ Run the installed command as follows:
 ```sh
 toggl summary 2026-06-01 2026-06-15
 toggl summary --clipboard 2026-06-01 2026-06-15
-toggl projects
+toggl project list
 toggl config
 ```
 
@@ -382,7 +383,7 @@ When running from a checkout without installing the executable, use
 ```sh
 deno task run -- init
 deno task run -- summary 2026-06-01 2026-06-15
-deno task run -- projects
+deno task run -- project list
 ```
 
 Runtime and maintenance-task permissions are defined as named permission sets in
