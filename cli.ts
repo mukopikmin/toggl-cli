@@ -1,21 +1,21 @@
 import { parseArgs } from "node:util";
 import { type DateTime, datetime } from "ptera";
-import type { ProjectsFormat } from "./command/projects.ts";
+import type { ProjectFormat } from "./command/project.ts";
 import type { SummaryFormat } from "./command/summary.ts";
 
 export function createHelpText(): string {
   return `Usage:
   toggl summary <start-date> <end-date> [options]
   toggl summary --days <days> [options]
-  toggl projects [options]
-  toggl projects sync
+  toggl project list [options]
+  toggl project sync
   toggl config [options]
   toggl init
   toggl update [--channel stable|nightly]
 
 Commands:
   init      Create the configuration file
-  projects  List projects
+  project   List projects
   config    Show configuration values
   summary   Summarize time entries for a range of days
   update    Update the installed Toggl CLI binary
@@ -38,9 +38,9 @@ export type CliCommand =
   | { name: "version" }
   | { name: "init" }
   | { name: "update"; channel?: "stable" | "nightly" }
-  | { name: "projects"; format: ProjectsFormat }
-  | { name: "config"; format: ProjectsFormat }
-  | { name: "projects-sync" }
+  | { name: "project-list"; format: ProjectFormat }
+  | { name: "config"; format: ProjectFormat }
+  | { name: "project-sync" }
   | {
     name: "summary";
     separator: string;
@@ -56,7 +56,7 @@ export type CliCommand =
 
 export class CliUsageError extends Error {}
 
-function parseFormat(value: string | undefined): ProjectsFormat {
+function parseFormat(value: string | undefined): ProjectFormat {
   const format = value ?? "csv";
   if (format !== "csv" && format !== "json") {
     throw new CliUsageError("format must be csv or json");
@@ -64,7 +64,7 @@ function parseFormat(value: string | undefined): ProjectsFormat {
   return format;
 }
 
-function parseProjectsArgs(args: string[]): CliCommand {
+function parseProjectListArgs(args: string[]): CliCommand {
   const parsed = parseArgs({
     args,
     options: {
@@ -75,10 +75,12 @@ function parseProjectsArgs(args: string[]): CliCommand {
   });
 
   if (parsed.positionals.length > 0) {
-    throw new CliUsageError("projects does not accept positional arguments");
+    throw new CliUsageError(
+      "project list does not accept positional arguments",
+    );
   }
 
-  return { name: "projects", format: parseFormat(parsed.values.format) };
+  return { name: "project-list", format: parseFormat(parsed.values.format) };
 }
 
 function parseConfigArgs(args: string[]): CliCommand {
@@ -208,14 +210,24 @@ export function parseCliArgs(
           throw new CliUsageError("init does not accept arguments");
         }
         return { name: "init" };
-      case "projects":
-        if (commandArgs[0] === "sync") {
-          if (commandArgs.length > 1) {
-            throw new CliUsageError("projects sync does not accept arguments");
-          }
-          return { name: "projects-sync" };
+      case "project":
+        switch (commandArgs[0]) {
+          case "list":
+            return parseProjectListArgs(commandArgs.slice(1));
+          case "sync":
+            if (commandArgs.length > 1) {
+              throw new CliUsageError("project sync does not accept arguments");
+            }
+            return { name: "project-sync" };
+          case undefined:
+            throw new CliUsageError(
+              "project requires a subcommand: list or sync",
+            );
+          default:
+            throw new CliUsageError(
+              `unknown project subcommand: ${commandArgs[0]}`,
+            );
         }
-        return parseProjectsArgs(commandArgs);
       case "config":
         return parseConfigArgs(commandArgs);
       case "summary":

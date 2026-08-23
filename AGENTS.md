@@ -11,6 +11,19 @@
   any of them outdated.
 - Never commit credentials, API tokens, or local configuration files.
 
+## CLI Command Design
+
+- Name resource-oriented top-level commands with a singular noun, such as
+  `project`, rather than a plural collection name such as `projects`.
+- Put resource operations under explicit verb subcommands, such as
+  `project list` and `project sync`. Do not make a bare resource command imply a
+  default operation; require the subcommand instead.
+- Keep standalone use cases that are not resource namespaces as direct top-level
+  commands, such as `summary`, `config`, `init`, and `update`.
+- When adding or renaming a resource command, use the same
+  `<resource> <operation>` terminology in argument parsing, command dispatch,
+  help text, tests, and documentation.
+
 ## Language
 
 - Use English for commit messages, branch names, pull request titles and

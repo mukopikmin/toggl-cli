@@ -7,10 +7,10 @@ import {
 import type { Project } from "../model/project.ts";
 import type { TogglClient } from "../toggl/api.ts";
 
-export type ProjectsFormat = "csv" | "json";
+export type ProjectFormat = "csv" | "json";
 
-export interface ProjectsCommand {
-  format: ProjectsFormat;
+export interface ProjectListCommand {
+  format: ProjectFormat;
 }
 
 export function formatProjectList(projects: Project[]): string {
@@ -23,7 +23,7 @@ export function formatProjectsJson(projects: Project[]): string {
 
 export function outputProjects(
   projects: Project[],
-  format: ProjectsFormat,
+  format: ProjectFormat,
 ): void {
   console.log(
     format === "json"
@@ -32,8 +32,8 @@ export function outputProjects(
   );
 }
 
-export async function runProjectsCommand(
-  cmd: ProjectsCommand,
+export async function runProjectListCommand(
+  cmd: ProjectListCommand,
   toggl: TogglClient,
 ): Promise<void> {
   const config = await loadConfig();
@@ -85,7 +85,7 @@ export function appendMissingProjects(
   };
 }
 
-export async function runProjectsSyncCommand(
+export async function runProjectSyncCommand(
   toggl: TogglClient,
 ): Promise<void> {
   const document = await loadConfigDocument();
