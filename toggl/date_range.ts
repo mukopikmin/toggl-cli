@@ -1,4 +1,4 @@
-import { resolveTimeZone } from "./date.ts";
+import { resolveTimeZone } from "../model/date.ts";
 
 export interface TimeEntriesDateRange {
   startDate: string;

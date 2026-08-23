@@ -1,18 +1,16 @@
 import { stringify } from "@std/toml";
 import { loadConfig, loadConfigDocument } from "../config.ts";
 import {
-  createProjects,
   sortProjectsByDisplayOrder,
   visibleProjects,
 } from "../model/project.ts";
 import type { Project } from "../model/project.ts";
 import type { TogglClient } from "../toggl/api.ts";
-import type { TogglProject } from "../toggl/types.ts";
 
-export type ProjectsFormat = "csv" | "json";
+export type ProjectFormat = "csv" | "json";
 
-export interface ProjectsCommand {
-  format: ProjectsFormat;
+export interface ProjectListCommand {
+  format: ProjectFormat;
 }
 
 export function formatProjectList(projects: Project[]): string {
@@ -25,7 +23,7 @@ export function formatProjectsJson(projects: Project[]): string {
 
 export function outputProjects(
   projects: Project[],
-  format: ProjectsFormat,
+  format: ProjectFormat,
 ): void {
   console.log(
     format === "json"
@@ -34,15 +32,12 @@ export function outputProjects(
   );
 }
 
-export async function runProjectsCommand(
-  cmd: ProjectsCommand,
+export async function runProjectListCommand(
+  cmd: ProjectListCommand,
   toggl: TogglClient,
 ): Promise<void> {
   const config = await loadConfig();
-  const projects = createProjects(
-    await toggl.getProjects(config),
-    config.PROJECTS,
-  );
+  const projects = await toggl.getProjects(config, config.PROJECTS);
 
   outputProjects(
     sortProjectsByDisplayOrder(visibleProjects(projects)),
@@ -53,7 +48,10 @@ export async function runProjectsCommand(
 export function appendMissingProjects(
   configText: string,
   configuredProjectIds: number[],
-  projects: TogglProject[],
+  projects: (
+    & Pick<Project, "id" | "name">
+    & Partial<Pick<Project, "active">>
+  )[],
 ): { text: string; addedCount: number } {
   const configuredIds = new Set(configuredProjectIds);
   const missingProjects = projects
@@ -87,11 +85,14 @@ export function appendMissingProjects(
   };
 }
 
-export async function runProjectsSyncCommand(
+export async function runProjectSyncCommand(
   toggl: TogglClient,
 ): Promise<void> {
   const document = await loadConfigDocument();
-  const projects = await toggl.getProjects(document.config);
+  const projects = await toggl.getProjects(
+    document.config,
+    document.config.PROJECTS,
+  );
   const result = appendMissingProjects(
     document.text,
     Object.keys(document.config.PROJECTS).map(Number),

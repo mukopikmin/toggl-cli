@@ -11,6 +11,19 @@
   any of them outdated.
 - Never commit credentials, API tokens, or local configuration files.
 
+## CLI Command Design
+
+- Name resource-oriented top-level commands with a singular noun, such as
+  `project`, rather than a plural collection name such as `projects`.
+- Put resource operations under explicit verb subcommands, such as
+  `project list` and `project sync`. Do not make a bare resource command imply a
+  default operation; require the subcommand instead.
+- Keep standalone use cases that are not resource namespaces as direct top-level
+  commands, such as `summary`, `config`, `init`, and `update`.
+- When adding or renaming a resource command, use the same
+  `<resource> <operation>` terminology in argument parsing, command dispatch,
+  help text, tests, and documentation.
+
 ## Language
 
 - Use English for commit messages, branch names, pull request titles and
@@ -19,6 +32,9 @@
   Avoid mixing languages in repository and GitHub communication.
 - Do not add tool-specific prefixes such as `[codex]` to pull request titles.
   Write titles that describe the change directly.
+- When work was started for the purpose of resolving an issue, include
+  `Closes #<issue_number>` or an equivalent closing keyword in the pull request
+  description so that merging the pull request closes the issue.
 
 ## Tool Usage
 
@@ -53,8 +69,17 @@
   delegation to commands. Do not add API communication or complex aggregation
   logic directly to it.
 - Use `command/` for CLI use cases, input interpretation, and output formatting.
-- Use `toggl/` for Toggl API communication, API data types, and domain logic
-  such as date ranges.
+- Use `model/` for API-independent domain models and pure domain operations.
+  Derived models such as `TimeEntrySummary` belong with the source models and
+  must be computable without depending on an API client or API DTO.
+- Use `toggl/` for Toggl API communication, request and response DTOs, and
+  translation between those DTOs and domain models. Keep DTOs private to the
+  adapter when they are not shared by multiple Toggl modules.
+- Public API client methods must return domain models rather than exposing API
+  DTOs. Dependencies must point from `toggl/` adapters to `model/`; code in
+  `model/` must not import from `toggl/`.
+- Keep fetching and derived operations separate. Commands may coordinate them,
+  for example by fetching `TimeEntry[]` and then deriving a `TimeEntrySummary`.
 - Keep `config.ts` responsible for configuration loading and validation. Do not
   add command-specific behavior to it.
 - Split a file or function when it begins to hold multiple independent

@@ -1,14 +1,14 @@
 import { loadConfig } from "../config.ts";
 import type { TogglClient } from "../toggl/api.ts";
-import type { TimeEntry } from "../toggl/types.ts";
+import type { TimeEntry } from "../model/time_entry.ts";
 
-export type TimeEntriesFormat = "csv" | "json";
+export type TimeEntryListFormat = "csv" | "json";
 
-export interface TimeEntriesCommand {
+export interface TimeEntryListCommand {
   startDay: Temporal.PlainDate;
   endDay: Temporal.PlainDate;
   separator: string;
-  format: TimeEntriesFormat;
+  format: TimeEntryListFormat;
 }
 
 export interface OutputTimeEntry {
@@ -24,7 +24,7 @@ function roundMinutes(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-export function prepareTimeEntries(
+export function prepareTimeEntryList(
   entries: TimeEntry[],
   now = Date.now(),
 ): OutputTimeEntry[] {
@@ -35,12 +35,13 @@ export function prepareTimeEntries(
     .map((entry) => ({
       id: entry.id,
       description: entry.description,
-      project_id: entry.project_id,
+      project_id: entry.projectId,
       start: entry.start,
       stop: entry.stop,
       duration_minutes: roundMinutes(
-        (entry.duration < 0 ? nowSeconds + entry.duration : entry.duration) /
-          60,
+        (entry.durationSeconds < 0
+          ? nowSeconds + entry.durationSeconds
+          : entry.durationSeconds) / 60,
       ),
     }));
 }
@@ -55,7 +56,7 @@ function escapeCsvField(value: string, separator: string): string {
   return value;
 }
 
-export function formatTimeEntriesCsv(
+export function formatTimeEntryListCsv(
   entries: OutputTimeEntry[],
   separator: string,
 ): string {
@@ -76,22 +77,22 @@ export function formatTimeEntriesCsv(
   ).join("\n");
 }
 
-export function formatTimeEntriesJson(entries: OutputTimeEntry[]): string {
+export function formatTimeEntryListJson(entries: OutputTimeEntry[]): string {
   return JSON.stringify(entries, null, 2);
 }
 
-export async function runTimeEntriesCommand(
-  cmd: TimeEntriesCommand,
+export async function runTimeEntryListCommand(
+  cmd: TimeEntryListCommand,
   toggl: TogglClient,
 ): Promise<void> {
   const config = await loadConfig();
-  const entries = prepareTimeEntries(
+  const entries = prepareTimeEntryList(
     await toggl.getTimeEntries(config, cmd.startDay, cmd.endDay),
   );
 
   console.log(
     cmd.format === "json"
-      ? formatTimeEntriesJson(entries)
-      : formatTimeEntriesCsv(entries, cmd.separator),
+      ? formatTimeEntryListJson(entries)
+      : formatTimeEntryListCsv(entries, cmd.separator),
   );
 }

@@ -12,7 +12,7 @@ import {
   appendMissingProjects,
   formatProjectList,
   formatProjectsJson,
-} from "./command/projects.ts";
+} from "./command/project.ts";
 import {
   formatConfigJson,
   formatConfigValues,
@@ -26,11 +26,17 @@ import {
   resolveSummaryDateRange,
 } from "./command/summary.ts";
 import {
-  formatTimeEntriesCsv as formatIndividualTimeEntriesCsv,
-  formatTimeEntriesJson as formatIndividualTimeEntriesJson,
-  prepareTimeEntries,
-} from "./command/time_entries.ts";
-import { parseConfigToml, parseProjectsConfig } from "./config.ts";
+  formatTimeEntryListCsv,
+  formatTimeEntryListJson,
+  prepareTimeEntryList,
+} from "./command/time_entry.ts";
+import {
+  ConfigValidationError,
+  loadConfigDocument,
+  parseConfigToml,
+  parseProjectsConfig,
+} from "./config.ts";
+import { main } from "./main.ts";
 import {
   createProject,
   sortProjectsByDisplayOrder,
@@ -38,13 +44,10 @@ import {
 } from "./model/project.ts";
 import { getProjects } from "./toggl/projects.ts";
 import { getSummaryTimeEntries } from "./toggl/summary.ts";
-import {
-  aggregateTimeEntriesForDays,
-  getTimeEntries,
-  getTimeEntriesForDays,
-} from "./toggl/time_entries.ts";
 import { apiEndpoint, reportsApiEndpoint } from "./toggl/api.ts";
-import { formatTimeEntryDate, resolveTimeZone } from "./toggl/date.ts";
+import { getTimeEntries } from "./toggl/time_entries.ts";
+import { formatTimeEntryDate, resolveTimeZone } from "./model/date.ts";
+import { TogglApiError } from "./toggl/error.ts";
 
 const config = {
   WORKSPACE: "workspace-id",
@@ -65,18 +68,20 @@ Deno.test("createHelpText describes commands and options", () => {
     `Usage:
   toggl summary <start-date> <end-date> [options]
   toggl summary --days <days> [options]
-  toggl time-entries <start-day> <end-day> [options]
-  toggl projects [options]
-  toggl projects sync
+  toggl time-entry list <start-day> <end-day> [options]
+  toggl project list [options]
+  toggl project sync
   toggl config [options]
   toggl init
+  toggl update [--channel stable|nightly]
 
 Commands:
-  init          Create the configuration file
-  projects      List projects
-  config        Show configuration values
-  summary       Summarize time entries for a range of days
-  time-entries  List individual time entries for a range of days
+  init        Create the configuration file
+  project     List and sync projects
+  time-entry  List individual time entries for a range of days
+  config      Show configuration values
+  summary     Summarize time entries for a range of days
+  update      Update the installed Toggl CLI binary
 
 Options:
   -s, --separator <text> Set the output delimiter (default: tab)
@@ -382,14 +387,14 @@ Deno.test("parseCliArgs rejects unknown commands", () => {
   assertEquals(error.message, "unknown command: foo");
 });
 
-Deno.test("parseCliArgs preserves init and projects routing", () => {
+Deno.test("parseCliArgs preserves init and project routing", () => {
   assertEquals(parseCliArgs(["init"]), { name: "init" });
-  assertEquals(parseCliArgs(["projects", "--format", "json"]), {
-    name: "projects",
+  assertEquals(parseCliArgs(["project", "list", "--format", "json"]), {
+    name: "project-list",
     format: "json",
   });
-  assertEquals(parseCliArgs(["projects", "sync"]), {
-    name: "projects-sync",
+  assertEquals(parseCliArgs(["project", "sync"]), {
+    name: "project-sync",
   });
   assertEquals(parseCliArgs(["config"]), {
     name: "config",
@@ -401,14 +406,23 @@ Deno.test("parseCliArgs preserves init and projects routing", () => {
   });
 });
 
-Deno.test("parseCliArgs parses time-entries options and current-month dates", () => {
+Deno.test("parseCliArgs parses time-entry list options and current-month dates", () => {
   const command = parseCliArgs(
-    ["time-entries", "--format", "json", "--separator", ",", "1", "31"],
+    [
+      "time-entry",
+      "list",
+      "--format",
+      "json",
+      "--separator",
+      ",",
+      "1",
+      "31",
+    ],
     datetime({ year: 2026, month: 7, day: 11 }),
   );
 
-  if (command.name !== "time-entries") {
-    throw new Error("expected time-entries command");
+  if (command.name !== "time-entry-list") {
+    throw new Error("expected time-entry-list command");
   }
   assertEquals(command.format, "json");
   assertEquals(command.separator, ",");
@@ -422,26 +436,89 @@ Deno.test("parseCliArgs parses time-entries options and current-month dates", ()
   );
 });
 
-Deno.test("parseCliArgs validates time-entries arguments", () => {
+Deno.test("parseCliArgs validates time-entry list arguments", () => {
   assertThrows(
-    () => parseCliArgs(["time-entries", "1"]),
+    () => parseCliArgs(["time-entry", "list", "1"]),
     CliUsageError,
-    "time-entries requires start and end day",
+    "time-entry list requires start and end day",
   );
   assertThrows(
     () =>
       parseCliArgs(
-        ["time-entries", "31", "1"],
+        ["time-entry", "list", "31", "1"],
         datetime({ year: 2026, month: 7, day: 11 }),
+      ),
+    CliUsageError,
+    "start day must not be after end day",
+  );
+  assertThrows(
+    () =>
+      parseCliArgs([
+        "time-entry",
+        "list",
+        "--separator",
+        "",
+        "1",
+        "2",
+      ]),
+    CliUsageError,
+    "separator must not be empty",
+  );
+  assertThrows(
+    () => parseCliArgs(["time-entry", "list", "1.5", "2"]),
+    CliUsageError,
+    "start and end day must be valid integers",
+  );
+  assertThrows(
+    () =>
+      parseCliArgs(
+        ["time-entry", "list", "1", "29"],
+        datetime({ year: 2026, month: 2, day: 1 }),
       ),
     CliUsageError,
     "start and end day must be valid dates",
   );
-  assertThrows(
-    () => parseCliArgs(["time-entries", "--separator", "", "1", "2"]),
-    CliUsageError,
-    "separator must not be empty",
+});
+
+Deno.test("parseCliArgs accepts a leap-day time-entry list boundary", () => {
+  const command = parseCliArgs(
+    ["time-entry", "list", "1", "29"],
+    datetime({ year: 2028, month: 2, day: 1 }),
   );
+
+  if (command.name !== "time-entry-list") {
+    throw new Error("expected time-entry-list command");
+  }
+  assertEquals(command.startDay.toString(), "2028-02-01");
+  assertEquals(command.endDay.toString(), "2028-02-29");
+});
+
+Deno.test("parseCliArgs requires a project subcommand", () => {
+  const missing = assertThrows(
+    () => parseCliArgs(["project"]),
+    CliUsageError,
+  );
+  assertEquals(missing.message, "project requires a subcommand: list or sync");
+
+  const unknown = assertThrows(
+    () => parseCliArgs(["project", "show"]),
+    CliUsageError,
+  );
+  assertEquals(unknown.message, "unknown project subcommand: show");
+});
+
+Deno.test("parseCliArgs requires the time-entry list subcommand", () => {
+  const missing = assertThrows(
+    () => parseCliArgs(["time-entry"]),
+    CliUsageError,
+  );
+  assertEquals(missing.message, "time-entry requires a subcommand: list");
+
+  const unknown = assertThrows(
+    () => parseCliArgs(["time-entry", "show"]),
+    CliUsageError,
+  );
+  assertEquals(unknown.message, "unknown time-entry subcommand: show");
 });
 
 function jsonResponse(body: unknown): Response {
@@ -534,6 +611,103 @@ display_name = "Internal"
       },
     },
   );
+});
+
+Deno.test("parseConfigToml reports missing required keys", () => {
+  const error = assertThrows(
+    () => parseConfigToml('timezone = "UTC"'),
+    ConfigValidationError,
+  );
+  assertEquals(error.missingKeys, ["workspace", "token"]);
+  assertEquals(error.invalidProjects, []);
+});
+
+Deno.test("parseConfigToml reports invalid project settings", () => {
+  const error = assertThrows(
+    () =>
+      parseConfigToml(`
+workspace = "workspace-id"
+token = "test-token"
+
+[projects.invalid]
+hidden = "yes"
+`),
+    ConfigValidationError,
+  );
+  assertEquals(error.missingKeys, []);
+  assertEquals(error.invalidProjects, ["projects.invalid"]);
+});
+
+Deno.test("loadConfigDocument uses injected environment and file access", async () => {
+  const requestedPaths: string[] = [];
+  const document = await loadConfigDocument({
+    getHome: () => "/home/tester",
+    readTextFile: (path) => {
+      requestedPaths.push(path);
+      return Promise.resolve('workspace = "w"\ntoken = "t"\n');
+    },
+    isNotFound: () => false,
+  });
+
+  assertEquals(requestedPaths, ["/home/tester/.config/toggl-cli/config.toml"]);
+  assertEquals(document.config.WORKSPACE, "w");
+});
+
+async function captureConfigBoundaryError(
+  adapter: Parameters<typeof loadConfigDocument>[0],
+) {
+  const messages: string[] = [];
+  const originalError = console.error;
+  console.error = (...values: unknown[]) => messages.push(values.join(" "));
+  try {
+    const exitCode = await main(["config"], {
+      runConfigCommand: async () => {
+        await loadConfigDocument(adapter);
+      },
+    });
+    return { exitCode, messages };
+  } finally {
+    console.error = originalError;
+  }
+}
+
+Deno.test("main reports a missing config file and returns exit code 1", async () => {
+  const result = await captureConfigBoundaryError({
+    getHome: () => "/home/tester",
+    readTextFile: () => Promise.reject(new Error("missing")),
+    isNotFound: () => true,
+  });
+  assertEquals(result.exitCode, 1);
+  assertEquals(result.messages, [
+    "Error: ~/.config/toggl-cli/config.toml file not found",
+    "Please create ~/.config/toggl-cli/config.toml with the following format:",
+    'workspace = "your_workspace_id"',
+    'token = "your_api_token"',
+  ]);
+});
+
+Deno.test("main reports an unset HOME and returns exit code 1", async () => {
+  const result = await captureConfigBoundaryError({
+    getHome: () => undefined,
+    readTextFile: () => Promise.reject(new Error("must not read")),
+    isNotFound: () => false,
+  });
+  assertEquals(result, {
+    exitCode: 1,
+    messages: ["Error: HOME environment variable not set"],
+  });
+});
+
+Deno.test("main reports config read errors and returns exit code 1", async () => {
+  const result = await captureConfigBoundaryError({
+    getHome: () => "/home/tester",
+    readTextFile: () => Promise.reject(new Error("permission denied")),
+    isNotFound: () => false,
+  });
+  assertEquals(result, {
+    exitCode: 1,
+    messages: ["Error: Unable to read ~/.config/toggl-cli/config.toml"],
+  });
 });
 
 Deno.test("formatProjectList returns one project name per line", () => {
@@ -1011,24 +1185,24 @@ Deno.test("formatTimeEntriesJson returns explicit JSON output for time entry dat
   );
 });
 
-Deno.test("prepareTimeEntries sorts entries and converts durations to minutes", () => {
+Deno.test("prepareTimeEntryList sorts entries and converts durations to minutes", () => {
   assertEquals(
-    prepareTimeEntries([
+    prepareTimeEntryList([
       {
         id: 2,
         description: "running",
-        project_id: null,
+        projectId: null,
         start: "2026-07-02T10:00:00Z",
         stop: null,
-        duration: -1_000,
+        durationSeconds: -1_000,
       },
       {
         id: 1,
         description: "finished",
-        project_id: 100,
+        projectId: 100,
         start: "2026-07-01T10:00:00Z",
         stop: "2026-07-01T10:30:00Z",
-        duration: 1_801,
+        durationSeconds: 1_801,
       },
     ], 1_900_000),
     [
@@ -1052,7 +1226,7 @@ Deno.test("prepareTimeEntries sorts entries and converts durations to minutes", 
   );
 });
 
-Deno.test("time-entries formatters preserve nulls and escape CSV fields", () => {
+Deno.test("time-entry list formatters preserve nulls and escape CSV fields", () => {
   const entries = [{
     id: 1,
     description: 'review, notes\nwith "quotes"',
@@ -1063,29 +1237,13 @@ Deno.test("time-entries formatters preserve nulls and escape CSV fields", () => 
   }];
 
   assertEquals(
-    formatIndividualTimeEntriesCsv(entries, ","),
+    formatTimeEntryListCsv(entries, ","),
     `id,description,project_id,start,stop,duration_minutes\n1,"review, notes\nwith ""quotes""",,2026-07-01T10:00:00Z,,30.5`,
   );
-  assertEquals(JSON.parse(formatIndividualTimeEntriesJson(entries)), entries);
+  assertEquals(JSON.parse(formatTimeEntryListJson(entries)), entries);
   assertEquals(
-    formatIndividualTimeEntriesCsv([], "\t"),
+    formatTimeEntryListCsv([], "\t"),
     "id\tdescription\tproject_id\tstart\tstop\tduration_minutes",
-  );
-});
-
-Deno.test("aggregateTimeEntriesForDays skips entries without a project", () => {
-  assertEquals(
-    aggregateTimeEntriesForDays([
-      {
-        id: 1,
-        description: "unassigned",
-        project_id: null,
-        start: "2026-07-01T10:00:00Z",
-        stop: "2026-07-01T10:30:00Z",
-        duration: 1_800,
-      },
-    ]),
-    {},
   );
 });
 
@@ -1123,6 +1281,30 @@ Deno.test("getProjects fetches active projects with Toggl auth", async () => {
       { id: 1, name: "Client work", active: true },
       { id: 3, name: "Legacy shape", active: true },
     ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("getProjects throws a typed error for a non-success response", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (() =>
+    Promise.resolve(
+      new Response(null, { status: 401, statusText: "Unauthorized" }),
+    )) as typeof fetch;
+
+  try {
+    const error = await assertRejects(
+      () => getProjects(config),
+      TogglApiError,
+      "Failed to fetch projects: HTTP 401 Unauthorized",
+    );
+    assertEquals(error.operation, "fetch projects");
+    assertEquals(error.status, 401);
+    assertEquals(
+      error.url,
+      `${apiEndpoint}/workspaces/${config.WORKSPACE}/projects`,
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -1185,6 +1367,32 @@ Deno.test("getSummaryTimeEntries posts summary request with Toggl auth", async (
   }
 });
 
+Deno.test("getSummaryTimeEntries throws a typed error for a non-success response", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (() =>
+    Promise.resolve(
+      new Response(null, { status: 429, statusText: "Too Many Requests" }),
+    )) as typeof fetch;
+  const fromDay = Temporal.PlainDate.from("2026-05-01");
+  const toDay = Temporal.PlainDate.from("2026-05-31");
+
+  try {
+    const error = await assertRejects(
+      () => getSummaryTimeEntries(config, fromDay, toDay),
+      TogglApiError,
+      "Failed to fetch summary time entries: HTTP 429 Too Many Requests",
+    );
+    assertEquals(error.operation, "fetch summary time entries");
+    assertEquals(error.status, 429);
+    assertEquals(
+      error.url,
+      `${reportsApiEndpoint}/workspace/${config.WORKSPACE}/summary/time_entries`,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 Deno.test("formatTimeEntryDate converts the same instant to configured timezone dates", () => {
   const start = "2026-05-01T15:30:00Z";
 
@@ -1200,7 +1408,7 @@ Deno.test("resolveTimeZone falls back to the system timezone", () => {
   assertEquals(resolveTimeZone(undefined, "Asia/Tokyo"), "Asia/Tokyo");
 });
 
-Deno.test("getTimeEntriesForDays fetches range in configured UTC timezone", async () => {
+Deno.test("getTimeEntries fetches range in configured UTC timezone", async () => {
   const originalFetch = globalThis.fetch;
   let requestedUrl = "";
 
@@ -1214,7 +1422,7 @@ Deno.test("getTimeEntriesForDays fetches range in configured UTC timezone", asyn
   const toDay = Temporal.PlainDate.from("2026-05-02");
 
   try {
-    const entries = await getTimeEntriesForDays(
+    const entries = await getTimeEntries(
       { ...config, TIMEZONE: "UTC" },
       fromDay,
       toDay,
@@ -1230,7 +1438,7 @@ Deno.test("getTimeEntriesForDays fetches range in configured UTC timezone", asyn
       url.searchParams.get("end_date"),
       "2026-05-03T00:00:00Z",
     );
-    assertEquals(entries, {});
+    assertEquals(entries, []);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -1259,10 +1467,10 @@ Deno.test("getTimeEntries returns individual entries with nullable fields", asyn
       ),
       [{
         id: 10,
-        project_id: null,
+        projectId: null,
         start: "2026-07-01T10:00:00Z",
         stop: null,
-        duration: -1_000,
+        durationSeconds: -1_000,
         description: "running entry",
       }],
     );
@@ -1271,7 +1479,33 @@ Deno.test("getTimeEntries returns individual entries with nullable fields", asyn
   }
 });
 
-Deno.test("getTimeEntriesForDays fetches range and aggregates minutes by date and project", async () => {
+Deno.test("getTimeEntries throws a typed error for a non-success response", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (() =>
+    Promise.resolve(
+      new Response(null, { status: 503, statusText: "Service Unavailable" }),
+    )) as typeof fetch;
+  const fromDay = Temporal.PlainDate.from("2026-05-01");
+  const toDay = Temporal.PlainDate.from("2026-05-02");
+
+  try {
+    const error = await assertRejects(
+      () => getTimeEntries({ ...config, TIMEZONE: "UTC" }, fromDay, toDay),
+      TogglApiError,
+      "Failed to fetch time entries: HTTP 503 Service Unavailable",
+    );
+    assertEquals(error.operation, "fetch time entries");
+    assertEquals(error.status, 503);
+    assertEquals(
+      new URL(error.url).origin + new URL(error.url).pathname,
+      `${apiEndpoint}/me/time_entries`,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("getTimeEntries maps response DTOs to domain models", async () => {
   const configWithTimezone = {
     ...config,
     TIMEZONE: "Asia/Tokyo",
@@ -1319,7 +1553,7 @@ Deno.test("getTimeEntriesForDays fetches range and aggregates minutes by date an
   const toDay = Temporal.PlainDate.from("2026-05-02");
 
   try {
-    const entries = await getTimeEntriesForDays(
+    const entries = await getTimeEntries(
       configWithTimezone,
       fromDay,
       toDay,
@@ -1335,16 +1569,38 @@ Deno.test("getTimeEntriesForDays fetches range and aggregates minutes by date an
       requestedHeaders.get("Authorization"),
       `Basic ${btoa(`${config.TOKEN}:api_token`)}`,
     );
-    assertEquals(entries, {
-      "2026-05-01": { 100: 45 },
-      "2026-05-02": { 200: 60 },
-    });
+    assertEquals(entries, [
+      {
+        id: 10,
+        projectId: 100,
+        start: "2026-05-01T12:00:00Z",
+        stop: "2026-05-01T12:30:00Z",
+        durationSeconds: 1800,
+        description: "first block",
+      },
+      {
+        id: 11,
+        projectId: 100,
+        start: "2026-05-01T13:00:00Z",
+        stop: "2026-05-01T13:15:00Z",
+        durationSeconds: 900,
+        description: "second block",
+      },
+      {
+        id: 12,
+        projectId: 200,
+        start: "2026-05-02T12:00:00Z",
+        stop: "2026-05-02T13:00:00Z",
+        durationSeconds: 3600,
+        description: "legacy project id",
+      },
+    ]);
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
 
-Deno.test("getTimeEntriesForDays aggregates entries by date in configured timezone", async () => {
+Deno.test("getTimeEntries returns domain entries without aggregating them", async () => {
   const configWithTimezone = {
     ...config,
     TIMEZONE: "Asia/Tokyo",
@@ -1368,15 +1624,20 @@ Deno.test("getTimeEntriesForDays aggregates entries by date in configured timezo
   const toDay = Temporal.PlainDate.from("2026-05-02");
 
   try {
-    const entries = await getTimeEntriesForDays(
+    const entries = await getTimeEntries(
       configWithTimezone,
       fromDay,
       toDay,
     );
 
-    assertEquals(entries, {
-      "2026-05-02": { 300: 30 },
-    });
+    assertEquals(entries, [{
+      id: 20,
+      projectId: 300,
+      start: "2026-05-01T15:30:00Z",
+      stop: "2026-05-01T16:00:00Z",
+      durationSeconds: 1800,
+      description: "crosses configured timezone date",
+    }]);
   } finally {
     globalThis.fetch = originalFetch;
   }

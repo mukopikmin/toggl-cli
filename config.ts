@@ -20,6 +20,55 @@ export interface ConfigDocument {
   config: Config;
 }
 
+export interface ConfigFileAdapter {
+  getHome(): string | undefined;
+  readTextFile(path: string): Promise<string>;
+  isNotFound(error: unknown): boolean;
+}
+
+export interface ConfigValidationIssue {
+  path: string;
+  code: "missing_required" | "invalid_project";
+}
+
+export class ConfigValidationError extends Error {
+  constructor(public readonly issues: ConfigValidationIssue[]) {
+    super("Invalid configuration");
+    this.name = "ConfigValidationError";
+  }
+
+  get missingKeys(): string[] {
+    return this.issues.filter((issue) => issue.code === "missing_required")
+      .map((issue) => issue.path);
+  }
+
+  get invalidProjects(): string[] {
+    return this.issues.filter((issue) => issue.code === "invalid_project")
+      .map((issue) => issue.path);
+  }
+}
+
+export class HomeNotSetError extends Error {
+  constructor() {
+    super("HOME environment variable not set");
+    this.name = "HomeNotSetError";
+  }
+}
+
+export class ConfigFileNotFoundError extends Error {
+  constructor() {
+    super(`${CONFIG_FILE_DISPLAY} file not found`);
+    this.name = "ConfigFileNotFoundError";
+  }
+}
+
+export class ConfigFileReadError extends Error {
+  constructor(public readonly configFile: string, options: ErrorOptions) {
+    super(`Unable to read ${CONFIG_FILE_DISPLAY}`, options);
+    this.name = "ConfigFileReadError";
+  }
+}
+
 export function getConfigFile(home: string): string {
   return join(home, ".config", "toggl-cli", "config.toml");
 }
@@ -76,19 +125,17 @@ export function parseConfigToml(text: string): Config {
     PROJECTS: parseProjectsConfig(parsed.projects),
   };
 
-  const missingKeys = [
-    !config.WORKSPACE ? "workspace" : undefined,
-    !config.TOKEN ? "token" : undefined,
-  ].filter((key): key is string => key !== undefined);
+  const issues: ConfigValidationIssue[] = [
+    ...(!config.WORKSPACE
+      ? [{ path: "workspace", code: "missing_required" as const }]
+      : []),
+    ...(!config.TOKEN
+      ? [{ path: "token", code: "missing_required" as const }]
+      : []),
+    ...validateProjectsConfig(parsed.projects),
+  ];
 
-  if (missingKeys.length > 0) {
-    console.error(
-      `Error: Missing required configuration in ${CONFIG_FILE_DISPLAY}: ${
-        missingKeys.join(", ")
-      }`,
-    );
-    Deno.exit(1);
-  }
+  if (issues.length > 0) throw new ConfigValidationError(issues);
 
   return {
     WORKSPACE: config.WORKSPACE,
@@ -98,33 +145,62 @@ export function parseConfigToml(text: string): Config {
   } as Config;
 }
 
-export async function loadConfigDocument(): Promise<ConfigDocument> {
-  const home = Deno.env.get("HOME");
-  if (!home) {
-    console.error("Error: HOME environment variable not set");
-    Deno.exit(1);
+function validateProjectsConfig(value: unknown): ConfigValidationIssue[] {
+  if (value === undefined) return [];
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return [{ path: "projects", code: "invalid_project" }];
   }
+
+  const issues: ConfigValidationIssue[] = [];
+  for (const [id, valueForProject] of Object.entries(value)) {
+    const path = `projects.${id}`;
+    if (
+      !/^\d+$/.test(id) || !valueForProject ||
+      typeof valueForProject !== "object" || Array.isArray(valueForProject)
+    ) {
+      issues.push({ path, code: "invalid_project" });
+      continue;
+    }
+    const project = valueForProject as Record<string, unknown>;
+    if (
+      ("display_name" in project &&
+        readString(project.display_name) === undefined) ||
+      ("hidden" in project && readBoolean(project.hidden) === undefined) ||
+      ("display_order" in project &&
+        readNumber(project.display_order) === undefined)
+    ) {
+      issues.push({ path, code: "invalid_project" });
+    }
+  }
+  return issues;
+}
+
+const denoConfigFileAdapter: ConfigFileAdapter = {
+  getHome: () => Deno.env.get("HOME"),
+  readTextFile: (path) => Deno.readTextFile(path),
+  isNotFound: (error) => error instanceof Deno.errors.NotFound,
+};
+
+export async function loadConfigDocument(
+  adapter: ConfigFileAdapter = denoConfigFileAdapter,
+): Promise<ConfigDocument> {
+  const home = adapter.getHome();
+  if (!home) throw new HomeNotSetError();
   const configFile = getConfigFile(home);
 
+  let text: string;
   try {
-    const text = await Deno.readTextFile(configFile);
-    return {
-      configFile,
-      text,
-      config: parseConfigToml(text),
-    };
+    text = await adapter.readTextFile(configFile);
   } catch (error) {
-    if (error instanceof Deno.errors.NotFound) {
-      console.error(`Error: ${CONFIG_FILE_DISPLAY} file not found`);
-      console.error(
-        `Please create ${CONFIG_FILE_DISPLAY} with the following format:`,
-      );
-      console.error('workspace = "your_workspace_id"');
-      console.error('token = "your_api_token"');
-      Deno.exit(1);
-    }
-    throw error;
+    if (adapter.isNotFound(error)) throw new ConfigFileNotFoundError();
+    throw new ConfigFileReadError(configFile, { cause: error });
   }
+
+  return {
+    configFile,
+    text,
+    config: parseConfigToml(text),
+  };
 }
 
 export async function loadConfig(): Promise<Config> {

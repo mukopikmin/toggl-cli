@@ -7,11 +7,8 @@ export function compileArgs(
 ): string[] {
   return [
     "compile",
-    "--allow-net",
-    "--allow-read",
-    "--allow-write",
-    "--allow-run=pbcopy,wl-copy,xclip,xsel,clip,powershell.exe,powershell",
-    "--allow-env",
+    "--quiet",
+    "-P=app",
     ...args,
     "--output",
     outputPath,
