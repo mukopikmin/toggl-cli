@@ -53,6 +53,24 @@ Deno.test("summarizeTimeEntries calculates a running entry from the supplied ins
   );
 });
 
+Deno.test("summarizeTimeEntries skips entries without a project", () => {
+  assertEquals(
+    summarizeTimeEntries(
+      [{
+        id: 1,
+        projectId: null,
+        start: "2026-05-01T10:00:00Z",
+        stop: "2026-05-01T10:30:00Z",
+        durationSeconds: 1800,
+        description: "Unassigned",
+      }],
+      "UTC",
+      Temporal.Instant.from("2026-05-01T11:00:00Z"),
+    ),
+    {},
+  );
+});
+
 Deno.test("summarizeTimeEntries uses the configured timezone at date and month boundaries", () => {
   const entries = [
     entry(1, 100, "2026-01-31T14:59:59Z", 60),

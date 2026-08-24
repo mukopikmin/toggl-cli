@@ -1,4 +1,5 @@
 import { assertEquals, assertRejects, assertThrows } from "@std/assert";
+import { datetime } from "ptera";
 import { ClipboardUnavailableError } from "./clipboard.ts";
 import {
   CliUsageError,
@@ -24,6 +25,11 @@ import {
   outputSummaryText,
   resolveSummaryDateRange,
 } from "./command/summary.ts";
+import {
+  formatTimeEntryListCsv,
+  formatTimeEntryListJson,
+  prepareTimeEntryList,
+} from "./command/time_entry.ts";
 import {
   ConfigValidationError,
   loadConfigDocument,
@@ -62,6 +68,7 @@ Deno.test("createHelpText describes commands and options", () => {
     `Usage:
   toggl summary <start-date> <end-date> [options]
   toggl summary --days <days> [options]
+  toggl time-entry list <start-day> <end-day> [options]
   toggl project list [options]
   toggl project sync
   toggl config [options]
@@ -69,11 +76,12 @@ Deno.test("createHelpText describes commands and options", () => {
   toggl update [--channel stable|nightly]
 
 Commands:
-  init      Create the configuration file
-  project   List projects
-  config    Show configuration values
-  summary   Summarize time entries for a range of days
-  update    Update the installed Toggl CLI binary
+  init        Create the configuration file
+  project     List and sync projects
+  time-entry  List individual time entries for a range of days
+  config      Show configuration values
+  summary     Summarize time entries for a range of days
+  update      Update the installed Toggl CLI binary
 
 Options:
   -s, --separator <text> Set the output delimiter (default: tab)
@@ -81,7 +89,7 @@ Options:
   -d, --days <days>      Aggregate from this many days ago through today
       --clipboard        Copy the output to the clipboard as well as stdout
   -h, --help             Show this help
-      --no-project       Omit the project column from CSV output
+      --no-project       Omit the project column (summary CSV only)
       --no-date          Omit the date header row from CSV output
       --version          Show the version`,
   );
@@ -398,6 +406,93 @@ Deno.test("parseCliArgs preserves init and project routing", () => {
   });
 });
 
+Deno.test("parseCliArgs parses time-entry list options and current-month dates", () => {
+  const command = parseCliArgs(
+    [
+      "time-entry",
+      "list",
+      "--format",
+      "json",
+      "--separator",
+      ",",
+      "1",
+      "31",
+    ],
+    datetime({ year: 2026, month: 7, day: 11 }),
+  );
+
+  if (command.name !== "time-entry-list") {
+    throw new Error("expected time-entry-list command");
+  }
+  assertEquals(command.format, "json");
+  assertEquals(command.separator, ",");
+  assertEquals(
+    [command.startDay.year, command.startDay.month, command.startDay.day],
+    [2026, 7, 1],
+  );
+  assertEquals(
+    [command.endDay.year, command.endDay.month, command.endDay.day],
+    [2026, 7, 31],
+  );
+});
+
+Deno.test("parseCliArgs validates time-entry list arguments", () => {
+  assertThrows(
+    () => parseCliArgs(["time-entry", "list", "1"]),
+    CliUsageError,
+    "time-entry list requires start and end day",
+  );
+  assertThrows(
+    () =>
+      parseCliArgs(
+        ["time-entry", "list", "31", "1"],
+        datetime({ year: 2026, month: 7, day: 11 }),
+      ),
+    CliUsageError,
+    "start day must not be after end day",
+  );
+  assertThrows(
+    () =>
+      parseCliArgs([
+        "time-entry",
+        "list",
+        "--separator",
+        "",
+        "1",
+        "2",
+      ]),
+    CliUsageError,
+    "separator must not be empty",
+  );
+  assertThrows(
+    () => parseCliArgs(["time-entry", "list", "1.5", "2"]),
+    CliUsageError,
+    "start and end day must be valid integers",
+  );
+  assertThrows(
+    () =>
+      parseCliArgs(
+        ["time-entry", "list", "1", "29"],
+        datetime({ year: 2026, month: 2, day: 1 }),
+      ),
+    CliUsageError,
+    "start and end day must be valid dates",
+  );
+});
+
+Deno.test("parseCliArgs accepts a leap-day time-entry list boundary", () => {
+  const command = parseCliArgs(
+    ["time-entry", "list", "1", "29"],
+    datetime({ year: 2028, month: 2, day: 1 }),
+  );
+
+  if (command.name !== "time-entry-list") {
+    throw new Error("expected time-entry-list command");
+  }
+  assertEquals(command.startDay.toString(), "2028-02-01");
+  assertEquals(command.endDay.toString(), "2028-02-29");
+});
+
 Deno.test("parseCliArgs requires a project subcommand", () => {
   const missing = assertThrows(
     () => parseCliArgs(["project"]),
@@ -410,6 +505,20 @@ Deno.test("parseCliArgs requires a project subcommand", () => {
     CliUsageError,
   );
   assertEquals(unknown.message, "unknown project subcommand: show");
+});
+
+Deno.test("parseCliArgs requires the time-entry list subcommand", () => {
+  const missing = assertThrows(
+    () => parseCliArgs(["time-entry"]),
+    CliUsageError,
+  );
+  assertEquals(missing.message, "time-entry requires a subcommand: list");
+
+  const unknown = assertThrows(
+    () => parseCliArgs(["time-entry", "show"]),
+    CliUsageError,
+  );
+  assertEquals(unknown.message, "unknown time-entry subcommand: show");
 });
 
 function jsonResponse(body: unknown): Response {
@@ -1076,6 +1185,68 @@ Deno.test("formatTimeEntriesJson returns explicit JSON output for time entry dat
   );
 });
 
+Deno.test("prepareTimeEntryList sorts entries and converts durations to minutes", () => {
+  assertEquals(
+    prepareTimeEntryList([
+      {
+        id: 2,
+        description: "running",
+        projectId: null,
+        start: "2026-07-02T10:00:00Z",
+        stop: null,
+        durationSeconds: -1_000,
+      },
+      {
+        id: 1,
+        description: "finished",
+        projectId: 100,
+        start: "2026-07-01T10:00:00Z",
+        stop: "2026-07-01T10:30:00Z",
+        durationSeconds: 1_801,
+      },
+    ], 1_900_000),
+    [
+      {
+        id: 1,
+        description: "finished",
+        project_id: 100,
+        start: "2026-07-01T10:00:00Z",
+        stop: "2026-07-01T10:30:00Z",
+        duration_minutes: 30.02,
+      },
+      {
+        id: 2,
+        description: "running",
+        project_id: null,
+        start: "2026-07-02T10:00:00Z",
+        stop: null,
+        duration_minutes: 15,
+      },
+    ],
+  );
+});
+
+Deno.test("time-entry list formatters preserve nulls and escape CSV fields", () => {
+  const entries = [{
+    id: 1,
+    description: 'review, notes\nwith "quotes"',
+    project_id: null,
+    start: "2026-07-01T10:00:00Z",
+    stop: null,
+    duration_minutes: 30.5,
+  }];
+
+  assertEquals(
+    formatTimeEntryListCsv(entries, ","),
+    `id,description,project_id,start,stop,duration_minutes\n1,"review, notes\nwith ""quotes""",,2026-07-01T10:00:00Z,,30.5`,
+  );
+  assertEquals(JSON.parse(formatTimeEntryListJson(entries)), entries);
+  assertEquals(
+    formatTimeEntryListCsv([], "\t"),
+    "id\tdescription\tproject_id\tstart\tstop\tduration_minutes",
+  );
+});
+
 Deno.test("getProjects fetches active projects with Toggl auth", async () => {
   const originalFetch = globalThis.fetch;
   let requestedUrl = "";
@@ -1268,6 +1439,41 @@ Deno.test("getTimeEntries fetches range in configured UTC timezone", async () =>
       "2026-05-03T00:00:00Z",
     );
     assertEquals(entries, []);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("getTimeEntries returns individual entries with nullable fields", async () => {
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = (() =>
+    Promise.resolve(jsonResponse([{
+      id: 10,
+      project_id: null,
+      pid: null,
+      start: "2026-07-01T10:00:00Z",
+      stop: null,
+      duration: -1_000,
+      description: "running entry",
+    }]))) as typeof fetch;
+
+  try {
+    assertEquals(
+      await getTimeEntries(
+        config,
+        Temporal.PlainDate.from("2026-07-01"),
+        Temporal.PlainDate.from("2026-07-02"),
+      ),
+      [{
+        id: 10,
+        projectId: null,
+        start: "2026-07-01T10:00:00Z",
+        stop: null,
+        durationSeconds: -1_000,
+        description: "running entry",
+      }],
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }

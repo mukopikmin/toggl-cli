@@ -7,6 +7,7 @@ import {
   runProjectSyncCommand,
 } from "./command/project.ts";
 import { runSummaryCommand } from "./command/summary.ts";
+import { runTimeEntryListCommand } from "./command/time_entry.ts";
 import { runUpdateCommand } from "./command/update.ts";
 import { togglClient } from "./toggl/api.ts";
 import { TogglApiError } from "./toggl/error.ts";
@@ -90,6 +91,9 @@ export async function main(
         return 0;
       case "summary":
         await runSummaryCommand(command, togglClient);
+        return 0;
+      case "time-entry-list":
+        await runTimeEntryListCommand(command, togglClient);
         return 0;
       case "update": {
         const result = await runUpdateCommand({

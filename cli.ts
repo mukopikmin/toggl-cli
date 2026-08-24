@@ -2,11 +2,13 @@ import { parseArgs } from "node:util";
 import { type DateTime, datetime } from "ptera";
 import type { ProjectFormat } from "./command/project.ts";
 import type { SummaryFormat } from "./command/summary.ts";
+import type { TimeEntryListFormat } from "./command/time_entry.ts";
 
 export function createHelpText(): string {
   return `Usage:
   toggl summary <start-date> <end-date> [options]
   toggl summary --days <days> [options]
+  toggl time-entry list <start-day> <end-day> [options]
   toggl project list [options]
   toggl project sync
   toggl config [options]
@@ -14,11 +16,12 @@ export function createHelpText(): string {
   toggl update [--channel stable|nightly]
 
 Commands:
-  init      Create the configuration file
-  project   List projects
-  config    Show configuration values
-  summary   Summarize time entries for a range of days
-  update    Update the installed Toggl CLI binary
+  init        Create the configuration file
+  project     List and sync projects
+  time-entry  List individual time entries for a range of days
+  config      Show configuration values
+  summary     Summarize time entries for a range of days
+  update      Update the installed Toggl CLI binary
 
 Options:
   -s, --separator <text> Set the output delimiter (default: tab)
@@ -26,7 +29,7 @@ Options:
   -d, --days <days>      Aggregate from this many days ago through today
       --clipboard        Copy the output to the clipboard as well as stdout
   -h, --help             Show this help
-      --no-project       Omit the project column from CSV output
+      --no-project       Omit the project column (summary CSV only)
       --no-date          Omit the date header row from CSV output
       --version          Show the version`;
 }
@@ -52,7 +55,14 @@ export type CliCommand =
     & (
       | { startDay: Temporal.PlainDate; endDay: Temporal.PlainDate }
       | { days: number }
-    );
+    )
+  | {
+    name: "time-entry-list";
+    startDay: Temporal.PlainDate;
+    endDay: Temporal.PlainDate;
+    separator: string;
+    format: TimeEntryListFormat;
+  };
 
 export class CliUsageError extends Error {}
 
@@ -185,6 +195,65 @@ function parseSummaryArgs(args: string[]): CliCommand {
   return { ...common, startDay, endDay };
 }
 
+function parseTimeEntryListArgs(args: string[], now: DateTime): CliCommand {
+  const parsed = parseArgs({
+    args,
+    options: {
+      separator: { type: "string", short: "s", default: "\t" },
+      format: { type: "string", short: "f", default: "csv" },
+    },
+    allowPositionals: true,
+    strict: true,
+  });
+
+  if (parsed.positionals.length !== 2) {
+    throw new CliUsageError("time-entry list requires start and end day");
+  }
+
+  if (!parsed.positionals.every((value) => /^\d+$/.test(value))) {
+    throw new CliUsageError("start and end day must be valid integers");
+  }
+
+  let startDay: Temporal.PlainDate;
+  let endDay: Temporal.PlainDate;
+  try {
+    startDay = Temporal.PlainDate.from(
+      {
+        year: now.year,
+        month: now.month,
+        day: Number(parsed.positionals[0]),
+      },
+      { overflow: "reject" },
+    );
+    endDay = Temporal.PlainDate.from(
+      {
+        year: now.year,
+        month: now.month,
+        day: Number(parsed.positionals[1]),
+      },
+      { overflow: "reject" },
+    );
+  } catch {
+    throw new CliUsageError("start and end day must be valid dates");
+  }
+  if (Temporal.PlainDate.compare(startDay, endDay) > 0) {
+    throw new CliUsageError("start day must not be after end day");
+  }
+
+  const separator = parsed.values.separator ?? "\t";
+  if (separator.length === 0) {
+    throw new CliUsageError("separator must not be empty");
+  }
+
+  return {
+    name: "time-entry-list",
+    startDay,
+    endDay,
+    separator,
+    format: parseFormat(parsed.values.format),
+  };
+}
+
 export function parseCliArgs(
   args: string[],
   now: DateTime = datetime(),
@@ -232,6 +301,19 @@ export function parseCliArgs(
         return parseConfigArgs(commandArgs);
       case "summary":
         return parseSummaryArgs(commandArgs);
+      case "time-entry":
+        switch (commandArgs[0]) {
+          case "list":
+            return parseTimeEntryListArgs(commandArgs.slice(1), now);
+          case undefined:
+            throw new CliUsageError(
+              "time-entry requires a subcommand: list",
+            );
+          default:
+            throw new CliUsageError(
+              `unknown time-entry subcommand: ${commandArgs[0]}`,
+            );
+        }
       case "update":
         return parseUpdateArgs(commandArgs);
       default:
