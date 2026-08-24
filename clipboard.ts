@@ -37,6 +37,37 @@ function clipboardCommands(): ClipboardCommand[] {
   }
 }
 
+async function commandExists(command: string): Promise<boolean> {
+  const path = Deno.env.get("PATH");
+  if (!path) return false;
+
+  const windows = Deno.build.os === "windows";
+  const separator = windows ? "\\" : "/";
+  const extensions = windows
+    ? ["", ...(Deno.env.get("PATHEXT") ?? ".COM;.EXE;.BAT;.CMD").split(";")]
+    : [""];
+
+  for (const directory of path.split(windows ? ";" : ":")) {
+    if (!directory) continue;
+
+    for (const extension of extensions) {
+      const candidate = `${directory}${separator}${command}${extension}`;
+      try {
+        const stat = await Deno.stat(candidate);
+        if (
+          stat.isFile && (windows || stat.mode === null || (stat.mode & 0o111))
+        ) {
+          return true;
+        }
+      } catch {
+        // Unreadable and missing PATH entries are not usable commands.
+      }
+    }
+  }
+
+  return false;
+}
+
 async function writeClipboardWithCommand(
   text: string,
   { command, args }: ClipboardCommand,
@@ -65,6 +96,8 @@ async function writeClipboardWithCommand(
 
 export async function writeClipboardText(text: string): Promise<void> {
   for (const command of clipboardCommands()) {
+    if (!(await commandExists(command.command))) continue;
+
     try {
       await writeClipboardWithCommand(text, command);
       return;
