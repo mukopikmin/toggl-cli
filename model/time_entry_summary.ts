@@ -16,6 +16,7 @@ export function summarizeTimeEntries(
   const nowEpochSeconds = Math.floor(now.epochMilliseconds / 1000);
 
   for (const entry of entries) {
+    if (entry.projectId === null) continue;
     const date = formatTimeEntryDate(entry.start, timeZone);
     const projects = result[date] ??= {};
     projects[entry.projectId] ??= 0;

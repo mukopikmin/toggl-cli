@@ -3,10 +3,11 @@ import { CliUsageError, HELP_TEXT, parseCliArgs } from "./cli.ts";
 import { runConfigCommand } from "./command/config.ts";
 import { runInitCommand } from "./command/init.ts";
 import {
-  runProjectsCommand,
-  runProjectsSyncCommand,
-} from "./command/projects.ts";
+  runProjectListCommand,
+  runProjectSyncCommand,
+} from "./command/project.ts";
 import { runSummaryCommand } from "./command/summary.ts";
+import { runTimeEntryListCommand } from "./command/time_entry.ts";
 import { runUpdateCommand } from "./command/update.ts";
 import { togglClient } from "./toggl/api.ts";
 import { TogglApiError } from "./toggl/error.ts";
@@ -79,17 +80,20 @@ export async function main(
       case "init":
         await runInitCommand();
         return 0;
-      case "projects":
-        await runProjectsCommand({ format: command.format }, togglClient);
+      case "project-list":
+        await runProjectListCommand({ format: command.format }, togglClient);
         return 0;
       case "config":
         await dependencies.runConfigCommand(command.format);
         return 0;
-      case "projects-sync":
-        await runProjectsSyncCommand(togglClient);
+      case "project-sync":
+        await runProjectSyncCommand(togglClient);
         return 0;
       case "summary":
         await runSummaryCommand(command, togglClient);
+        return 0;
+      case "time-entry-list":
+        await runTimeEntryListCommand(command, togglClient);
         return 0;
       case "update": {
         const result = await runUpdateCommand({

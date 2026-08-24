@@ -70,11 +70,12 @@ display_order = 20
 
 Display names are used when rendering project lists and summary CSV output. When
 `display_name` is omitted, the Toggl project name is used. When `hidden` is
-omitted, it defaults to `false`. Hidden projects are excluded from `projects`
-output and summary CSV output. The optional `display_order` setting controls the
-order of visible projects in `projects` output and summary CSV rows. Projects
-with `display_order` are shown first in ascending numeric order, and projects
-without `display_order` keep their Toggl API order after the ordered projects.
+omitted, it defaults to `false`. Hidden projects are excluded from
+`project list` output and summary CSV output. The optional `display_order`
+setting controls the order of visible projects in `project list` output and
+summary CSV rows. Projects with `display_order` are shown first in ascending
+numeric order, and projects without `display_order` keep their Toggl API order
+after the ordered projects.
 
 The optional `timezone` setting is used to calculate the Toggl time entry query
 range. When it is omitted, the CLI uses the execution environment's timezone.
@@ -103,13 +104,14 @@ deno task run -- --help
 
 ### Commands
 
-| Command                              | Description                                            |
-| ------------------------------------ | ------------------------------------------------------ |
-| `summary <start-date> <end-date>`    | Aggregate time entries for a date range.               |
-| `projects`                           | List active, visible projects.                         |
-| `projects sync`                      | Add missing active projects to the configuration file. |
-| `init`                               | Create the configuration file.                         |
-| `update [--channel stable\|nightly]` | Update the installed compiled binary.                  |
+| Command                                 | Description                                            |
+| --------------------------------------- | ------------------------------------------------------ |
+| `summary <start-date> <end-date>`       | Aggregate time entries for a date range.               |
+| `time-entry list <start-day> <end-day>` | List individual time entries for a range of days.      |
+| `project list`                          | List active, visible projects.                         |
+| `project sync`                          | Add missing active projects to the configuration file. |
+| `init`                                  | Create the configuration file.                         |
+| `update [--channel stable\|nightly]`    | Update the installed compiled binary.                  |
 
 ### Options
 
@@ -120,7 +122,7 @@ deno task run -- --help
 | `-d`, `--days <days>`      | Aggregate from this many days ago through today.                |
 | `--clipboard`              | Copy the output to the clipboard as well as stdout.             |
 | `-h`, `--help`             | Show command-line help.                                         |
-| `--no-project`             | Omit the project column from CSV output.                        |
+| `--no-project`             | Omit the project column from `summary` CSV output.              |
 | `--no-date`                | Omit the date header row from CSV output.                       |
 | `--version`                | Show the CLI version.                                           |
 
@@ -217,18 +219,60 @@ The JSON output maps each date to project IDs and their work time in minutes:
 }
 ```
 
+### List time entries
+
+List individual time entries between two day numbers in the current month. The
+end day is included in the query.
+
+```sh
+toggl time-entry list 1 15
+```
+
+The default output is tab-separated with the columns `id`, `description`,
+`project_id`, `start`, `stop`, and `duration_minutes`. Entries are sorted by
+start time in ascending order. Descriptions containing delimiters, quotes, or
+line breaks are quoted. Use `--separator` or `-s` to select another delimiter:
+
+```sh
+toggl time-entry list --separator "," 1 15
+```
+
+Use `--format json` or `-f json` to output an array of objects with the same
+fields:
+
+```sh
+toggl time-entry list --format json 1 15
+```
+
+```json
+[
+  {
+    "id": 123456789,
+    "description": "Review",
+    "project_id": 987654321,
+    "start": "2026-07-01T01:00:00Z",
+    "stop": "2026-07-01T01:30:00Z",
+    "duration_minutes": 30
+  }
+]
+```
+
+For a running entry, `stop` is `null` in JSON (and empty in CSV) and the
+duration is calculated through the time the response is processed. Entries
+without a project similarly use `null` in JSON and an empty CSV field.
+
 ### List projects
 
 List the display names of all active, visible projects:
 
 ```sh
-deno task run -- projects
+deno task run -- project list
 ```
 
 Project information can also be output as JSON:
 
 ```sh
-deno task run -- --format json projects
+deno task run -- project list --format json
 ```
 
 Print the CLI version:
@@ -241,7 +285,7 @@ To add all active Toggl projects that are not yet in the configuration file,
 run:
 
 ```sh
-deno task run -- projects sync
+deno task run -- project sync
 ```
 
 Each new project is appended with its Toggl project name as a comment and with
@@ -285,8 +329,9 @@ Run the compiled executable as follows:
 ./out/toggl summary 2026-06-01 2026-06-15
 ./out/toggl summary --no-project 2026-06-01 2026-06-15
 ./out/toggl summary --clipboard 2026-06-01 2026-06-15
-./out/toggl projects
-./out/toggl projects sync
+./out/toggl time-entry list 1 15
+./out/toggl project list
+./out/toggl project sync
 ./out/toggl config
 ```
 
@@ -370,7 +415,7 @@ Run the installed command as follows:
 ```sh
 toggl summary 2026-06-01 2026-06-15
 toggl summary --clipboard 2026-06-01 2026-06-15
-toggl projects
+toggl project list
 toggl config
 ```
 
@@ -382,13 +427,18 @@ When running from a checkout without installing the executable, use
 ```sh
 deno task run -- init
 deno task run -- summary 2026-06-01 2026-06-15
-deno task run -- projects
+deno task run -- time-entry list 1 15
+deno task run -- project list
 ```
+
+Runtime and maintenance-task permissions are defined as named permission sets in
+`deno.json`. Keep task commands using their corresponding `-P` permission set
+instead of duplicating `--allow-*` flags.
 
 ```sh
 deno fmt --check
 sh -n install.sh
-deno check --lock=deno.lock main.ts main_test.ts toggl/projects_test.ts command/update_test.ts model/project_test.ts scripts/install.ts scripts/install_release_test.ts scripts/install_test.ts scripts/release.ts scripts/release_test.ts toggl/date_range_test.ts model/time_entry_summary_test.ts
-deno test --allow-read --allow-write --allow-run=sh,tar --allow-env=HOME,PATH main_test.ts toggl/projects_test.ts command/update_test.ts model/project_test.ts scripts/install_release_test.ts scripts/install_test.ts scripts/release_test.ts toggl/date_range_test.ts model/time_entry_summary_test.ts
-deno compile --quiet --allow-net=api.github.com,github.com --allow-read --allow-write --allow-run --allow-env --output /tmp/toggl-cli main.ts
+deno task check
+deno task test
+deno task compile --output /tmp/toggl-cli
 ```

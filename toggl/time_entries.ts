@@ -11,7 +11,7 @@ interface TimeEntryDto {
   task_id: number;
   billable: boolean;
   start: string;
-  stop: string;
+  stop: string | null;
   duration: number;
   description: string;
   duronly: boolean;
@@ -20,7 +20,7 @@ interface TimeEntryDto {
   user_id: number;
   uid: number;
   wid: number;
-  pid: number;
+  pid: number | null;
   client_name: string;
   project_name: string;
   project_color: string;
