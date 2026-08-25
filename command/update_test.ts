@@ -91,6 +91,7 @@ Deno.test("update CLI parses channels and rejects invalid arguments", () => {
 
 Deno.test("update selects channels, artifact names, and supported targets", () => {
   assertEquals(defaultUpdateChannel("nightly-20260806-abcdef1"), "nightly");
+  assertEquals(defaultUpdateChannel("nightly"), "nightly");
   assertEquals(defaultUpdateChannel("1.2.3"), "stable");
   assertEquals(
     archiveName("stable", "1.2.3", "linux-x64"),
@@ -126,7 +127,7 @@ Deno.test("update reports current and performs a verified atomic update", async 
   assertEquals(update.removed.includes("/tmp/update"), true);
 });
 
-Deno.test("nightly version comes from tag commit date and SHA", async () => {
+Deno.test("nightly version comes from the tag commit's UTC date and SHA", async () => {
   const item = await fixture({
     fetch: (input) => {
       const url = String(input);
@@ -138,7 +139,7 @@ Deno.test("nightly version comes from tag commit date and SHA", async () => {
       if (url.includes("/commits/")) {
         return Promise.resolve(
           Response.json({
-            commit: { committer: { date: "2026-08-06T12:00:00Z" } },
+            commit: { committer: { date: "2026-08-24T23:54:06Z" } },
           }),
         );
       }
@@ -148,9 +149,9 @@ Deno.test("nightly version comes from tag commit date and SHA", async () => {
   assertEquals(
     await runUpdateCommand({
       channel: "nightly",
-      currentVersion: "nightly-20260806-abcdef1",
+      currentVersion: "nightly-20260824-abcdef1",
     }, item.deps),
-    { status: "current", version: "nightly-20260806-abcdef1" },
+    { status: "current", version: "nightly-20260824-abcdef1" },
   );
 });
 

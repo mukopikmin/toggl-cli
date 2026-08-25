@@ -1,4 +1,5 @@
 import { basename, dirname, join } from "@std/path";
+import { isNightlyVersion, nightlyVersion } from "../model/version.ts";
 
 export type UpdateChannel = "stable" | "nightly";
 export type UpdateResult =
@@ -50,9 +51,7 @@ const defaultDependencies: UpdateDependencies = {
 };
 
 export function defaultUpdateChannel(currentVersion: string): UpdateChannel {
-  return /^nightly-\d{8}-[0-9a-f]+$/i.test(currentVersion)
-    ? "nightly"
-    : "stable";
+  return isNightlyVersion(currentVersion) ? "nightly" : "stable";
 }
 
 export function releaseTarget(os: string, arch: string): string {
@@ -149,14 +148,12 @@ async function desiredVersion(
     ? (commitData as Record<string, unknown>).committer
     : undefined;
   const date = field(committer, "date", "nightly commit");
-  const parsed = new Date(date);
-  if (Number.isNaN(parsed.valueOf())) {
+  const commitTimestamp = Date.parse(date) / 1000;
+  if (!Number.isInteger(commitTimestamp)) {
     throw new Error("GitHub returned an invalid nightly commit date.");
   }
   return {
-    version: `nightly-${
-      parsed.toISOString().slice(0, 10).replaceAll("-", "")
-    }-${sha.slice(0, 7)}`,
+    version: nightlyVersion(commitTimestamp, sha),
     releaseTag: "nightly",
   };
 }

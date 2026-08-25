@@ -36,13 +36,6 @@ jobs:
       - name: Build nightly archives
         run: deno task dist --version nightly
 
-      - name: Move nightly tag
-        env:
-          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
-        run: |
-          git tag --force nightly "$HEAD_SHA"
-          git push origin refs/tags/nightly --force
-
       - name: Create or update nightly release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -66,12 +59,22 @@ jobs:
               dist/*.zip \
               dist/*.sha256 \
               dist/checksums.txt \
-              --verify-tag \
+              --target "$HEAD_SHA" \
               --title "Nightly" \
               --notes "Latest tested build from main ($HEAD_SHA)." \
               --prerelease \
               --latest=false
           fi
+
+      # For an existing release, publish all assets before changing the pointer
+      # used by the updater. Release creation creates the tag itself, so the
+      # initial publication is the only case where this cannot be ordered.
+      - name: Move nightly tag
+        env:
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          git tag --force nightly "$HEAD_SHA"
+          git push origin refs/tags/nightly --force
 
       - name: Remove obsolete nightly releases and tags
         env:
