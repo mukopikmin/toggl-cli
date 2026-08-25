@@ -136,11 +136,12 @@ toggl update --channel nightly
 toggl update --channel stable
 ```
 
-Versions named `nightly-YYYYMMDD-<sha>` use the Nightly channel by default; all
-other versions use the latest stable GitHub release. An explicit `--channel`
-overrides that selection. Self-update supports Linux x64 and macOS arm64,
-matching the published `.tar.gz` artifacts. Windows and other architectures must
-be updated manually.
+Versions named `nightly-YYYYMMDD-<7-character-sha>` use the Nightly channel by
+default. The legacy version `nightly` is also recognized as Nightly; all other
+versions use the latest stable GitHub release. An explicit `--channel` overrides
+that selection. Self-update supports Linux x64 and macOS arm64, matching the
+published `.tar.gz` artifacts. Windows and other architectures must be updated
+manually.
 
 The updater verifies the downloaded SHA-256 checksum and binary version before
 atomically replacing the running executable. It therefore needs `tar` on `PATH`
@@ -404,7 +405,8 @@ GitHub release. Release notes start at the previous stable release; the
 After the `Test` workflow succeeds on `main`, the tested commit is published as
 the `nightly` prerelease. Its moving `nightly` tag and assets are replaced on
 each successful run independently of stable releases. Nightly binaries report
-their version as `nightly`, and archives use names such as
+`nightly-YYYYMMDD-<7-character-sha>`, derived from the commit's Unix timestamp
+in UTC and its SHA. Archives keep channel-stable names such as
 `toggl-cli-nightly-linux-x64.tar.gz`. Legacy versioned Nightly releases and tags
 are removed automatically.
 

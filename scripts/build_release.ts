@@ -1,4 +1,5 @@
 import { basename, join } from "@std/path";
+import { nightlyVersion } from "../model/version.ts";
 
 type Target = {
   id: string;
@@ -45,6 +46,24 @@ const run = async (
   }).output();
 
   if (!result.success) Deno.exit(result.code);
+};
+
+const gitOutput = async (args: string[]): Promise<string> => {
+  const result = await new Deno.Command("git", {
+    args,
+    stdout: "piped",
+    stderr: "inherit",
+  }).output();
+  if (!result.success) Deno.exit(result.code);
+  return new TextDecoder().decode(result.stdout).trim();
+};
+
+const resolveNightlyVersion = async (): Promise<string> => {
+  const timestamp = Number(
+    await gitOutput(["show", "-s", "--format=%ct", "HEAD"]),
+  );
+  const sha = await gitOutput(["rev-parse", "HEAD"]);
+  return nightlyVersion(timestamp, sha);
 };
 
 const commandExists = async (command: string): Promise<boolean> => {
@@ -211,7 +230,10 @@ const verifyNativeBinary = async (
 const selected = parseSelectedTargets(Deno.args);
 ensureKnownTargets(selected);
 
-const version = parseVersion(Deno.args);
+const requestedVersion = parseVersion(Deno.args);
+const version = requestedVersion === "nightly"
+  ? await resolveNightlyVersion()
+  : requestedVersion;
 const releaseTargets = targets.filter((target) =>
   selected ? selected.has(target.id) : true
 );
@@ -243,7 +265,7 @@ for (const target of releaseTargets) {
 
     if (target.native) await verifyNativeBinary(binaryPath, version);
 
-    const archivePath = await archive(target, version, binaryPath);
+    const archivePath = await archive(target, requestedVersion, binaryPath);
     const archiveChecksum = await sha256(archivePath);
     checksums.push(`${archiveChecksum}  ${basename(archivePath)}`);
     await Deno.writeTextFile(`${archivePath}.sha256`, `${archiveChecksum}\n`);
