@@ -46,8 +46,9 @@ toggl init
 
 This asks for your workspace ID, API token, and timezone, then creates
 `~/.config/toggl-cli/config.toml` if it does not already exist. The API token is
-not printed back to the terminal after entry. You can also create the file
-manually:
+not printed back to the terminal after entry. On POSIX systems, `toggl init`
+creates the file with permissions set to `0600` so that only its owner can read
+or write it. You can also create the file manually:
 
 ```toml
 workspace = "your_workspace_id"
@@ -86,9 +87,9 @@ To migrate an old `~/.toggl_config` file, run:
 deno task migrate-config
 ```
 
-You can find your API token in your Toggl Track profile settings. Because the
-configuration file contains credentials, restrict its permissions so that other
-users cannot read it:
+You can find your API token in your Toggl Track profile settings. If you create
+the configuration file manually, remember that it contains credentials and
+restrict its permissions so that other users cannot read it:
 
 ```sh
 chmod 600 ~/.config/toggl-cli/config.toml
