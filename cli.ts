@@ -10,6 +10,7 @@ export function createHelpText(): string {
   toggl summary --days <days> [options]
   toggl time-entry list <start-day> <end-day> [options]
   toggl project list [options]
+  toggl project reorder
   toggl project sync
   toggl config [options]
   toggl init
@@ -17,7 +18,7 @@ export function createHelpText(): string {
 
 Commands:
   init        Create the configuration file
-  project     List and sync projects
+  project     List, reorder, and sync projects
   time-entry  List individual time entries for a range of days
   config      Show configuration values
   summary     Summarize time entries for a range of days
@@ -42,6 +43,7 @@ export type CliCommand =
   | { name: "init" }
   | { name: "update"; channel?: "stable" | "nightly" }
   | { name: "project-list"; format: ProjectFormat }
+  | { name: "project-reorder" }
   | { name: "config"; format: ProjectFormat }
   | { name: "project-sync" }
   | {
@@ -288,9 +290,16 @@ export function parseCliArgs(
               throw new CliUsageError("project sync does not accept arguments");
             }
             return { name: "project-sync" };
+          case "reorder":
+            if (commandArgs.length > 1) {
+              throw new CliUsageError(
+                "project reorder does not accept arguments",
+              );
+            }
+            return { name: "project-reorder" };
           case undefined:
             throw new CliUsageError(
-              "project requires a subcommand: list or sync",
+              "project requires a subcommand: list, reorder, or sync",
             );
           default:
             throw new CliUsageError(
