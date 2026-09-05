@@ -1,7 +1,7 @@
 import { ClipboardUnavailableError } from "./clipboard.ts";
 import { CliUsageError, HELP_TEXT, parseCliArgs } from "./cli.ts";
 import { runConfigCommand } from "./command/config.ts";
-import { runInitCommand } from "./command/init.ts";
+import { InitInputError, runInitCommand } from "./command/init.ts";
 import {
   runProjectListCommand,
   runProjectSyncCommand,
@@ -44,6 +44,10 @@ function reportConfigError(error: unknown): boolean {
   if (
     error instanceof HomeNotSetError || error instanceof ConfigFileReadError
   ) {
+    console.error(`Error: ${error.message}`);
+    return true;
+  }
+  if (error instanceof InitInputError) {
     console.error(`Error: ${error.message}`);
     return true;
   }

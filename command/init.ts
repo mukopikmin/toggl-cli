@@ -10,6 +10,16 @@ export type InitialConfig = {
   timezone?: string;
 };
 
+export interface InitInput {
+  readonly interactive: boolean;
+  readLine(secret?: boolean): Promise<string | null>;
+  write(text: string): Promise<void>;
+}
+
+export class InitInputError extends Error {
+  override name = "InitInputError";
+}
+
 export function createConfigToml(config: InitialConfig): string {
   return stringify({
     workspace: config.workspace,
@@ -62,18 +72,22 @@ async function writeText(text: string): Promise<void> {
   await writeAll(new TextEncoder().encode(text));
 }
 
-async function readInputLine(secret = false): Promise<string> {
+async function readInputLine(secret = false): Promise<string | null> {
   if (secret && Deno.stdin.isTerminal()) {
     Deno.stdin.setRaw(true);
   }
 
   const buffer = new Uint8Array(1);
   const chunks: number[] = [];
+  let reachedEof = false;
 
   try {
     while (true) {
       const bytesRead = await Deno.stdin.read(buffer);
-      if (bytesRead === null) break;
+      if (bytesRead === null) {
+        reachedEof = true;
+        break;
+      }
 
       const byte = buffer[0];
       if (byte === 3) {
@@ -99,24 +113,48 @@ async function readInputLine(secret = false): Promise<string> {
     }
   }
 
+  if (reachedEof && chunks.length === 0) return null;
   return new TextDecoder().decode(new Uint8Array(chunks)).trim();
 }
 
+const denoInput: InitInput = {
+  interactive: Deno.stdin.isTerminal(),
+  readLine: readInputLine,
+  write: writeText,
+};
+
 async function promptForValue(
+  input: InitInput,
   label: string,
-  options: { defaultValue?: string; secret?: boolean } = {},
+  options: { defaultValue?: string; required?: boolean; secret?: boolean } = {},
 ): Promise<string> {
-  const suffix = options.defaultValue ? ` [${options.defaultValue}]` : "";
-  await writeText(`${label}${suffix}: `);
-  const value = await readInputLine(options.secret);
-  return value || options.defaultValue || "";
+  while (true) {
+    const suffix = options.defaultValue ? ` [${options.defaultValue}]` : "";
+    await input.write(`${label}${suffix}: `);
+    const value = await input.readLine(options.secret);
+    if (value === null) {
+      throw new InitInputError(`Input ended before ${label} was provided`);
+    }
+    if (value.trim()) return value.trim();
+    if (options.defaultValue) return options.defaultValue;
+    if (!options.required) return "";
+    if (!input.interactive) {
+      throw new InitInputError(`${label} is required`);
+    }
+    await input.write(`${label} is required. Please enter a value.\n`);
+  }
 }
 
-async function promptForInitialConfig(): Promise<InitialConfig> {
+export async function promptForInitialConfig(
+  input: InitInput,
+): Promise<InitialConfig> {
   return {
-    workspace: await promptForValue("Workspace"),
-    token: await promptForValue("API token", { secret: true }),
-    timezone: await promptForValue("Timezone", {
+    workspace: await promptForValue(input, "Workspace", { required: true }),
+    token: await promptForValue(input, "API token", {
+      required: true,
+      secret: true,
+    }),
+    timezone: await promptForValue(input, "Timezone", {
       defaultValue: DEFAULT_TIMEZONE,
     }),
   };
@@ -131,7 +169,9 @@ export async function writeInitialConfig(
   await Deno.writeTextFile(configFile, configToml);
 }
 
-export async function runInitCommand(): Promise<void> {
+export async function runInitCommand(
+  input: InitInput = denoInput,
+): Promise<void> {
   const home = Deno.env.get("HOME");
   if (!home) {
     console.error("Error: HOME environment variable not set");
@@ -140,7 +180,7 @@ export async function runInitCommand(): Promise<void> {
 
   const configFile = getConfigFile(home);
   await assertConfigFileDoesNotExist(configFile);
-  const config = await promptForInitialConfig();
+  const config = await promptForInitialConfig(input);
   await Deno.mkdir(dirname(configFile), { recursive: true });
   await Deno.writeTextFile(configFile, createConfigToml(config));
   console.log(`Wrote ${CONFIG_FILE_DISPLAY}`);
