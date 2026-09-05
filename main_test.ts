@@ -12,6 +12,10 @@ import {
   appendMissingProjects,
   formatProjectList,
   formatProjectsJson,
+  ProjectReorderUnavailableError,
+  selectProjectOrder,
+  updateProjectDisplayOrders,
+  updateProjectReorderState,
 } from "./command/project.ts";
 import {
   formatConfigJson,
@@ -70,6 +74,7 @@ Deno.test("createHelpText describes commands and options", () => {
   toggl summary --days <days> [options]
   toggl time-entry list <start-day> <end-day> [options]
   toggl project list [options]
+  toggl project reorder
   toggl project sync
   toggl config [options]
   toggl init
@@ -77,7 +82,7 @@ Deno.test("createHelpText describes commands and options", () => {
 
 Commands:
   init        Create the configuration file
-  project     List and sync projects
+  project     List, reorder, and sync projects
   time-entry  List individual time entries for a range of days
   config      Show configuration values
   summary     Summarize time entries for a range of days
@@ -396,6 +401,9 @@ Deno.test("parseCliArgs preserves init and project routing", () => {
   assertEquals(parseCliArgs(["project", "sync"]), {
     name: "project-sync",
   });
+  assertEquals(parseCliArgs(["project", "reorder"]), {
+    name: "project-reorder",
+  });
   assertEquals(parseCliArgs(["config"]), {
     name: "config",
     format: "csv",
@@ -498,7 +506,16 @@ Deno.test("parseCliArgs requires a project subcommand", () => {
     () => parseCliArgs(["project"]),
     CliUsageError,
   );
-  assertEquals(missing.message, "project requires a subcommand: list or sync");
+  assertEquals(
+    missing.message,
+    "project requires a subcommand: list, reorder, or sync",
+  );
+
+  assertThrows(
+    () => parseCliArgs(["project", "reorder", "extra"]),
+    CliUsageError,
+    "project reorder does not accept arguments",
+  );
 
   const unknown = assertThrows(
     () => parseCliArgs(["project", "show"]),
@@ -734,6 +751,131 @@ Deno.test("formatProjectList returns one project name per line", () => {
 
 Deno.test("formatProjectList returns an empty string for no projects", () => {
   assertEquals(formatProjectList([]), "");
+});
+
+const reorderProjects = [
+  {
+    id: 10,
+    name: "Alpha",
+    displayName: "Alpha",
+    active: true,
+    hidden: false,
+  },
+  {
+    id: 20,
+    name: "Beta",
+    displayName: "Beta",
+    active: true,
+    hidden: false,
+  },
+  {
+    id: 30,
+    name: "Gamma",
+    displayName: "Gamma",
+    active: true,
+    hidden: false,
+  },
+];
+
+Deno.test("updateProjectReorderState selects and moves projects within bounds", () => {
+  let state = { projects: reorderProjects, selectedIndex: 0 };
+  state = updateProjectReorderState(state, "select-up");
+  assertEquals(state.selectedIndex, 0);
+  state = updateProjectReorderState(state, "select-down");
+  state = updateProjectReorderState(state, "move-down");
+  assertEquals(state.projects.map((project) => project.id), [10, 30, 20]);
+  assertEquals(state.selectedIndex, 2);
+  assertEquals(updateProjectReorderState(state, "move-down"), state);
+});
+
+Deno.test("updateProjectDisplayOrders preserves settings and adds projects", () => {
+  const input = `workspace = "workspace-id"
+token = "test-token"
+
+# Existing project
+[projects."20"]
+display_name = "Custom"
+display_order = 99 # old order
+hidden = true
+
+[unrelated]
+value = "keep"
+`;
+  const output = updateProjectDisplayOrders(input, [20, 10]);
+
+  assertEquals(
+    output,
+    `workspace = "workspace-id"
+token = "test-token"
+
+# Existing project
+[projects."20"]
+display_name = "Custom"
+display_order = 1 # old order
+hidden = true
+
+[unrelated]
+value = "keep"
+
+[projects."10"]
+display_order = 2
+`,
+  );
+  assertEquals(parseConfigToml(output).PROJECTS[20], {
+    displayName: "Custom",
+    hidden: true,
+    displayOrder: 1,
+  });
+  assertEquals(parseConfigToml(output).PROJECTS[10].displayOrder, 2);
+});
+
+Deno.test("selectProjectOrder saves changes and restores the terminal", async () => {
+  const inputs = ["\x1b[B", "J", "\r"].map((input) =>
+    new TextEncoder().encode(input)
+  );
+  const rawChanges: boolean[] = [];
+  const output: string[] = [];
+  const selected = await selectProjectOrder(reorderProjects, {
+    isTerminal: () => true,
+    setRaw: (enabled) => rawChanges.push(enabled),
+    read: (buffer) => {
+      const input = inputs.shift();
+      if (!input) return Promise.resolve(null);
+      buffer.set(input);
+      return Promise.resolve(input.length);
+    },
+    write: (text) => output.push(text),
+  });
+
+  assertEquals(selected?.map((project) => project.id), [10, 30, 20]);
+  assertEquals(rawChanges, [true, false]);
+  assertEquals(output.at(-1), "\x1b[2J\x1b[H\x1b[?25h");
+});
+
+Deno.test("selectProjectOrder cancels and rejects non-terminal input", async () => {
+  const input = new TextEncoder().encode("q");
+  assertEquals(
+    await selectProjectOrder(reorderProjects, {
+      isTerminal: () => true,
+      setRaw: () => {},
+      read: (buffer) => {
+        buffer.set(input);
+        return Promise.resolve(input.length);
+      },
+      write: () => {},
+    }),
+    undefined,
+  );
+  await assertRejects(
+    () =>
+      selectProjectOrder(reorderProjects, {
+        isTerminal: () => false,
+        setRaw: () => {},
+        read: () => Promise.resolve(null),
+        write: () => {},
+      }),
+    ProjectReorderUnavailableError,
+  );
 });
 
 Deno.test("createProject stores original and display project names", () => {

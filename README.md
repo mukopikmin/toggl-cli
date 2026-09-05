@@ -109,6 +109,7 @@ deno task run -- --help
 | `summary <start-date> <end-date>`       | Aggregate time entries for a date range.               |
 | `time-entry list <start-day> <end-day>` | List individual time entries for a range of days.      |
 | `project list`                          | List active, visible projects.                         |
+| `project reorder`                       | Interactively reorder visible projects.                |
 | `project sync`                          | Add missing active projects to the configuration file. |
 | `init`                                  | Create the configuration file.                         |
 | `update [--channel stable\|nightly]`    | Update the installed compiled binary.                  |
@@ -276,6 +277,19 @@ Project information can also be output as JSON:
 deno task run -- project list --format json
 ```
 
+### Reorder projects
+
+Reorder visible projects interactively in a terminal:
+
+```sh
+deno task run -- project reorder
+```
+
+Use Up/Down (or `j`/`k`) to select a project and Ctrl+Up/Ctrl+Down (or uppercase
+`K`/`J`) to move it. Press Enter to save the order to the `display_order`
+settings in the configuration file. Press `q` or Escape to cancel without
+changing the file. This command requires an interactive terminal.
+
 Print the CLI version:
 
 ```sh
@@ -332,6 +346,7 @@ Run the compiled executable as follows:
 ./out/toggl summary --clipboard 2026-06-01 2026-06-15
 ./out/toggl time-entry list 1 15
 ./out/toggl project list
+./out/toggl project reorder
 ./out/toggl project sync
 ./out/toggl config
 ```
@@ -421,6 +436,7 @@ Run the installed command as follows:
 toggl summary 2026-06-01 2026-06-15
 toggl summary --clipboard 2026-06-01 2026-06-15
 toggl project list
+toggl project reorder
 toggl config
 ```
 
