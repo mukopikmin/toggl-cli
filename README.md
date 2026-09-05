@@ -1,7 +1,7 @@
 # toggl-cli
 
 A Deno CLI that aggregates Toggl Track time entries by project and date. Results
-can be output as delimiter-separated values or JSON.
+can be output as delimiter-separated values, JSON, or a bordered terminal table.
 
 ## Requirements
 
@@ -115,16 +115,16 @@ deno task run -- --help
 
 ### Options
 
-| Option                     | Description                                                     |
-| -------------------------- | --------------------------------------------------------------- |
-| `-s`, `--separator <text>` | Set the output delimiter. The default is a tab.                 |
-| `-f`, `--format <format>`  | Set the output format to `csv` or `json`. The default is `csv`. |
-| `-d`, `--days <days>`      | Aggregate from this many days ago through today.                |
-| `--clipboard`              | Copy the output to the clipboard as well as stdout.             |
-| `-h`, `--help`             | Show command-line help.                                         |
-| `--no-project`             | Omit the project column from `summary` CSV output.              |
-| `--no-date`                | Omit the date header row from CSV output.                       |
-| `--version`                | Show the CLI version.                                           |
+| Option                     | Description                                                    |
+| -------------------------- | -------------------------------------------------------------- |
+| `-s`, `--separator <text>` | Set the CSV output delimiter. The default is a tab.            |
+| `-f`, `--format <format>`  | Set output to `csv`, `json`, or `table`. The default is `csv`. |
+| `-d`, `--days <days>`      | Aggregate from this many days ago through today.               |
+| `--clipboard`              | Copy the output to the clipboard as well as stdout.            |
+| `-h`, `--help`             | Show command-line help.                                        |
+| `--no-project`             | Omit the project column from `summary` CSV output.             |
+| `--no-date`                | Omit the date header row from summary CSV output.              |
+| `--version`                | Show the CLI version.                                          |
 
 ### Update the CLI
 
@@ -203,8 +203,28 @@ Use `--format json` or `-f json` to output JSON:
 deno task run -- summary --format json 2026-06-01 2026-06-15
 ```
 
-Use `--clipboard` to print the summary and copy the same output to the
-clipboard:
+Use `--format table` for a plain-text, bordered layout whose widths are derived
+from its headers and values (including Unicode and multiline values):
+
+```sh
+deno task run -- summary --format table 2026-06-01 2026-06-02
+```
+
+```text
+┌─────────┬────────────┬────────────┐
+│ Project │ 2026-06-01 │ 2026-06-02 │
+├─────────┼────────────┼────────────┤
+│ Client  │ 60         │            │
+└─────────┴────────────┴────────────┘
+```
+
+`--separator`, `--no-project`, and `--no-date` are CSV-only and are rejected
+when combined with `summary --format table`. `time-entry list --format table`
+similarly rejects `--separator` rather than silently ignoring it.
+
+Use `--clipboard` to print the summary and copy the exact same output to the
+clipboard. Table output is plain text: neither redirected output nor clipboard
+content contains ANSI color or styling escape sequences.
 
 ```sh
 deno task run -- summary --clipboard 2026-06-01 2026-06-15
@@ -258,6 +278,13 @@ toggl time-entry list --format json 1 15
 ]
 ```
 
+For an aligned terminal view, use table format. Empty `project_id` and `stop`
+cells remain blank, and multiline descriptions occupy additional table lines:
+
+```sh
+toggl time-entry list --format table 1 15
+```
+
 For a running entry, `stop` is `null` in JSON (and empty in CSV) and the
 duration is calculated through the time the response is processed. Entries
 without a project similarly use `null` in JSON and an empty CSV field.
@@ -274,6 +301,12 @@ Project information can also be output as JSON:
 
 ```sh
 deno task run -- project list --format json
+```
+
+Use `--format table` to show display names in a bordered `Project` column:
+
+```sh
+deno task run -- project list --format table
 ```
 
 Print the CLI version:
@@ -305,6 +338,12 @@ Configuration can also be output as JSON:
 
 ```sh
 deno task run -- config --format json
+```
+
+Use `--format table` to show `Setting` and `Value` columns:
+
+```sh
+deno task run -- config --format table
 ```
 
 The `TOKEN` setting is never printed.
