@@ -1,8 +1,10 @@
 import { loadConfig } from "../config.ts";
 import type { TogglClient } from "../toggl/api.ts";
 import type { TimeEntry } from "../model/time_entry.ts";
+import type { OutputFormat } from "./output_format.ts";
+import { formatTable } from "./table.ts";
 
-export type TimeEntryListFormat = "csv" | "json";
+export type TimeEntryListFormat = OutputFormat;
 
 export interface TimeEntryListCommand {
   startDay: Temporal.PlainDate;
@@ -81,6 +83,28 @@ export function formatTimeEntryListJson(entries: OutputTimeEntry[]): string {
   return JSON.stringify(entries, null, 2);
 }
 
+export function formatTimeEntryListTable(entries: OutputTimeEntry[]): string {
+  const headers = [
+    "id",
+    "description",
+    "project_id",
+    "start",
+    "stop",
+    "duration_minutes",
+  ];
+  return formatTable(
+    headers,
+    entries.map((entry) => [
+      String(entry.id),
+      entry.description,
+      entry.project_id === null ? "" : String(entry.project_id),
+      entry.start,
+      entry.stop ?? "",
+      String(entry.duration_minutes),
+    ]),
+  );
+}
+
 export async function runTimeEntryListCommand(
   cmd: TimeEntryListCommand,
   toggl: TogglClient,
@@ -93,6 +117,8 @@ export async function runTimeEntryListCommand(
   console.log(
     cmd.format === "json"
       ? formatTimeEntryListJson(entries)
+      : cmd.format === "table"
+      ? formatTimeEntryListTable(entries)
       : formatTimeEntryListCsv(entries, cmd.separator),
   );
 }

@@ -12,9 +12,11 @@ import {
   appendMissingProjects,
   formatProjectList,
   formatProjectsJson,
+  formatProjectsTable,
 } from "./command/project.ts";
 import {
   formatConfigJson,
+  formatConfigTable,
   formatConfigValues,
   withoutSensitiveConfig,
 } from "./command/config.ts";
@@ -22,12 +24,14 @@ import {
   buildWorkTimeTable,
   formatTimeEntriesJson,
   formatWorkTimeTable,
+  formatWorkTimeTerminalTable,
   outputSummaryText,
   resolveSummaryDateRange,
 } from "./command/summary.ts";
 import {
   formatTimeEntryListCsv,
   formatTimeEntryListJson,
+  formatTimeEntryListTable,
   prepareTimeEntryList,
 } from "./command/time_entry.ts";
 import {
@@ -84,8 +88,8 @@ Commands:
   update      Update the installed Toggl CLI binary
 
 Options:
-  -s, --separator <text> Set the output delimiter (default: tab)
-  -f, --format <format>  Set the output format: csv or json (default: csv)
+  -s, --separator <text> Set the CSV delimiter (default: tab; CSV only)
+  -f, --format <format>  Set the output format: csv, json, or table (default: csv)
   -d, --days <days>      Aggregate from this many days ago through today
       --clipboard        Copy the output to the clipboard as well as stdout
   -h, --help             Show this help
@@ -125,6 +129,116 @@ Deno.test("parseCliArgs parses the explicit summary command", () => {
     [command.endDay.year, command.endDay.month, command.endDay.day],
     [2026, 5, 31],
   );
+});
+
+Deno.test("parseCliArgs accepts table format for output commands", () => {
+  assertEquals(parseCliArgs(["project", "list", "--format", "table"]), {
+    name: "project-list",
+    format: "table",
+  });
+  assertEquals(parseCliArgs(["config", "-f", "table"]), {
+    name: "config",
+    format: "table",
+  });
+  const summary = parseCliArgs([
+    "summary",
+    "--format",
+    "table",
+    "2026-05-01",
+    "2026-05-02",
+  ]);
+  if (summary.name !== "summary") throw new Error("expected summary");
+  assertEquals(summary.format, "table");
+});
+
+Deno.test("parseCliArgs rejects unknown formats", () => {
+  assertThrows(
+    () => parseCliArgs(["project", "list", "--format", "xml"]),
+    CliUsageError,
+    "format must be csv, json, or table",
+  );
+});
+
+Deno.test("parseCliArgs rejects CSV-only options with table format", () => {
+  for (const option of ["--separator", "--no-project", "--no-date"]) {
+    const args = option === "--separator" ? [option, ","] : [option];
+    assertThrows(
+      () =>
+        parseCliArgs([
+          "summary",
+          "--format",
+          "table",
+          ...args,
+          "2026-05-01",
+          "2026-05-02",
+        ]),
+      CliUsageError,
+      "cannot be used with table format",
+    );
+  }
+  assertThrows(
+    () =>
+      parseCliArgs([
+        "time-entry",
+        "list",
+        "--format",
+        "table",
+        "-s",
+        ",",
+        "1",
+        "2",
+      ]),
+    CliUsageError,
+    "--separator cannot be used with table format",
+  );
+});
+
+Deno.test("table command formatters handle empty and special values", () => {
+  const project = createProject(
+    { id: 1, name: "開発\n長い project name", active: true },
+    {},
+  );
+  const projects = formatProjectsTable([project]);
+  assertEquals(projects.includes("開発"), true);
+  assertEquals(projects.includes("長い project name"), true);
+  assertEquals(formatProjectsTable([]).includes("Project"), true);
+
+  const configTable = formatConfigTable({
+    WORKSPACE: "ワークスペース\nsecond line",
+    TOKEN: "secret",
+    PROJECTS: {},
+  });
+  assertEquals(configTable.includes("ワークスペース"), true);
+  assertEquals(configTable.includes("second line"), true);
+  assertEquals(configTable.includes("secret"), false);
+});
+
+Deno.test("summary table handles empty summary cells and Unicode projects", () => {
+  const text = formatWorkTimeTerminalTable({
+    projectNames: ["開発", "A very long project name"],
+    headers: ["2026-05-01"],
+    rows: [[""], ["123.45"]],
+  });
+  assertEquals(text.includes("│ 開発"), true);
+  assertEquals(text.includes("A very long project name"), true);
+  assertEquals(text.includes("│ 123.45"), true);
+});
+
+Deno.test("time-entry table handles missing projects, running entries, and line breaks", () => {
+  const entries = prepareTimeEntryList([{
+    id: 1,
+    description: "調査\nlong follow-up value",
+    projectId: null,
+    start: "2026-05-01T00:00:00Z",
+    stop: null,
+    durationSeconds: -1_767_225_600,
+  }], Date.parse("2026-01-01T00:01:00Z"));
+  const text = formatTimeEntryListTable(entries);
+  assertEquals(entries[0].duration_minutes, 1);
+  assertEquals(text.includes("調査"), true);
+  assertEquals(text.includes("long follow-up value"), true);
+  assertEquals(text.includes("\x1b"), false);
+  assertEquals(formatTimeEntryListTable([]).includes("description"), true);
 });
 
 Deno.test("parseCliArgs accepts a summary range across years", () => {
@@ -238,7 +352,7 @@ Deno.test("parseCliArgs validates summary format and dates", () => {
     () =>
       parseCliArgs(["summary", "--format", "xml", "2026-05-01", "2026-05-02"]),
     CliUsageError,
-    "format must be csv or json",
+    "format must be csv, json, or table",
   );
   assertThrows(
     () => parseCliArgs(["summary", "2026-05-31", "2026-05-01"]),
