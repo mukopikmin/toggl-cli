@@ -1,484 +1,136 @@
 # toggl-cli
 
 A Deno CLI that aggregates Toggl Track time entries by project and date. Results
-can be output as delimiter-separated values, JSON, or a bordered terminal table.
+can be output as delimiter-separated values, JSON, or bordered terminal tables.
 
 ## Requirements
 
 - A Toggl Track API token
-- The ID of the target workspace
-
-Building from source additionally requires Deno 2.8 or later.
+- A workspace ID
+- Deno 2.8 or later (when running from source)
 
 ## Installation
 
-On Linux x64 and macOS arm64, install the latest release binary to
-`$HOME/.local/bin/toggl` without cloning the repository:
+Install the latest release on Linux x64 or macOS arm64:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/mukopikmin/toggl-cli/main/install.sh | sh
 ```
 
-To install the latest tested nightly build instead:
+The binary is installed to `$HOME/.local/bin/toggl`; make sure that directory is
+in your `PATH`. To install the latest tested nightly build, add `--nightly`:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/mukopikmin/toggl-cli/main/install.sh | sh -s -- --nightly
 ```
 
-Make sure `$HOME/.local/bin` is included in your `PATH`.
-
-To build and install from source, clone the repository and run:
-
-```sh
-deno task install --version 0.1.0
-```
-
-On Windows, download the `windows-x64` release archive, extract `toggl.exe`, and
-place it in a directory included in your `PATH`.
+Windows users can download the `windows-x64` release archive and place
+`toggl.exe` in a directory on `PATH`.
 
 ## Configuration
 
-Create a config file:
+Create `~/.config/toggl-cli/config.toml` interactively:
 
 ```sh
 toggl init
 ```
 
-This asks for your workspace ID, API token, and timezone, then creates
-`~/.config/toggl-cli/config.toml` if it does not already exist. The API token is
-not printed back to the terminal after entry. On POSIX systems, `toggl init`
-creates the file with permissions set to `0600` so that only its owner can read
-or write it. You can also create the file manually:
+This asks for a workspace ID, API token, and timezone. The workspace ID and API
+token are required; interactive input retries empty values, while incomplete
+non-interactive input does not create the file. On POSIX systems, the file is
+created with permissions set to `0600`. The API token is not printed after
+entry. You can also create it manually:
 
 ```toml
 workspace = "your_workspace_id"
 token = "your_api_token"
 timezone = "Asia/Tokyo"
-```
 
-Optional per-project settings can be configured with the `projects` table:
-
-```toml
 [projects."123456"]
 display_name = "Client A"
-hidden = false
 display_order = 10
-
-[projects."789012"]
-hidden = true
-display_order = 20
+hidden = false
 ```
 
-Display names are used when rendering project lists and summary CSV output. When
-`display_name` is omitted, the Toggl project name is used. When `hidden` is
-omitted, it defaults to `false`. Hidden projects are excluded from
-`project list` output and summary CSV output. The optional `display_order`
-setting controls the order of visible projects in `project list` output and
-summary CSV rows. Projects with `display_order` are shown first in ascending
-numeric order, and projects without `display_order` keep their Toggl API order
-after the ordered projects.
+`timezone` is optional and defaults to the execution environment's timezone.
+Project settings are also optional: `display_name` changes the displayed name,
+`display_order` sorts configured projects first in ascending order, and `hidden`
+excludes a project from project lists and CSV summaries.
 
-The optional `timezone` setting is used to calculate the Toggl time entry query
-range. When it is omitted, the CLI uses the execution environment's timezone.
-
-To migrate an old `~/.toggl_config` file, run:
-
-```sh
-deno task migrate-config
-```
-
-You can find your API token in your Toggl Track profile settings. If you create
-the configuration file manually, remember that it contains credentials and
-restrict its permissions so that other users cannot read it:
+The config contains credentials, so restrict access to it:
 
 ```sh
 chmod 600 ~/.config/toggl-cli/config.toml
 ```
 
+To import an old `~/.toggl_config` file, run `deno task migrate-config` from a
+repository checkout.
+
 ## Usage
 
-Show command-line help:
-
-```sh
-deno task run -- --help
-```
-
-### Commands
-
-| Command                                 | Description                                            |
-| --------------------------------------- | ------------------------------------------------------ |
-| `summary <start-date> <end-date>`       | Aggregate time entries for a date range.               |
-| `time-entry list <start-day> <end-day>` | List individual time entries for a range of days.      |
-| `project list`                          | List active, visible projects.                         |
-| `project sync`                          | Add missing active projects to the configuration file. |
-| `init`                                  | Create the configuration file.                         |
-| `update [--channel stable\|nightly]`    | Update the installed compiled binary.                  |
-
-### Options
-
-| Option                     | Description                                                    |
-| -------------------------- | -------------------------------------------------------------- |
-| `-s`, `--separator <text>` | Set the CSV output delimiter. The default is a tab.            |
-| `-f`, `--format <format>`  | Set output to `csv`, `json`, or `table`. The default is `csv`. |
-| `-d`, `--days <days>`      | Aggregate from this many days ago through today.               |
-| `--clipboard`              | Copy the output to the clipboard as well as stdout.            |
-| `-h`, `--help`             | Show command-line help.                                        |
-| `--no-project`             | Omit the project column from `summary` CSV output.             |
-| `--no-date`                | Omit the date header row from summary CSV output.              |
-| `--version`                | Show the CLI version.                                          |
-
-### Update the CLI
-
-Update the current compiled executable in place:
-
-```sh
-toggl update
-toggl update --channel nightly
-toggl update --channel stable
-```
-
-Versions named `nightly-YYYYMMDD-<7-character-sha>` use the Nightly channel by
-default. The legacy version `nightly` is also recognized as Nightly; all other
-versions use the latest stable GitHub release. An explicit `--channel` overrides
-that selection. Self-update supports Linux x64 and macOS arm64, matching the
-published `.tar.gz` artifacts. Windows and other architectures must be updated
-manually.
-
-The updater verifies the downloaded SHA-256 checksum and binary version before
-atomically replacing the running executable. It therefore needs `tar` on `PATH`
-and write permission for the executable's directory. A failure leaves the
-existing binary unchanged. Self-update is unavailable under `deno task run` (or
-another source execution); install a compiled release binary first.
-
-### Aggregate time entries
-
-Specify the inclusive start and end dates in `YYYY-MM-DD` format. Date ranges
-may cross month and year boundaries.
-
-```sh
-deno task run -- summary 2026-06-01 2026-06-15
-```
-
-Alternatively, use `--days` or `-d` to aggregate from the specified number of
-days ago through today. Today is determined using the configured `timezone`, or
-the execution environment's timezone when no timezone is configured. Both
-endpoints are included, so `--days 7` outputs eight days including today.
-
-```sh
-deno task run -- summary --days 7
-deno task run -- summary -d 7
-```
-
-By default, the command outputs a single tab-separated table with projects in
-the first column and work time in minutes for each project and date in the
-remaining columns. You can paste this output directly into spreadsheet
-applications such as Excel.
-
-Use `--separator` or `-s` to change the delimiter:
-
-```sh
-deno task run -- summary --separator "," 2026-06-01 2026-06-15
-```
-
-Use `--no-project` to omit the project column from CSV output:
-
-```sh
-deno task run -- summary --no-project 2026-06-01 2026-06-15
-```
-
-Use `--no-date` to omit the date header row from CSV output:
-
-```sh
-deno task run -- summary --no-date 2026-06-01 2026-06-15
-```
-
-The two options can be combined to output only the work-time values:
-
-```sh
-deno task run -- summary --no-project --no-date 2026-06-01 2026-06-15
-```
-
-Use `--format json` or `-f json` to output JSON:
-
-```sh
-deno task run -- summary --format json 2026-06-01 2026-06-15
-```
-
-Use `--format table` for a plain-text, bordered layout whose widths are derived
-from its headers and values (including Unicode and multiline values):
-
-```sh
-deno task run -- summary --format table 2026-06-01 2026-06-02
-```
-
 ```text
-┌─────────┬────────────┬────────────┐
-│ Project │ 2026-06-01 │ 2026-06-02 │
-├─────────┼────────────┼────────────┤
-│ Client  │ 60         │            │
-└─────────┴────────────┴────────────┘
+toggl summary <start-date> <end-date> [options]
+toggl summary --days <days> [options]
+toggl time-entry list <start-day> <end-day> [options]
+toggl project list [options]
+toggl project reorder
+toggl project sync
+toggl config [options]
+toggl init
+toggl update [--channel stable|nightly]
 ```
 
-`--separator`, `--no-project`, and `--no-date` are CSV-only and are rejected
-when combined with `summary --format table`. `time-entry list --format table`
-similarly rejects `--separator` rather than silently ignoring it.
+Run `toggl --help` for the complete option list.
 
-Use `--clipboard` to print the summary and copy the exact same output to the
-clipboard. Table output is plain text: neither redirected output nor clipboard
-content contains ANSI color or styling escape sequences.
+### Examples
 
 ```sh
-deno task run -- summary --clipboard 2026-06-01 2026-06-15
-```
-
-The JSON output maps each date to project IDs and their work time in minutes:
-
-```json
-{
-  "2026-06-01": {
-    "123456789": 60
-  }
-}
-```
-
-### List time entries
-
-List individual time entries between two day numbers in the current month. The
-end day is included in the query.
-
-```sh
-toggl time-entry list 1 15
-```
-
-The default output is tab-separated with the columns `id`, `description`,
-`project_id`, `start`, `stop`, and `duration_minutes`. Entries are sorted by
-start time in ascending order. Descriptions containing delimiters, quotes, or
-line breaks are quoted. Use `--separator` or `-s` to select another delimiter:
-
-```sh
-toggl time-entry list --separator "," 1 15
-```
-
-Use `--format json` or `-f json` to output an array of objects with the same
-fields:
-
-```sh
-toggl time-entry list --format json 1 15
-```
-
-```json
-[
-  {
-    "id": 123456789,
-    "description": "Review",
-    "project_id": 987654321,
-    "start": "2026-07-01T01:00:00Z",
-    "stop": "2026-07-01T01:30:00Z",
-    "duration_minutes": 30
-  }
-]
-```
-
-For an aligned terminal view, use table format. Empty `project_id` and `stop`
-cells remain blank, and multiline descriptions occupy additional table lines:
-
-```sh
-toggl time-entry list --format table 1 15
-```
-
-For a running entry, `stop` is `null` in JSON (and empty in CSV) and the
-duration is calculated through the time the response is processed. Entries
-without a project similarly use `null` in JSON and an empty CSV field.
-
-### List projects
-
-List the display names of all active, visible projects:
-
-```sh
-deno task run -- project list
-```
-
-Project information can also be output as JSON:
-
-```sh
-deno task run -- project list --format json
-```
-
-Use `--format table` to show display names in a bordered `Project` column:
-
-```sh
-deno task run -- project list --format table
-```
-
-Print the CLI version:
-
-```sh
-deno task run -- --version
-```
-
-To add all active Toggl projects that are not yet in the configuration file,
-run:
-
-```sh
-deno task run -- project sync
-```
-
-Each new project is appended with its Toggl project name as a comment and with
-`hidden = false`. Existing project settings and other configuration file content
-are left unchanged.
-
-### Show configuration
-
-Show the loaded configuration values:
-
-```sh
-deno task run -- config
-```
-
-Configuration can also be output as JSON:
-
-```sh
-deno task run -- config --format json
-```
-
-Use `--format table` to show `Setting` and `Value` columns:
-
-```sh
-deno task run -- config --format table
-```
-
-The `TOKEN` setting is never printed.
-
-## Build
-
-Compile a standalone binary:
-
-```sh
-deno task compile
-./toggl --version
-```
-
-The `build` task is a convenience alias that writes the binary to `out/toggl`:
-
-```sh
-deno task build
-```
-
-Run the compiled executable as follows:
-
-```sh
-./out/toggl summary 2026-06-01 2026-06-15
-./out/toggl summary --no-project 2026-06-01 2026-06-15
-./out/toggl summary --clipboard 2026-06-01 2026-06-15
-./out/toggl time-entry list 1 15
-./out/toggl project list
-./out/toggl project sync
-./out/toggl config
-```
-
-If `--version` is omitted, the compiled binary reports the development version
-`0.0.0-dev`. Pass the release version explicitly when building release binaries:
-
-```sh
-deno task compile --version 0.1.0
-```
-
-## Release Archives
-
-Build release archives under `dist/`:
-
-```sh
-deno task dist --version 0.1.0
-```
-
-The release build creates archives for:
-
-- `darwin-arm64`
-- `linux-x64`
-- `windows-x64`
-
-To build a single target:
-
-```sh
-deno task dist --version 0.1.0 --target linux-x64
-```
-
-Each archive includes the `toggl` binary and `README.md`. If a `LICENSE` file is
-present, it is included as well. macOS and Linux targets are packaged as
-`.tar.gz`; Windows is packaged as `.zip`. `dist/checksums.txt` and per-archive
-`.sha256` files are generated for the final archives.
-
-The release build uses the system `tar` command for `.tar.gz` archives and the
-system `zip` command for the Windows archive. A full release build requires both
-commands. A single-target build only requires the archive command for that
-target.
-
-For native targets, the release build runs the compiled binary with `--version`
-to verify that the requested release version was embedded.
-
-Stable releases are prepared from an exact, successfully tested `main` commit:
-
-```sh
-gh workflow run release_prepare.yml \
-  -f version=1.0.0 \
-  -f target_sha=<full-40-character-main-sha>
-```
-
-The preparation workflow validates the target, test run, tag and release state;
-builds and attests the archives; generates release notes from the latest stable
-release; and uploads an immutable `release-candidate`. For the first stable
-release, `release-notes-baseline` must exist on the repository root commit.
-Review the exact SHA and generated notes, then compare the SHA-256 of the
-downloaded `release-plan.json` with the preparation run summary.
-
-After explicitly approving the exact SHA, notes, and plan hash, publish that
-candidate by passing its preparation run ID and approved hash:
-
-```sh
-gh workflow run release.yml \
-  -f prepare_run_id=<prepare-run-id> \
-  -f plan_sha256=<approved-release-plan-sha256>
-```
-
-The publication workflow downloads only that candidate, verifies its plan,
-checksums and artifact attestations, rechecks the current stable-release state,
-and creates the annotated tag and GitHub release. Do not push stable release
-tags locally.
-
-After the `Test` workflow succeeds on `main`, the tested commit is published as
-the `nightly` prerelease. Its moving `nightly` tag and assets are replaced on
-each successful run independently of stable releases. Nightly binaries report
-`nightly-YYYYMMDD-<7-character-sha>`, derived from the commit's Unix timestamp
-in UTC and its SHA. Archives keep channel-stable names such as
-`toggl-cli-nightly-linux-x64.tar.gz`. Legacy versioned Nightly releases and tags
-are removed automatically.
-
-## Running the Installed Command
-
-Run the installed command as follows:
-
-```sh
+# Summarize an inclusive date range as tab-separated values.
 toggl summary 2026-06-01 2026-06-15
-toggl summary --clipboard 2026-06-01 2026-06-15
-toggl project list
-toggl config
+
+# Summarize the previous seven days and today as JSON.
+toggl summary --days 7 --format json
+
+# Produce comma-separated values without project or date headings.
+toggl summary 2026-06-01 2026-06-15 -s "," --no-project --no-date
+
+# Print a summary and copy it to the clipboard.
+toggl summary 2026-06-01 2026-06-15 --clipboard
+
+# List entries from the 1st through the 15th of the current month.
+toggl time-entry list 1 15
+
+# List projects in a bordered table.
+toggl project list --format table
+
+# Reorder visible projects interactively.
+toggl project reorder
 ```
+
+Summary dates and time-entry day ranges are inclusive. CSV output uses tabs by
+default; `--separator` (`-s`) changes the delimiter, and `--format json`
+(`-f json`) selects JSON output.
+
+`toggl update` updates a compiled installation in place and verifies its
+checksum and version. Linux x64 and macOS arm64 are supported; source-based,
+Windows, and other installations must be updated manually.
 
 ## Development
 
-When running from a checkout without installing the executable, use
-`deno task run --` and pass the same arguments after it:
+Run commands from a checkout with `deno task run --`, for example:
 
 ```sh
-deno task run -- init
 deno task run -- summary 2026-06-01 2026-06-15
-deno task run -- time-entry list 1 15
-deno task run -- project list
 ```
 
-Runtime and maintenance-task permissions are defined as named permission sets in
-`deno.json`. Keep task commands using their corresponding `-P` permission set
-instead of duplicating `--allow-*` flags.
+Install or build a standalone binary:
+
+```sh
+deno task install --version 0.1.0
+deno task compile --version 0.1.0
+```
+
+Run the same checks as CI:
 
 ```sh
 deno fmt --check
@@ -487,3 +139,9 @@ deno task check
 deno task test
 deno task compile --output /tmp/toggl-cli
 ```
+
+Build release archives for all supported platforms with
+`deno task dist --version 0.1.0`, or add `--target linux-x64` to build one
+target. Stable releases are prepared with `release_prepare.yml` and published
+from the approved candidate with `release.yml`; successful `main` builds publish
+the moving `nightly` release automatically.
