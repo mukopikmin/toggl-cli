@@ -1,6 +1,7 @@
 # toggl-cli
 
-A Deno CLI for summarizing Toggl Track time entries by project and date.
+A Deno CLI that aggregates Toggl Track time entries by project and date. Results
+can be output as delimiter-separated values, JSON, or bordered terminal tables.
 
 ## Requirements
 
@@ -34,7 +35,11 @@ Create `~/.config/toggl-cli/config.toml` interactively:
 toggl init
 ```
 
-Or create it manually:
+This asks for a workspace ID, API token, and timezone. The workspace ID and API
+token are required; interactive input retries empty values, while incomplete
+non-interactive input does not create the file. On POSIX systems, the file is
+created with permissions set to `0600`. The API token is not printed after
+entry. You can also create it manually:
 
 ```toml
 workspace = "your_workspace_id"
@@ -67,9 +72,10 @@ repository checkout.
 toggl summary <start-date> <end-date> [options]
 toggl summary --days <days> [options]
 toggl time-entry list <start-day> <end-day> [options]
-toggl project list [--format csv|json]
+toggl project list [options]
+toggl project reorder
 toggl project sync
-toggl config [--format csv|json]
+toggl config [options]
 toggl init
 toggl update [--channel stable|nightly]
 ```
@@ -94,9 +100,11 @@ toggl summary 2026-06-01 2026-06-15 --clipboard
 # List entries from the 1st through the 15th of the current month.
 toggl time-entry list 1 15
 
-# List visible projects and add missing projects to the config.
-toggl project list
-toggl project sync
+# List projects in a bordered table.
+toggl project list --format table
+
+# Reorder visible projects interactively.
+toggl project reorder
 ```
 
 Summary dates and time-entry day ranges are inclusive. CSV output uses tabs by

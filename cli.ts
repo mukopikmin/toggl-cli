@@ -1,8 +1,6 @@
 import { parseArgs } from "node:util";
 import { type DateTime, datetime } from "ptera";
-import type { ProjectFormat } from "./command/project.ts";
-import type { SummaryFormat } from "./command/summary.ts";
-import type { TimeEntryListFormat } from "./command/time_entry.ts";
+import type { OutputFormat } from "./command/output_format.ts";
 
 export function createHelpText(): string {
   return `Usage:
@@ -24,8 +22,8 @@ Commands:
   update      Update the installed Toggl CLI binary
 
 Options:
-  -s, --separator <text> Set the output delimiter (default: tab)
-  -f, --format <format>  Set the output format: csv or json (default: csv)
+  -s, --separator <text> Set the CSV delimiter (default: tab; CSV only)
+  -f, --format <format>  Set the output format: csv, json, or table (default: csv)
   -d, --days <days>      Aggregate from this many days ago through today
       --clipboard        Copy the output to the clipboard as well as stdout
   -h, --help             Show this help
@@ -41,13 +39,13 @@ export type CliCommand =
   | { name: "version" }
   | { name: "init" }
   | { name: "update"; channel?: "stable" | "nightly" }
-  | { name: "project-list"; format: ProjectFormat }
-  | { name: "config"; format: ProjectFormat }
+  | { name: "project-list"; format: OutputFormat }
+  | { name: "config"; format: OutputFormat }
   | { name: "project-sync" }
   | {
     name: "summary";
     separator: string;
-    format: SummaryFormat;
+    format: OutputFormat;
     noProject: boolean;
     noDate: boolean;
     clipboard: boolean;
@@ -61,15 +59,15 @@ export type CliCommand =
     startDay: Temporal.PlainDate;
     endDay: Temporal.PlainDate;
     separator: string;
-    format: TimeEntryListFormat;
+    format: OutputFormat;
   };
 
 export class CliUsageError extends Error {}
 
-function parseFormat(value: string | undefined): ProjectFormat {
+export function parseFormat(value: string | undefined): OutputFormat {
   const format = value ?? "csv";
-  if (format !== "csv" && format !== "json") {
-    throw new CliUsageError("format must be csv or json");
+  if (format !== "csv" && format !== "json" && format !== "table") {
+    throw new CliUsageError("format must be csv, json, or table");
   }
   return format;
 }
@@ -163,6 +161,18 @@ function parseSummaryArgs(args: string[]): CliCommand {
     clipboard: parsed.values.clipboard ?? false,
   } as const;
 
+  if (
+    common.format === "table" &&
+    (args.some((arg) =>
+      arg === "--separator" || arg === "-s" ||
+      arg.startsWith("--separator=")
+    ) || common.noProject || common.noDate)
+  ) {
+    throw new CliUsageError(
+      "--separator, --no-project, and --no-date cannot be used with table format",
+    );
+  }
+
   if (parsed.values.days !== undefined) {
     if (parsed.positionals.length > 0) {
       throw new CliUsageError(
@@ -244,13 +254,22 @@ function parseTimeEntryListArgs(args: string[], now: DateTime): CliCommand {
   if (separator.length === 0) {
     throw new CliUsageError("separator must not be empty");
   }
+  const format = parseFormat(parsed.values.format);
+  if (
+    format === "table" &&
+    args.some((arg) =>
+      arg === "--separator" || arg === "-s" || arg.startsWith("--separator=")
+    )
+  ) {
+    throw new CliUsageError("--separator cannot be used with table format");
+  }
 
   return {
     name: "time-entry-list",
     startDay,
     endDay,
     separator,
-    format: parseFormat(parsed.values.format),
+    format,
   };
 }
 

@@ -6,8 +6,10 @@ import {
 } from "../model/project.ts";
 import type { Project } from "../model/project.ts";
 import type { TogglClient } from "../toggl/api.ts";
+import type { OutputFormat } from "./output_format.ts";
+import { formatTable } from "./table.ts";
 
-export type ProjectFormat = "csv" | "json";
+export type ProjectFormat = OutputFormat;
 
 export interface ProjectListCommand {
   format: ProjectFormat;
@@ -21,6 +23,13 @@ export function formatProjectsJson(projects: Project[]): string {
   return JSON.stringify(projects, null, 2);
 }
 
+export function formatProjectsTable(projects: Project[]): string {
+  return formatTable(
+    ["Project"],
+    projects.map((project) => [project.displayName]),
+  );
+}
+
 export function outputProjects(
   projects: Project[],
   format: ProjectFormat,
@@ -28,6 +37,8 @@ export function outputProjects(
   console.log(
     format === "json"
       ? formatProjectsJson(projects)
+      : format === "table"
+      ? formatProjectsTable(projects)
       : formatProjectList(projects),
   );
 }
