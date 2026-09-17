@@ -1,5 +1,7 @@
 import { loadConfig } from "../config.ts";
 import type { Config } from "../config.ts";
+import type { OutputFormat } from "./output_format.ts";
+import { formatTable } from "./table.ts";
 
 export function withoutSensitiveConfig(config: Config): Record<string, string> {
   const visibleConfig: Record<string, string> = {};
@@ -22,9 +24,20 @@ export function formatConfigJson(config: Config): string {
   return JSON.stringify(withoutSensitiveConfig(config), null, 2);
 }
 
-export async function runConfigCommand(format: "csv" | "json") {
+export function formatConfigTable(config: Config): string {
+  return formatTable(
+    ["Setting", "Value"],
+    Object.entries(withoutSensitiveConfig(config)),
+  );
+}
+
+export async function runConfigCommand(format: OutputFormat) {
   const config = await loadConfig();
   console.log(
-    format === "json" ? formatConfigJson(config) : formatConfigValues(config),
+    format === "json"
+      ? formatConfigJson(config)
+      : format === "table"
+      ? formatConfigTable(config)
+      : formatConfigValues(config),
   );
 }

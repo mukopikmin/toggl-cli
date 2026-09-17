@@ -11,8 +11,10 @@ import {
   summarizeTimeEntries,
   type TimeEntrySummary,
 } from "../model/time_entry_summary.ts";
+import type { OutputFormat } from "./output_format.ts";
+import { formatTable } from "./table.ts";
 
-export type SummaryFormat = "csv" | "json";
+export type SummaryFormat = OutputFormat;
 
 interface SummaryOptions {
   separator: string;
@@ -116,6 +118,13 @@ export function formatWorkTimeTable(
   return lines.join("\n");
 }
 
+export function formatWorkTimeTerminalTable(table: WorkTimeTable): string {
+  return formatTable(
+    ["Project", ...table.headers],
+    table.rows.map((row, index) => [table.projectNames[index], ...row]),
+  );
+}
+
 export function outputWorkTimeTable(
   table: WorkTimeTable,
   separator: string,
@@ -210,7 +219,9 @@ export async function runSummaryCommand(
   );
 
   await outputSummaryText(
-    formatWorkTimeTable(table, separator, noProject, noDate),
+    format === "table"
+      ? formatWorkTimeTerminalTable(table)
+      : formatWorkTimeTable(table, separator, noProject, noDate),
     clipboard,
     output,
   );

@@ -1,7 +1,7 @@
 # toggl-cli
 
 A Deno CLI that aggregates Toggl Track time entries by project and date. Results
-can be output as delimiter-separated values or JSON.
+can be output as delimiter-separated values, JSON, or a bordered terminal table.
 
 ## Requirements
 
@@ -48,8 +48,10 @@ This asks for your workspace ID, API token, and timezone, then creates
 `~/.config/toggl-cli/config.toml` if it does not already exist. The workspace ID
 and API token are required; an interactive prompt asks again if either is empty,
 and incomplete non-interactive input does not create the file. The API token is
-not printed back to the terminal after entry. The timezone remains optional and
-defaults to `Asia/Tokyo`. You can also create the file manually:
+not printed back to the terminal after entry. On POSIX systems, `toggl init`
+creates the file with permissions set to `0600` so that only its owner can read
+or write it. The timezone remains optional and defaults to `Asia/Tokyo`. You can
+also create the file manually:
 
 ```toml
 workspace = "your_workspace_id"
@@ -88,9 +90,9 @@ To migrate an old `~/.toggl_config` file, run:
 deno task migrate-config
 ```
 
-You can find your API token in your Toggl Track profile settings. Because the
-configuration file contains credentials, restrict its permissions so that other
-users cannot read it:
+You can find your API token in your Toggl Track profile settings. If you create
+the configuration file manually, remember that it contains credentials and
+restrict its permissions so that other users cannot read it:
 
 ```sh
 chmod 600 ~/.config/toggl-cli/config.toml
@@ -117,16 +119,16 @@ deno task run -- --help
 
 ### Options
 
-| Option                     | Description                                                     |
-| -------------------------- | --------------------------------------------------------------- |
-| `-s`, `--separator <text>` | Set the output delimiter. The default is a tab.                 |
-| `-f`, `--format <format>`  | Set the output format to `csv` or `json`. The default is `csv`. |
-| `-d`, `--days <days>`      | Aggregate from this many days ago through today.                |
-| `--clipboard`              | Copy the output to the clipboard as well as stdout.             |
-| `-h`, `--help`             | Show command-line help.                                         |
-| `--no-project`             | Omit the project column from `summary` CSV output.              |
-| `--no-date`                | Omit the date header row from CSV output.                       |
-| `--version`                | Show the CLI version.                                           |
+| Option                     | Description                                                    |
+| -------------------------- | -------------------------------------------------------------- |
+| `-s`, `--separator <text>` | Set the CSV output delimiter. The default is a tab.            |
+| `-f`, `--format <format>`  | Set output to `csv`, `json`, or `table`. The default is `csv`. |
+| `-d`, `--days <days>`      | Aggregate from this many days ago through today.               |
+| `--clipboard`              | Copy the output to the clipboard as well as stdout.            |
+| `-h`, `--help`             | Show command-line help.                                        |
+| `--no-project`             | Omit the project column from `summary` CSV output.             |
+| `--no-date`                | Omit the date header row from summary CSV output.              |
+| `--version`                | Show the CLI version.                                          |
 
 ### Update the CLI
 
@@ -205,8 +207,28 @@ Use `--format json` or `-f json` to output JSON:
 deno task run -- summary --format json 2026-06-01 2026-06-15
 ```
 
-Use `--clipboard` to print the summary and copy the same output to the
-clipboard:
+Use `--format table` for a plain-text, bordered layout whose widths are derived
+from its headers and values (including Unicode and multiline values):
+
+```sh
+deno task run -- summary --format table 2026-06-01 2026-06-02
+```
+
+```text
+┌─────────┬────────────┬────────────┐
+│ Project │ 2026-06-01 │ 2026-06-02 │
+├─────────┼────────────┼────────────┤
+│ Client  │ 60         │            │
+└─────────┴────────────┴────────────┘
+```
+
+`--separator`, `--no-project`, and `--no-date` are CSV-only and are rejected
+when combined with `summary --format table`. `time-entry list --format table`
+similarly rejects `--separator` rather than silently ignoring it.
+
+Use `--clipboard` to print the summary and copy the exact same output to the
+clipboard. Table output is plain text: neither redirected output nor clipboard
+content contains ANSI color or styling escape sequences.
 
 ```sh
 deno task run -- summary --clipboard 2026-06-01 2026-06-15
@@ -260,6 +282,13 @@ toggl time-entry list --format json 1 15
 ]
 ```
 
+For an aligned terminal view, use table format. Empty `project_id` and `stop`
+cells remain blank, and multiline descriptions occupy additional table lines:
+
+```sh
+toggl time-entry list --format table 1 15
+```
+
 For a running entry, `stop` is `null` in JSON (and empty in CSV) and the
 duration is calculated through the time the response is processed. Entries
 without a project similarly use `null` in JSON and an empty CSV field.
@@ -276,6 +305,12 @@ Project information can also be output as JSON:
 
 ```sh
 deno task run -- project list --format json
+```
+
+Use `--format table` to show display names in a bordered `Project` column:
+
+```sh
+deno task run -- project list --format table
 ```
 
 Print the CLI version:
@@ -307,6 +342,12 @@ Configuration can also be output as JSON:
 
 ```sh
 deno task run -- config --format json
+```
+
+Use `--format table` to show `Setting` and `Value` columns:
+
+```sh
+deno task run -- config --format table
 ```
 
 The `TOKEN` setting is never printed.
@@ -378,31 +419,34 @@ target.
 For native targets, the release build runs the compiled binary with `--version`
 to verify that the requested release version was embedded.
 
-Before creating a stable release, verify the local checkout and the successful
-GitHub `Test` workflow for the commit on `main`:
+Stable releases are prepared from an exact, successfully tested `main` commit:
 
 ```sh
-deno task release:check --version 1.0.0
+gh workflow run release_prepare.yml \
+  -f version=1.0.0 \
+  -f target_sha=<full-40-character-main-sha>
 ```
 
-The check requires a clean `main` branch that exactly matches `origin/main`, an
-unused version tag and GitHub release, and a successful workflow run for the
-target commit. For the first stable release, create the `release-notes-baseline`
-tag on the repository root commit. Later releases use the latest non-draft,
-non-prerelease stable release and ignore Nightly tags.
+The preparation workflow validates the target, test run, tag and release state;
+builds and attests the archives; generates release notes from the latest stable
+release; and uploads an immutable `release-candidate`. For the first stable
+release, `release-notes-baseline` must exist on the repository root commit.
+Review the exact SHA and generated notes, then compare the SHA-256 of the
+downloaded `release-plan.json` with the preparation run summary.
 
-Preview GitHub's generated title and notes as reviewable JSON on standard
-output, or write them to a file:
+After explicitly approving the exact SHA, notes, and plan hash, publish that
+candidate by passing its preparation run ID and approved hash:
 
 ```sh
-deno task release:notes --version 1.0.0
-deno task release:notes --version 1.0.0 --output /tmp/release-notes.json
+gh workflow run release.yml \
+  -f prepare_run_id=<prepare-run-id> \
+  -f plan_sha256=<approved-release-plan-sha256>
 ```
 
-Pushing a semantic-version tag, with or without a leading `v` (for example,
-`v0.1.0` or `0.1.0`), publishes all three archives and their checksum files as a
-GitHub release. Release notes start at the previous stable release; the
-`release-notes-baseline` tag is used when there is no previous stable release.
+The publication workflow downloads only that candidate, verifies its plan,
+checksums and artifact attestations, rechecks the current stable-release state,
+and creates the annotated tag and GitHub release. Do not push stable release
+tags locally.
 
 After the `Test` workflow succeeds on `main`, the tested commit is published as
 the `nightly` prerelease. Its moving `nightly` tag and assets are replaced on

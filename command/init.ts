@@ -164,9 +164,11 @@ export async function writeInitialConfig(
   configFile: string,
   configToml = createConfigTemplate(),
 ): Promise<void> {
-  await assertConfigFileDoesNotExist(configFile);
   await Deno.mkdir(dirname(configFile), { recursive: true });
-  await Deno.writeTextFile(configFile, configToml);
+  await Deno.writeTextFile(configFile, configToml, {
+    createNew: true,
+    mode: 0o600,
+  });
 }
 
 export async function runInitCommand(
@@ -181,7 +183,6 @@ export async function runInitCommand(
   const configFile = getConfigFile(home);
   await assertConfigFileDoesNotExist(configFile);
   const config = await promptForInitialConfig(input);
-  await Deno.mkdir(dirname(configFile), { recursive: true });
-  await Deno.writeTextFile(configFile, createConfigToml(config));
+  await writeInitialConfig(configFile, createConfigToml(config));
   console.log(`Wrote ${CONFIG_FILE_DISPLAY}`);
 }
