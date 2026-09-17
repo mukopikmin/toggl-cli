@@ -253,7 +253,10 @@ export async function verifyChecksum(
       "Release checksum is not exactly one 64-digit hexadecimal SHA-256 value.",
     );
   }
-  const digest = await crypto.subtle.digest("SHA-256", archive);
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new Uint8Array(archive).buffer,
+  );
   const actual = [...new Uint8Array(digest)].map((byte) =>
     byte.toString(16).padStart(2, "0")
   ).join("");
