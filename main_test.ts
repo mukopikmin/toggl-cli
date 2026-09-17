@@ -892,7 +892,7 @@ const reorderProjects = [
 ];
 
 Deno.test("updateProjectReorderState selects and moves projects within bounds", () => {
-  let state = { projects: reorderProjects, selectedIndex: 0 };
+  let state = { projects: reorderProjects, selectedIndex: 0, moving: false };
   state = updateProjectReorderState(state, "select-up");
   assertEquals(state.selectedIndex, 0);
   state = updateProjectReorderState(state, "select-down");
@@ -943,10 +943,10 @@ display_order = 2
   assertEquals(parseConfigToml(output).PROJECTS[10].displayOrder, 2);
 });
 
-Deno.test("selectProjectOrder saves changes and restores the terminal", async () => {
-  const inputs = ["\x1b[B", "J", "\r"].map((input) =>
-    new TextEncoder().encode(input)
-  );
+Deno.test("selectProjectOrder supports j/k navigation and J/K reordering", async () => {
+  const inputs = ["k", "K", "j", "k", "j", "J", "j", "J", "K", "K", "\r"].map((
+    input,
+  ) => new TextEncoder().encode(input));
   const rawChanges: boolean[] = [];
   const output: string[] = [];
   const selected = await selectProjectOrder(reorderProjects, {
@@ -961,9 +961,60 @@ Deno.test("selectProjectOrder saves changes and restores the terminal", async ()
     write: (text) => output.push(text),
   });
 
-  assertEquals(selected?.map((project) => project.id), [10, 30, 20]);
+  assertEquals(selected?.map((project) => project.id), [20, 10, 30]);
   assertEquals(rawChanges, [true, false]);
+  assertEquals(
+    output[1].includes(
+      "j/k: select down/up  Shift+j/Shift+k: move down/up  Space: pick/drop",
+    ),
+    true,
+  );
+  assertEquals(output[2], output[1]);
+  assertEquals(output[3], output[1]);
+  assertEquals(output[4].includes("  Alpha\n> Beta\n  Gamma"), true);
+  assertEquals(output[5], output[1]);
+  assertEquals(output[7].includes("  Alpha\n  Gamma\n> Beta"), true);
+  assertEquals(output[8], output[7]);
+  assertEquals(output[9], output[7]);
+  assertEquals(output[10].includes("  Alpha\n> Beta\n  Gamma"), true);
+  assertEquals(output[11].includes("> Beta\n  Alpha\n  Gamma"), true);
   assertEquals(output.at(-1), "\x1b[2J\x1b[H\x1b[?25h");
+});
+
+Deno.test("selectProjectOrder picks with Space and moves with arrows", async () => {
+  const inputs = [
+    "\x1b[B",
+    " ",
+    "\x1b[B",
+    "\x1b[B",
+    "\x1b[A",
+    "\x1b[A",
+    " ",
+    "\r",
+  ]
+    .map((input) => new TextEncoder().encode(input));
+  const output: string[] = [];
+  const selected = await selectProjectOrder(reorderProjects, {
+    isTerminal: () => true,
+    setRaw: () => {},
+    read: (buffer) => {
+      const input = inputs.shift();
+      if (!input) return Promise.resolve(null);
+      buffer.set(input);
+      return Promise.resolve(input.length);
+    },
+    write: (text) => output.push(text),
+  });
+
+  assertEquals(selected?.map((project) => project.id), [20, 10, 30]);
+  assertEquals(
+    output[1].includes("While picked, j/k or Up/Down: move"),
+    true,
+  );
+  assertEquals(output[3].includes("  Alpha\n* Beta\n  Gamma"), true);
+  assertEquals(output[5], output[4]);
+  assertEquals(output[7].includes("* Beta\n  Alpha\n  Gamma"), true);
+  assertEquals(output[8].includes("> Beta\n  Alpha\n  Gamma"), true);
 });
 
 Deno.test("selectProjectOrder cancels and rejects non-terminal input", async () => {

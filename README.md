@@ -313,10 +313,12 @@ Reorder visible projects interactively in a terminal:
 deno task run -- project reorder
 ```
 
-Use Up/Down (or `j`/`k`) to select a project and Ctrl+Up/Ctrl+Down (or uppercase
-`K`/`J`) to move it. Press Enter to save the order to the `display_order`
-settings in the configuration file. Press `q` or Escape to cancel without
-changing the file. This command requires an interactive terminal.
+Use `j`/`k` to select down/up and `Shift+j`/`Shift+k` to move the selected
+project down/up. Alternatively, press Space to pick up a project, move it with
+`j`/`k` or Up/Down, and press Space again to drop it. Press Enter to save the
+order to the `display_order` settings in the configuration file. Press `q` or
+Esc to cancel without changing the file. This command requires an interactive
+terminal.
 
 Use `--format table` to show display names in a bordered `Project` column:
 
