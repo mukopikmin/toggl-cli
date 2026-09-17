@@ -3,7 +3,9 @@ import { CliUsageError, HELP_TEXT, parseCliArgs } from "./cli.ts";
 import { runConfigCommand } from "./command/config.ts";
 import { runInitCommand } from "./command/init.ts";
 import {
+  ProjectReorderUnavailableError,
   runProjectListCommand,
+  runProjectReorderCommand,
   runProjectSyncCommand,
 } from "./command/project.ts";
 import { runSummaryCommand } from "./command/summary.ts";
@@ -83,6 +85,9 @@ export async function main(
       case "project-list":
         await runProjectListCommand({ format: command.format }, togglClient);
         return 0;
+      case "project-reorder":
+        await runProjectReorderCommand(togglClient);
+        return 0;
       case "config":
         await dependencies.runConfigCommand(command.format);
         return 0;
@@ -110,6 +115,10 @@ export async function main(
     }
   } catch (error) {
     if (reportConfigError(error)) return 1;
+    if (error instanceof ProjectReorderUnavailableError) {
+      console.error(`Error: ${error.message}`);
+      return 1;
+    }
     if (
       !(error instanceof ClipboardUnavailableError) &&
       !(error instanceof TogglApiError)
