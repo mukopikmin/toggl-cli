@@ -45,6 +45,7 @@ import {
   parseProjectsConfig,
 } from "./config.ts";
 import { main } from "./main.ts";
+import type { UpdatePlan } from "./command/update.ts";
 import {
   createProject,
   sortProjectsByDisplayOrder,
@@ -61,6 +62,98 @@ const config = {
   WORKSPACE: "workspace-id",
   TOKEN: "test-token",
 };
+
+const updatePlan = (updateAvailable: boolean): UpdatePlan => ({
+  channel: "stable",
+  currentVersion: "0.0.0-dev",
+  targetVersion: "1.2.3",
+  target: "linux-x64",
+  executable: "/opt/bin/toggl",
+  archive: "toggl-cli-v1.2.3-linux-x64.tar.gz",
+  downloadUrl:
+    "https://github.com/mukopikmin/toggl-cli/releases/download/v1.2.3/toggl-cli-v1.2.3-linux-x64.tar.gz",
+  updateAvailable,
+});
+
+Deno.test("main reports update versions and skips installation when current", async () => {
+  const messages: string[] = [];
+  const originalLog = console.log;
+  console.log = (...values: unknown[]) => messages.push(values.join(" "));
+  let installed = false;
+  try {
+    assertEquals(
+      await main(["update"], {
+        checkForUpdate: () => Promise.resolve(updatePlan(false)),
+        installUpdate: () => {
+          installed = true;
+          throw new Error("unexpected");
+        },
+        confirm: () => {
+          throw new Error("unexpected");
+        },
+      }),
+      0,
+    );
+  } finally {
+    console.log = originalLog;
+  }
+  assertEquals(installed, false);
+  assertEquals(messages, [
+    "Current version: 0.0.0-dev",
+    "Update channel: stable",
+    "Available version: 1.2.3",
+    "Already up to date; no update was installed.",
+  ]);
+});
+
+Deno.test("main reports cancellation before downloading", async () => {
+  const messages: string[] = [];
+  const originalLog = console.log;
+  console.log = (...values: unknown[]) => messages.push(values.join(" "));
+  let installed = false;
+  try {
+    assertEquals(
+      await main(["update"], {
+        checkForUpdate: () => Promise.resolve(updatePlan(true)),
+        installUpdate: () => {
+          installed = true;
+          throw new Error("unexpected");
+        },
+        confirm: () => false,
+      }),
+      0,
+    );
+  } finally {
+    console.log = originalLog;
+  }
+  assertEquals(installed, false);
+  assertEquals(messages.at(-1), "Update cancelled.");
+});
+
+Deno.test("main confirms and reports the installed target version", async () => {
+  const messages: string[] = [];
+  const originalLog = console.log;
+  console.log = (...values: unknown[]) => messages.push(values.join(" "));
+  try {
+    assertEquals(
+      await main(["update", "--channel", "stable"], {
+        checkForUpdate: () => Promise.resolve(updatePlan(true)),
+        installUpdate: (plan) =>
+          Promise.resolve({
+            channel: plan.channel,
+            currentVersion: plan.currentVersion,
+            targetVersion: plan.targetVersion,
+            updated: true,
+          }),
+        confirm: () => true,
+      }),
+      0,
+    );
+  } finally {
+    console.log = originalLog;
+  }
+  assertEquals(messages.at(-1), "Installed version 1.2.3.");
+});
 
 Deno.test("parseCliArgs returns help for the root command", () => {
   assertEquals(parseCliArgs([]), { name: "help" });

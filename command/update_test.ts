@@ -1,136 +1,53 @@
-import { assertEquals, assertRejects, assertThrows } from "@std/assert";
+import {
+  assertEquals,
+  assertRejects,
+  assertStringIncludes,
+  assertThrows,
+} from "@std/assert";
 import { CliUsageError, parseCliArgs } from "../cli.ts";
 import {
   archiveName,
+  checkForUpdate,
   defaultUpdateChannel,
+  installUpdate,
   releaseTarget,
-  runUpdateCommand,
   type UpdateDependencies,
+  updateIsNewer,
+  verifyChecksum,
 } from "./update.ts";
 
 const encoder = new TextEncoder();
-const ok = (stdout = "") => ({
-  success: true,
-  stdout: encoder.encode(stdout),
-  stderr: new Uint8Array(),
-});
 
-async function fixture(
-  overrides: Partial<UpdateDependencies> = {},
-  options: { version?: string; archive?: Uint8Array<ArrayBuffer> } = {},
-) {
-  const archive = options.archive ?? encoder.encode("archive");
-  const digest = await crypto.subtle.digest("SHA-256", archive.buffer);
+async function fixture(options: {
+  current?: string;
+  target?: string;
+  os?: string;
+  checksum?: string;
+  extractionFails?: boolean;
+  executableIsFile?: boolean;
+  probeOutput?: string;
+  renameFails?: boolean;
+} = {}) {
+  const current = options.current ?? "1.0.0";
+  const target = options.target ?? "1.2.3";
+  const archiveBytes = encoder.encode("archive");
+  const digest = await crypto.subtle.digest("SHA-256", archiveBytes);
   const checksum = [...new Uint8Array(digest)].map((value) =>
     value.toString(16).padStart(2, "0")
   ).join("");
-  const files = new Map<string, Uint8Array>();
   const removed: string[] = [];
   const renamed: string[] = [];
-  const version = options.version ?? "1.2.3";
+  const spawned: Array<{ command: string; args: string[] }> = [];
+  const written = new Map<string, Uint8Array>();
+  let tempFileIndex = 0;
+  let fetchCount = 0;
   const deps: UpdateDependencies = {
     fetch: (input) => {
+      fetchCount++;
       const url = String(input);
       if (url.endsWith("/releases/latest")) {
-        return Promise.resolve(Response.json({ tag_name: `v${version}` }));
+        return Promise.resolve(Response.json({ tag_name: `v${target}` }));
       }
-      if (url.endsWith(".sha256")) {
-        return Promise.resolve(new Response(`${checksum}\n`));
-      }
-      return Promise.resolve(new Response(archive.buffer));
-    },
-    os: "linux",
-    arch: "x86_64",
-    execPath: () => "/opt/bin/toggl",
-    makeTempDir: () => Promise.resolve("/tmp/update"),
-    remove: (path) => {
-      removed.push(path);
-      files.delete(path);
-      return Promise.resolve();
-    },
-    readFile: (path) =>
-      Promise.resolve(files.get(path) ?? encoder.encode("binary")),
-    writeFile: (path, data) => {
-      files.set(path, data);
-      return Promise.resolve();
-    },
-    chmod: () => Promise.resolve(),
-    rename: (from, to) => {
-      renamed.push(`${from}->${to}`);
-      return Promise.resolve();
-    },
-    run: (command, args) =>
-      args[0] === "--version"
-        ? Promise.resolve(ok(version))
-        : Promise.resolve(ok()),
-    randomId: () => "id",
-    ...overrides,
-  };
-  return { deps, removed, renamed, files, archive, checksum };
-}
-
-Deno.test("update CLI parses channels and rejects invalid arguments", () => {
-  assertEquals(parseCliArgs(["update"]), {
-    name: "update",
-    channel: undefined,
-  });
-  assertEquals(parseCliArgs(["update", "--channel", "nightly"]), {
-    name: "update",
-    channel: "nightly",
-  });
-  for (
-    const args of [["update", "extra"], ["update", "--channel"], [
-      "update",
-      "--channel",
-      "beta",
-    ]]
-  ) {
-    assertThrows(() => parseCliArgs(args), CliUsageError);
-  }
-});
-
-Deno.test("update selects channels, artifact names, and supported targets", () => {
-  assertEquals(defaultUpdateChannel("nightly-20260806-abcdef1"), "nightly");
-  assertEquals(defaultUpdateChannel("nightly"), "nightly");
-  assertEquals(defaultUpdateChannel("1.2.3"), "stable");
-  assertEquals(
-    archiveName("stable", "1.2.3", "linux-x64"),
-    "toggl-cli-v1.2.3-linux-x64.tar.gz",
-  );
-  assertEquals(
-    archiveName("nightly", "ignored", "darwin-arm64"),
-    "toggl-cli-nightly-darwin-arm64.tar.gz",
-  );
-  assertEquals(releaseTarget("linux", "x86_64"), "linux-x64");
-  assertEquals(releaseTarget("darwin", "aarch64"), "darwin-arm64");
-  assertThrows(
-    () => releaseTarget("windows", "x86_64"),
-    Error,
-    "not supported",
-  );
-  assertThrows(() => releaseTarget("linux", "aarch64"), Error, "not supported");
-});
-
-Deno.test("update reports current and performs a verified atomic update", async () => {
-  const current = await fixture();
-  assertEquals(
-    await runUpdateCommand({ currentVersion: "1.2.3" }, current.deps),
-    { status: "current", version: "1.2.3" },
-  );
-  assertEquals(current.renamed, []);
-  const update = await fixture();
-  assertEquals(
-    await runUpdateCommand({ currentVersion: "1.0.0" }, update.deps),
-    { status: "updated", version: "1.2.3" },
-  );
-  assertEquals(update.renamed, ["/opt/bin/.toggl-update-id->/opt/bin/toggl"]);
-  assertEquals(update.removed.includes("/tmp/update"), true);
-});
-
-Deno.test("nightly version comes from the tag commit's UTC date and SHA", async () => {
-  const item = await fixture({
-    fetch: (input) => {
-      const url = String(input);
       if (url.includes("git/ref")) {
         return Promise.resolve(
           Response.json({ object: { sha: "abcdef1234567890" } }),
@@ -143,82 +60,209 @@ Deno.test("nightly version comes from the tag commit's UTC date and SHA", async 
           }),
         );
       }
-      throw new Error(`unexpected ${url}`);
+      if (url.endsWith(".sha256")) {
+        return Promise.resolve(new Response(options.checksum ?? checksum));
+      }
+      return Promise.resolve(new Response(archiveBytes));
     },
+    platform: { os: options.os ?? "linux", arch: "x86_64" },
+    execPath: () =>
+      options.os === "windows" ? "C:\\bin\\toggl.exe" : "/opt/bin/toggl",
+    pid: 42,
+    stat: (path) =>
+      Promise.resolve({
+        isFile: path === (options.os === "windows"
+            ? "C:\\bin\\toggl.exe"
+            : "/opt/bin/toggl")
+          ? options.executableIsFile !== false
+          : true,
+      }),
+    makeTempDir: () => Promise.resolve("/tmp/update"),
+    makeTempFile: ({ suffix = "" } = {}) =>
+      Promise.resolve(`/opt/bin/.toggl-update-${++tempFileIndex}${suffix}`),
+    remove: (path) => {
+      removed.push(path);
+      return Promise.resolve();
+    },
+    copyFile: () => Promise.resolve(),
+    writeFile: (path, data) => {
+      written.set(path, data);
+      return Promise.resolve();
+    },
+    chmod: () => Promise.resolve(),
+    rename: (from, to) => {
+      if (options.renameFails) return Promise.reject(new Error("denied"));
+      renamed.push(`${from}->${to}`);
+      return Promise.resolve();
+    },
+    run: (command, args) => {
+      if (args[0] === "--version") {
+        const installed = command === (options.os === "windows"
+          ? "C:\\bin\\toggl.exe"
+          : "/opt/bin/toggl");
+        return Promise.resolve({
+          success: true,
+          output: installed ? options.probeOutput ?? current : target,
+        });
+      }
+      return Promise.resolve({
+        success: !options.extractionFails,
+        output: options.extractionFails ? "broken archive" : "",
+      });
+    },
+    spawn: (command, args) => spawned.push({ command, args }),
+  };
+  return {
+    deps,
+    removed,
+    renamed,
+    spawned,
+    written,
+    get fetchCount() {
+      return fetchCount;
+    },
+  };
+}
+
+Deno.test("update CLI parses channels and rejects invalid arguments", () => {
+  assertEquals(parseCliArgs(["update"]), {
+    name: "update",
+    channel: undefined,
   });
+  assertEquals(parseCliArgs(["update", "--channel", "nightly"]), {
+    name: "update",
+    channel: "nightly",
+  });
+  assertThrows(
+    () => parseCliArgs(["update", "--channel", "beta"]),
+    CliUsageError,
+  );
+});
+
+Deno.test("update selects channels and names all published archives", () => {
+  assertEquals(defaultUpdateChannel("nightly-20260806-abcdef1"), "nightly");
+  assertEquals(defaultUpdateChannel("1.2.3"), "stable");
+  assertEquals(releaseTarget("linux", "x86_64"), "linux-x64");
+  assertEquals(releaseTarget("darwin", "aarch64"), "darwin-arm64");
+  assertEquals(releaseTarget("windows", "x86_64"), "windows-x64");
   assertEquals(
-    await runUpdateCommand({
-      channel: "nightly",
-      currentVersion: "nightly-20260824-abcdef1",
-    }, item.deps),
-    { status: "current", version: "nightly-20260824-abcdef1" },
+    archiveName("stable", "1.2.3", "windows-x64"),
+    "toggl-cli-v1.2.3-windows-x64.zip",
+  );
+  assertEquals(
+    archiveName("nightly", "ignored", "windows-x64"),
+    "toggl-cli-nightly-windows-x64.zip",
+  );
+  assertThrows(() => releaseTarget("linux", "aarch64"), Error, "not supported");
+});
+
+Deno.test("semantic comparison prevents downgrades and upgrades prereleases", () => {
+  assertEquals(updateIsNewer("stable", "2.0.0", "1.9.9"), false);
+  assertEquals(updateIsNewer("stable", "1.2.3-beta.1", "1.2.3"), true);
+  assertEquals(updateIsNewer("stable", "1.2.3", "1.2.3-beta.1"), false);
+  assertEquals(
+    updateIsNewer(
+      "nightly",
+      "nightly-20260824-aaaaaaa",
+      "nightly-20260824-bbbbbbb",
+    ),
+    true,
+  );
+  assertEquals(
+    updateIsNewer(
+      "nightly",
+      "nightly-20260825-aaaaaaa",
+      "nightly-20260824-bbbbbbb",
+    ),
+    false,
   );
 });
 
-Deno.test("update rejects checksum mismatch and malformed GitHub data", async () => {
-  const mismatch = await fixture({
-    fetch: (input) =>
-      String(input).endsWith("/releases/latest")
-        ? Promise.resolve(Response.json({ tag_name: "v1.2.3" }))
-        : Promise.resolve(new Response("bad")),
-  });
-  await assertRejects(
-    () => runUpdateCommand({ currentVersion: "1.0.0" }, mismatch.deps),
-    Error,
-    "checksum mismatch",
-  );
-  assertEquals(mismatch.renamed, []);
-  const malformed = await fixture({
-    fetch: () => Promise.resolve(Response.json({ nope: true })),
-  });
-  await assertRejects(
-    () => runUpdateCommand({ currentVersion: "1.0.0" }, malformed.deps),
-    Error,
-    "invalid latest release",
-  );
-});
-
-Deno.test("update preserves binary for extraction, version, and rename failures", async () => {
-  for (const failure of ["extract", "version", "rename"] as const) {
-    const dependencies: Partial<UpdateDependencies> = {
-      run: (_command, args) => {
-        if (args[0] === "--version") {
-          return Promise.resolve(
-            failure === "version" ? ok("9.9.9") : ok("1.2.3"),
-          );
-        }
-        return Promise.resolve(
-          failure === "extract" ? { ...ok(), success: false } : ok(),
-        );
-      },
-    };
-    if (failure === "rename") {
-      dependencies.rename = () =>
-        Promise.reject(new Error("permission denied"));
-    }
-    const item = await fixture(dependencies);
-    await assertRejects(() =>
-      runUpdateCommand({ currentVersion: "1.0.0" }, item.deps)
+Deno.test("planning verifies the current executable before querying GitHub", async () => {
+  for (
+    const options of [{ executableIsFile: false }, { probeOutput: "not toggl" }]
+  ) {
+    const item = await fixture(options);
+    await assertRejects(
+      () => checkForUpdate("1.0.0", undefined, item.deps),
+      Error,
+      "expected compiled Toggl CLI",
     );
-    assertEquals(item.removed.includes("/tmp/update"), true);
-    if (failure === "rename") {
-      assertEquals(item.removed.includes("/opt/bin/.toggl-update-id"), true);
-    }
+    assertEquals(item.fetchCount, 0);
   }
 });
 
-Deno.test("update refuses source execution and unsupported OS before downloads", async () => {
-  const source = await fixture({ execPath: () => "/usr/bin/deno" });
-  await assertRejects(
-    () => runUpdateCommand({ currentVersion: "1.0.0" }, source.deps),
-    Error,
-    "running from source",
+Deno.test("planning reports downgrade as unavailable and same-day nightly SHA as available", async () => {
+  const stable = await fixture({ current: "2.0.0", target: "1.2.3" });
+  assertEquals(
+    (await checkForUpdate("2.0.0", undefined, stable.deps)).updateAvailable,
+    false,
   );
-  const windows = await fixture({ os: "windows" });
-  await assertRejects(
-    () => runUpdateCommand({ currentVersion: "1.0.0" }, windows.deps),
-    Error,
-    "not supported",
+  const nightly = await fixture({
+    current: "nightly-20260824-1111111",
+    probeOutput: "nightly-20260824-1111111",
+  });
+  const plan = await checkForUpdate(
+    "nightly-20260824-1111111",
+    "nightly",
+    nightly.deps,
   );
-  assertEquals(windows.renamed, []);
+  assertEquals(plan.targetVersion, "nightly-20260824-abcdef1");
+  assertEquals(plan.updateAvailable, true);
+});
+
+Deno.test("checksum requires exactly one hexadecimal digest", async () => {
+  const bytes = encoder.encode("archive");
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  const checksum = [...new Uint8Array(digest)].map((value) =>
+    value.toString(16).padStart(2, "0")
+  ).join("");
+  await verifyChecksum(bytes, ` ${checksum}\n`);
+  await assertRejects(
+    () => verifyChecksum(bytes, `${checksum}  archive.tar.gz`),
+    Error,
+    "exactly one",
+  );
+});
+
+Deno.test("Linux installation atomically replaces and cleans temporary files", async () => {
+  const item = await fixture();
+  const plan = await checkForUpdate("1.0.0", undefined, item.deps);
+  assertEquals((await installUpdate(plan, item.deps)).updated, true);
+  assertEquals(item.renamed, ["/opt/bin/.toggl-update-1->/opt/bin/toggl"]);
+  assertEquals(item.removed, ["/tmp/update"]);
+});
+
+Deno.test("Windows installation defers replacement to a detached helper", async () => {
+  const item = await fixture({ os: "windows" });
+  const plan = await checkForUpdate("1.0.0", undefined, item.deps);
+  await installUpdate(plan, item.deps);
+  assertEquals(item.renamed, []);
+  assertEquals(item.spawned.length, 1);
+  assertEquals(item.spawned[0].command, "powershell.exe");
+  const script = new TextDecoder().decode(
+    item.written.get("/opt/bin/.toggl-update-2.ps1"),
+  );
+  assertStringIncludes(script, "Wait-Process -Id 42");
+  assertStringIncludes(script, "Move-Item");
+  assertEquals(item.removed, ["/tmp/update"]);
+});
+
+Deno.test("extraction failures preserve the executable and clean work files", async () => {
+  const item = await fixture({ extractionFails: true });
+  const plan = await checkForUpdate("1.0.0", undefined, item.deps);
+  await assertRejects(
+    () => installUpdate(plan, item.deps),
+    Error,
+    "Failed to extract",
+  );
+  assertEquals(item.renamed, []);
+  assertEquals(item.removed, ["/tmp/update"]);
+});
+
+Deno.test("failed atomic replacement removes staged and work files", async () => {
+  const item = await fixture({ renameFails: true });
+  const plan = await checkForUpdate("1.0.0", undefined, item.deps);
+  await assertRejects(() => installUpdate(plan, item.deps), Error, "denied");
+  assertEquals(item.removed, ["/opt/bin/.toggl-update-1", "/tmp/update"]);
 });

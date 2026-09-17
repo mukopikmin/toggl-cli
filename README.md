@@ -141,15 +141,22 @@ toggl update --channel stable
 Versions named `nightly-YYYYMMDD-<7-character-sha>` use the Nightly channel by
 default. The legacy version `nightly` is also recognized as Nightly; all other
 versions use the latest stable GitHub release. An explicit `--channel` overrides
-that selection. Self-update supports Linux x64 and macOS arm64, matching the
-published `.tar.gz` artifacts. Windows and other architectures must be updated
-manually.
+that selection. Before downloading, the command reports the installed version,
+selected channel, and available version, then asks for confirmation. It never
+replaces a newer stable or nightly build with an older release.
+
+Self-update supports Linux x64 and macOS arm64 (`.tar.gz`) and Windows x64
+(`.zip`), matching the artifacts produced by the release workflows. Other
+architectures must be updated manually.
 
 The updater verifies the downloaded SHA-256 checksum and binary version before
 atomically replacing the running executable. It therefore needs `tar` on `PATH`
-and write permission for the executable's directory. A failure leaves the
-existing binary unchanged. Self-update is unavailable under `deno task run` (or
-another source execution); install a compiled release binary first.
+on Linux and macOS, and PowerShell on Windows, plus write permission for the
+executable's directory. Windows stages the executable and replaces it after the
+running process exits. A failure leaves the existing binary unchanged. After a
+successful installation, the command reports the installed target version.
+Self-update is unavailable under `deno task run` (or another source execution);
+install a compiled release binary first.
 
 ### Aggregate time entries
 
