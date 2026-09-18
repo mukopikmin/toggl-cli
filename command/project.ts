@@ -24,6 +24,7 @@ export type ProjectReorderAction =
 export interface ProjectReorderState {
   projects: Project[];
   selectedIndex: number;
+  moving: boolean;
 }
 
 export interface ProjectReorderTerminal {
@@ -108,7 +109,7 @@ export function updateProjectReorderState(
     projects[destination],
     projects[state.selectedIndex],
   ];
-  return { projects, selectedIndex: destination };
+  return { ...state, projects, selectedIndex: destination };
 }
 
 export function updateProjectDisplayOrders(
@@ -164,24 +165,30 @@ export function updateProjectDisplayOrders(
 
 function renderProjectReorder(state: ProjectReorderState): string {
   const rows = state.projects.map((project, index) =>
-    `${index === state.selectedIndex ? ">" : " "} ${project.displayName}`
+    `${
+      index === state.selectedIndex ? state.moving ? "*" : ">" : " "
+    } ${project.displayName}`
   );
   return [
     "\x1b[2J\x1b[HReorder projects",
-    "Up/Down: select  Ctrl+Up/Ctrl+Down: move  Enter: save  q/Esc: cancel",
+    "j/k: select down/up  Shift+j/Shift+k: move down/up  Space: pick/drop",
+    "While picked, j/k or Up/Down: move  Enter: save  q/Esc: cancel",
     "",
     ...rows,
   ].join("\n");
 }
 
-function projectReorderAction(input: string): ProjectReorderAction | undefined {
+function projectReorderAction(
+  input: string,
+  moving: boolean,
+): ProjectReorderAction | undefined {
   switch (input) {
     case "\x1b[A":
     case "k":
-      return "select-up";
+      return moving ? "move-up" : "select-up";
     case "\x1b[B":
     case "j":
-      return "select-down";
+      return moving ? "move-down" : "select-down";
     case "\x1b[1;5A":
     case "K":
       return "move-up";
@@ -205,7 +212,11 @@ export async function selectProjectOrder(
   if (projects.length === 0) return projects;
   if (!terminal.isTerminal()) throw new ProjectReorderUnavailableError();
 
-  let state: ProjectReorderState = { projects, selectedIndex: 0 };
+  let state: ProjectReorderState = {
+    projects,
+    selectedIndex: 0,
+    moving: false,
+  };
   const buffer = new Uint8Array(16);
   terminal.setRaw(true);
   terminal.write("\x1b[?25l");
@@ -217,7 +228,11 @@ export async function selectProjectOrder(
       const input = new TextDecoder().decode(buffer.subarray(0, bytesRead));
       if (input === "\r" || input === "\n") return state.projects;
       if (input === "q" || input === "\x1b") return undefined;
-      const action = projectReorderAction(input);
+      if (input === " ") {
+        state = { ...state, moving: !state.moving };
+        continue;
+      }
+      const action = projectReorderAction(input, state.moving);
       if (action) state = updateProjectReorderState(state, action);
     }
   } finally {
