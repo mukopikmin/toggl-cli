@@ -151,6 +151,10 @@ and write permission for the executable's directory. A failure leaves the
 existing binary unchanged. Self-update is unavailable under `deno task run` (or
 another source execution); install a compiled release binary first.
 
+GitHub network access is not granted to the executable in advance. Deno asks for
+access to `api.github.com` and `github.com` only when `update` needs those
+hosts; deny the request to leave the installed binary unchanged.
+
 ### Aggregate time entries
 
 Specify the inclusive start and end dates in `YYYY-MM-DD` format. Date ranges
