@@ -45,10 +45,13 @@ toggl init
 ```
 
 This asks for your workspace ID, API token, and timezone, then creates
-`~/.config/toggl-cli/config.toml` if it does not already exist. The API token is
+`~/.config/toggl-cli/config.toml` if it does not already exist. The workspace ID
+and API token are required; an interactive prompt asks again if either is empty,
+and incomplete non-interactive input does not create the file. The API token is
 not printed back to the terminal after entry. On POSIX systems, `toggl init`
 creates the file with permissions set to `0600` so that only its owner can read
-or write it. You can also create the file manually:
+or write it. The timezone remains optional and defaults to `Asia/Tokyo`. You can
+also create the file manually:
 
 ```toml
 workspace = "your_workspace_id"
