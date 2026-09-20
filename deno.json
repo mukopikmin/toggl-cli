@@ -2,7 +2,7 @@
   "nodeModulesDir": "none",
   "permissions": {
     "app": {
-      "net": ["api.track.toggl.com", "api.github.com", "github.com"],
+      "net": ["api.track.toggl.com"],
       "read": true,
       "write": true,
       "env": true,

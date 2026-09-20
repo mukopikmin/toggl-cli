@@ -37,9 +37,10 @@ toggl init
 
 This asks for a workspace ID, API token, and timezone. The workspace ID and API
 token are required; interactive input retries empty values, while incomplete
-non-interactive input does not create the file. On POSIX systems, the file is
-created with permissions set to `0600`. The API token is not printed after
-entry. You can also create it manually:
+non-interactive input does not create the file. The timezone defaults to
+`Asia/Tokyo`. On POSIX systems, the file is created with permissions set to
+`0600`. The API token is not printed after entry. You can also create it
+manually:
 
 ```toml
 workspace = "your_workspace_id"
@@ -52,10 +53,11 @@ display_order = 10
 hidden = false
 ```
 
-`timezone` is optional and defaults to the execution environment's timezone.
-Project settings are also optional: `display_name` changes the displayed name,
+Project settings are optional: `display_name` changes the displayed name,
 `display_order` sorts configured projects first in ascending order, and `hidden`
-excludes a project from project lists and CSV summaries.
+excludes a project from project lists and CSV summaries. The timezone is used to
+calculate date ranges and defaults to the execution environment's timezone when
+loading a manually created file without one.
 
 The config contains credentials, so restrict access to it:
 

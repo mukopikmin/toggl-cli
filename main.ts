@@ -1,14 +1,16 @@
 import { ClipboardUnavailableError } from "./clipboard.ts";
 import { CliUsageError, HELP_TEXT, parseCliArgs } from "./cli.ts";
 import { runConfigCommand } from "./command/config.ts";
-import { runInitCommand } from "./command/init.ts";
+import { InitInputError, runInitCommand } from "./command/init.ts";
 import {
+  ProjectReorderUnavailableError,
   runProjectListCommand,
+  runProjectReorderCommand,
   runProjectSyncCommand,
 } from "./command/project.ts";
 import { runSummaryCommand } from "./command/summary.ts";
 import { runTimeEntryListCommand } from "./command/time_entry.ts";
-import { runUpdateCommand } from "./command/update.ts";
+import { checkForUpdate, installUpdate } from "./command/update.ts";
 import { togglClient } from "./toggl/api.ts";
 import { TogglApiError } from "./toggl/error.ts";
 import { version } from "./version.ts";
@@ -47,19 +49,32 @@ function reportConfigError(error: unknown): boolean {
     console.error(`Error: ${error.message}`);
     return true;
   }
+  if (error instanceof InitInputError) {
+    console.error(`Error: ${error.message}`);
+    return true;
+  }
   return false;
 }
 
 export interface MainDependencies {
   runConfigCommand: typeof runConfigCommand;
+  checkForUpdate: typeof checkForUpdate;
+  installUpdate: typeof installUpdate;
+  confirm(message: string): boolean;
 }
 
-const defaultMainDependencies: MainDependencies = { runConfigCommand };
+const defaultMainDependencies: MainDependencies = {
+  runConfigCommand,
+  checkForUpdate,
+  installUpdate,
+  confirm,
+};
 
 export async function main(
   args: string[],
-  dependencies: MainDependencies = defaultMainDependencies,
+  overrides: Partial<MainDependencies> = {},
 ): Promise<number> {
+  const dependencies = { ...defaultMainDependencies, ...overrides };
   let command;
   try {
     command = parseCliArgs(args);
@@ -83,6 +98,9 @@ export async function main(
       case "project-list":
         await runProjectListCommand({ format: command.format }, togglClient);
         return 0;
+      case "project-reorder":
+        await runProjectReorderCommand(togglClient);
+        return 0;
       case "config":
         await dependencies.runConfigCommand(command.format);
         return 0;
@@ -96,20 +114,32 @@ export async function main(
         await runTimeEntryListCommand(command, togglClient);
         return 0;
       case "update": {
-        const result = await runUpdateCommand({
-          channel: command.channel,
-          currentVersion: version,
-        });
-        console.log(
-          result.status === "updated"
-            ? `Updated to ${result.version}.`
-            : `Already up to date (${result.version}).`,
+        const plan = await dependencies.checkForUpdate(
+          version,
+          command.channel,
         );
+        console.log(`Current version: ${plan.currentVersion}`);
+        console.log(`Update channel: ${plan.channel}`);
+        console.log(`Available version: ${plan.targetVersion}`);
+        if (!plan.updateAvailable) {
+          console.log("Already up to date; no update was installed.");
+          return 0;
+        }
+        if (!dependencies.confirm("Download and install this update?")) {
+          console.log("Update cancelled.");
+          return 0;
+        }
+        const result = await dependencies.installUpdate(plan);
+        console.log(`Installed version ${result.targetVersion}.`);
         return 0;
       }
     }
   } catch (error) {
     if (reportConfigError(error)) return 1;
+    if (error instanceof ProjectReorderUnavailableError) {
+      console.error(`Error: ${error.message}`);
+      return 1;
+    }
     if (
       !(error instanceof ClipboardUnavailableError) &&
       !(error instanceof TogglApiError)
