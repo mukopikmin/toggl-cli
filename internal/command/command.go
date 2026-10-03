@@ -8,10 +8,8 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -633,26 +631,4 @@ func csv(h []string, rows [][]string, sep string) string {
 		lines = append(lines, strings.Join(r, sep))
 	}
 	return strings.Join(lines, "\n")
-}
-func clipboard(text string) error {
-	var candidates [][]string
-	switch runtime.GOOS {
-	case "darwin":
-		candidates = [][]string{{"pbcopy"}}
-	case "windows":
-		candidates = [][]string{{"clip"}, {"powershell.exe", "-NoProfile", "-Command", "Set-Clipboard"}}
-	case "linux":
-		candidates = [][]string{{"wl-copy"}, {"xclip", "-selection", "clipboard"}, {"xsel", "--clipboard", "--input"}}
-	}
-	for _, c := range candidates {
-		if _, e := exec.LookPath(c[0]); e != nil {
-			continue
-		}
-		cmd := exec.Command(c[0], c[1:]...)
-		cmd.Stdin = strings.NewReader(text)
-		if cmd.Run() == nil {
-			return nil
-		}
-	}
-	return errors.New("Could not copy output to the clipboard.")
 }
