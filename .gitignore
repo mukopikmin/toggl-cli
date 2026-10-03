@@ -1,11 +1,6 @@
-# Created by https://www.toptal.com/developers/gitignore/api/macos,visualstudiocode,deno
-# Edit at https://www.toptal.com/developers/gitignore?templates=macos,visualstudiocode,deno
-
-### Deno ###
+# Development tools
 /.idea/
 /.vscode/
-
-/node_modules
 
 .env
 *.orig

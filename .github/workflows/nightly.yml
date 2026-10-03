@@ -28,13 +28,13 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
-      - name: Setup Deno
-        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+      - name: Setup Go
+        uses: actions/setup-go@f18c1e0c8b801e2bb1e5986465851e8a7f165732 # v6.0.0
         with:
-          deno-version: v2.8.0
+          go-version: '1.23.x'
 
       - name: Build nightly archives
-        run: deno task dist --version nightly
+        run: ./scripts/build_release.sh nightly
 
       - name: Create or update nightly release
         env:
