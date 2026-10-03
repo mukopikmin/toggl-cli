@@ -29,7 +29,7 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Setup Go
-        uses: actions/setup-go@f18c1e0c8b801e2bb1e5986465851e8a7f165732 # v6.0.0
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
           go-version: '1.23.x'
 
