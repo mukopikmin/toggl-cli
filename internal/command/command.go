@@ -206,9 +206,6 @@ func parseOpts(args []string, allowed map[string]bool) (opts, error) {
 	if o.format != "csv" && o.format != "json" && o.format != "table" {
 		return o, usage("format must be csv, json, or table")
 	}
-	if o.sep == "" {
-		return o, usage("separator must not be empty")
-	}
 	return o, nil
 }
 func loadCfg() (config.Document, error) { return config.Load() }
@@ -263,8 +260,14 @@ func (a App) init(args []string) error {
 	p := config.Path(home)
 	if _, e := os.Stat(p); e == nil {
 		return fmt.Errorf("%s already exists", config.DisplayPath)
+	} else if !os.IsNotExist(e) {
+		return e
 	}
 	r := bufio.NewReader(a.In)
+	interactive := false
+	if in, ok := a.In.(*os.File); ok {
+		interactive = term.IsTerminal(int(in.Fd()))
+	}
 	ask := func(label, def string, secret bool) (string, error) {
 		for {
 			if def != "" {
@@ -296,6 +299,10 @@ func (a App) init(args []string) error {
 			if e != nil {
 				return "", fmt.Errorf("Input ended before %s was provided", label)
 			}
+			if !interactive {
+				return "", fmt.Errorf("%s is required", label)
+			}
+			fmt.Fprintf(a.Out, "%s is required. Please enter a value.\n", label)
 		}
 	}
 	w, e := ask("Workspace", "", false)
@@ -313,8 +320,21 @@ func (a App) init(args []string) error {
 	if e = os.MkdirAll(filepath.Dir(p), 0700); e != nil {
 		return e
 	}
-	text := fmt.Sprintf("workspace = %q\ntoken = %q\ntimezone = %q\n", w, t, z)
-	if e = os.WriteFile(p, []byte(text), 0600); e != nil {
+	text, e := config.EncodeInitial(w, t, z)
+	if e != nil {
+		return e
+	}
+	file, e := os.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if e != nil {
+		return e
+	}
+	if _, e = file.WriteString(text); e != nil {
+		file.Close()
+		os.Remove(p)
+		return e
+	}
+	if e = file.Close(); e != nil {
+		os.Remove(p)
 		return e
 	}
 	fmt.Fprintf(a.Out, "Wrote %s\n", config.DisplayPath)
@@ -368,9 +388,11 @@ func (a App) project(ctx context.Context, args []string) error {
 			}
 			fmt.Fprintln(a.Out, table([]string{"Project"}, rows))
 		} else {
-			for _, p := range ps {
-				fmt.Fprintln(a.Out, p.DisplayName)
+			names := make([]string, len(ps))
+			for i, p := range ps {
+				names[i] = p.DisplayName
 			}
+			fmt.Fprintln(a.Out, strings.Join(names, "\n"))
 		}
 		return nil
 	case "sync":
@@ -385,7 +407,8 @@ func (a App) project(ctx context.Context, args []string) error {
 			if !strings.HasSuffix(text, "\n") {
 				text += "\n"
 			}
-			text += fmt.Sprintf("\n# %s\n[projects.\"%d\"]\nhidden = false\n", strings.ReplaceAll(p.Name, "\n", "\n# "), p.ID)
+			name := strings.ReplaceAll(strings.ReplaceAll(p.Name, "\r\n", "\n"), "\r", "\n")
+			text += fmt.Sprintf("\n# %s\n[projects.\"%d\"]\nhidden = false\n", strings.ReplaceAll(name, "\n", "\n# "), p.ID)
 			count++
 		}
 		if count == 0 {
@@ -532,6 +555,9 @@ func (a App) timeEntry(ctx context.Context, args []string) error {
 	}
 	if len(o.pos) != 2 {
 		return usage("time-entry list requires start and end day")
+	}
+	if o.sep == "" {
+		return usage("separator must not be empty")
 	}
 	if o.format == "table" && o.separatorSet {
 		return usage("--separator cannot be used with table format")

@@ -176,3 +176,12 @@ func TestInstallUpdateVerifiesAndReplacesExecutable(t *testing.T) {
 		t.Fatalf("%q %v", got, err)
 	}
 }
+
+func TestWindowsUpdateScriptCleansUpAndQuotesPaths(t *testing.T) {
+	script := windowsUpdateScript(42, `C:\O'Brien\stage.exe`, `C:\O'Brien\toggl.exe`)
+	for _, want := range []string{`try {`, `finally {`, `C:\O''Brien\stage.exe`, `C:\O''Brien\toggl.exe`, `Remove-Item -LiteralPath $PSCommandPath`} {
+		if !strings.Contains(script, want) {
+			t.Fatalf("script lacks %q:\n%s", want, script)
+		}
+	}
+}

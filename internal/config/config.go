@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
 	"math"
 	"os"
@@ -112,4 +113,17 @@ func Parse(text string) (Config, error) {
 		return Config{}, fmt.Errorf("Invalid project configuration: %s", strings.Join(invalid, ", "))
 	}
 	return cfg, nil
+}
+
+func EncodeInitial(workspace, token, timezone string) (string, error) {
+	value := struct {
+		Workspace string `toml:"workspace"`
+		Token     string `toml:"token"`
+		Timezone  string `toml:"timezone"`
+	}{workspace, token, timezone}
+	var output bytes.Buffer
+	if err := toml.NewEncoder(&output).Encode(value); err != nil {
+		return "", err
+	}
+	return output.String(), nil
 }

@@ -1,6 +1,7 @@
 package command
 
 import (
+	"bytes"
 	"github.com/mukopikmin/toggl-cli/internal/model"
 	"strings"
 	"testing"
@@ -11,6 +12,14 @@ func TestUpdateReorderState(t *testing.T) {
 	s := updateReorderState(reorderState{Projects: p, Selected: 1}, "move-up")
 	if s.Selected != 0 || s.Projects[0].ID != 2 || p[0].ID != 1 {
 		t.Fatalf("%+v", s)
+	}
+}
+
+func TestSelectOrderEOFCancels(t *testing.T) {
+	projects := []model.Project{{ID: 1, DisplayName: "one"}}
+	got, saved, err := selectOrderLoop(projects, bytes.NewReader(nil), &bytes.Buffer{})
+	if err != nil || saved || got != nil {
+		t.Fatalf("got=%v saved=%v err=%v", got, saved, err)
 	}
 }
 func TestUpdateProjectOrders(t *testing.T) {

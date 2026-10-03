@@ -103,6 +103,16 @@ func TestProjectListAndSync(t *testing.T) {
 		t.Fatal(string(b))
 	}
 }
+
+func TestEmptyProjectListWritesNewline(t *testing.T) {
+	app, out := configuredApp(t, &fakeClient{}, "")
+	if err := app.Run(context.Background(), []string{"project", "list"}); err != nil {
+		t.Fatal(err)
+	}
+	if out.String() != "\n" {
+		t.Fatalf("%q", out.String())
+	}
+}
 func TestSummaryFormatsAndBoundaries(t *testing.T) {
 	pid := int64(1)
 	client := &fakeClient{projects: []model.Project{{ID: 1, Name: "P", DisplayName: "P", Active: true}}, entries: []model.TimeEntry{{ID: 1, ProjectID: &pid, Start: "2026-05-01T23:30:00Z", DurationSeconds: 90}}}
@@ -125,6 +135,17 @@ func TestSummaryFormatsAndBoundaries(t *testing.T) {
 	app, _ := configuredApp(t, client, "")
 	if err := app.Run(context.Background(), []string{"summary", "2026-05-01", "2026-05-02", "--format", "table", "--separator", ","}); err == nil {
 		t.Fatal("expected table/separator error")
+	}
+}
+
+func TestSummaryAllowsEmptySeparator(t *testing.T) {
+	client := &fakeClient{projects: []model.Project{{ID: 1, DisplayName: "P"}}}
+	app, out := configuredApp(t, client, "")
+	if err := app.Run(context.Background(), []string{"summary", "2026-05-01", "2026-05-01", "--separator", ""}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "Project2026-05-01") {
+		t.Fatal(out.String())
 	}
 }
 func TestTimeEntryFormats(t *testing.T) {
@@ -153,6 +174,14 @@ func TestTimeEntryFormats(t *testing.T) {
 		})
 	}
 }
+
+func TestTimeEntryRejectsEmptySeparator(t *testing.T) {
+	app, _ := configuredApp(t, &fakeClient{}, "")
+	err := app.Run(context.Background(), []string{"time-entry", "list", "1", "2", "--separator", ""})
+	if err == nil || err.Error() != "separator must not be empty" {
+		t.Fatalf("%v", err)
+	}
+}
 func TestInitCreatesProtectedConfig(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -168,6 +197,15 @@ func TestInitCreatesProtectedConfig(t *testing.T) {
 	if info.Mode().Perm() != 0600 {
 		t.Fatalf("mode %o", info.Mode().Perm())
 	}
+	before, _ := os.ReadFile(config.Path(home))
+	app.In = strings.NewReader("replacement\nreplacement\nUTC\n")
+	if err := app.Run(context.Background(), []string{"init"}); err == nil {
+		t.Fatal("expected existing config error")
+	}
+	after, _ := os.ReadFile(config.Path(home))
+	if !bytes.Equal(before, after) {
+		t.Fatal("existing config was overwritten")
+	}
 }
 
 func TestInitRejectsIncompleteInputWithoutCreatingFile(t *testing.T) {
@@ -179,6 +217,16 @@ func TestInitRejectsIncompleteInputWithoutCreatingFile(t *testing.T) {
 	}
 	if _, err := os.Stat(config.Path(home)); !os.IsNotExist(err) {
 		t.Fatalf("config should not exist: %v", err)
+	}
+}
+
+func TestInitRejectsEmptyNonInteractiveRequiredValue(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	app := App{Client: &fakeClient{}, Out: &bytes.Buffer{}, In: strings.NewReader("\n")}
+	err := app.Run(context.Background(), []string{"init"})
+	if err == nil || err.Error() != "Workspace is required" {
+		t.Fatalf("%v", err)
 	}
 }
 

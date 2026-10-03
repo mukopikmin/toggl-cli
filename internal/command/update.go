@@ -145,15 +145,19 @@ func desiredVersion(ctx context.Context, client *http.Client, channel string) (v
 	return version, "nightly", err
 }
 func checkUpdate(ctx context.Context, current, channel string, client *http.Client) (updatePlan, error) {
-	if current == "0.0.0-dev" || !stableVersion.MatchString(current) && !isNightly(current) {
-		return updatePlan{}, errors.New("Self-update is unavailable when running from source. Install a compiled toggl binary first.")
-	}
 	if channel == "" {
 		channel = defaultChannel(current)
 	}
 	target, err := releaseTarget(runtime.GOOS, runtime.GOARCH)
 	if err != nil {
 		return updatePlan{}, err
+	}
+	validVersion := stableVersion.MatchString(current) || current == "nightly" || regexp.MustCompile(`^nightly-\d{8}-[0-9a-fA-F]{7,40}$`).MatchString(current)
+	if current == "0.0.0-dev" {
+		return updatePlan{}, errors.New("Self-update is unavailable when running from source. Install a compiled toggl binary first.")
+	}
+	if !validVersion {
+		return updatePlan{}, errors.New("The running executable does not report a valid Toggl CLI version.")
 	}
 	exe, err := os.Executable()
 	if err != nil {
@@ -238,15 +242,36 @@ func extractBinary(archive []byte, name, target string) ([]byte, error) {
 	}
 	return nil, errors.New("Release archive does not contain the expected Toggl CLI binary.")
 }
+
+func windowsUpdateScript(pid int, staged, executable string) string {
+	quotedStage, quotedExecutable := strings.ReplaceAll(staged, "'", "''"), strings.ReplaceAll(executable, "'", "''")
+	return fmt.Sprintf(`$ErrorActionPreference = "Stop"
+$updated = $false
+try {
+  Wait-Process -Id %d -ErrorAction SilentlyContinue
+  Move-Item -LiteralPath '%s' -Destination '%s' -Force
+  $updated = $true
+} finally {
+  if (-not $updated) { Remove-Item -LiteralPath '%s' -Force -ErrorAction SilentlyContinue }
+  Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
+}
+`, pid, quotedStage, quotedExecutable, quotedStage)
+}
+
 func installUpdate(ctx context.Context, p updatePlan, client *http.Client) error {
-	archive, err := download(ctx, client, p.DownloadURL)
-	if err != nil {
-		return err
+	type result struct {
+		data []byte
+		err  error
 	}
-	checksum, err := download(ctx, client, p.DownloadURL+".sha256")
-	if err != nil {
-		return err
+	archiveResult, checksumResult := make(chan result, 1), make(chan result, 1)
+	go func() { b, e := download(ctx, client, p.DownloadURL); archiveResult <- result{b, e} }()
+	go func() { b, e := download(ctx, client, p.DownloadURL+".sha256"); checksumResult <- result{b, e} }()
+	a, c := <-archiveResult, <-checksumResult
+	if a.err != nil || c.err != nil {
+		return errors.New("Failed to download the update archive or checksum.")
 	}
+	archive, checksum := a.data, c.data
+	var err error
 	if err = verifyChecksum(archive, string(checksum)); err != nil {
 		return err
 	}
@@ -280,19 +305,26 @@ func installUpdate(ctx context.Context, p updatePlan, client *http.Client) error
 		return fmt.Errorf("Downloaded binary version mismatch (expected %s); the existing binary was not changed.", p.TargetVersion)
 	}
 	if runtime.GOOS == "windows" {
-		script := fmt.Sprintf("Wait-Process -Id %d; Move-Item -LiteralPath '%s' -Destination '%s' -Force; Remove-Item -LiteralPath $PSCommandPath -Force", os.Getpid(), strings.ReplaceAll(stageName, "'", "''"), strings.ReplaceAll(p.Executable, "'", "''"))
+		script := windowsUpdateScript(os.Getpid(), stageName, p.Executable)
 		helper, err := os.CreateTemp(dir, ".toggl-update-*.ps1")
 		if err != nil {
 			return err
 		}
 		if _, err = helper.WriteString(script); err != nil {
+			helper.Close()
+			os.Remove(helper.Name())
 			return err
 		}
-		helper.Close()
+		if err = helper.Close(); err != nil {
+			os.Remove(helper.Name())
+			return err
+		}
 		cmd := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", helper.Name())
 		if err = cmd.Start(); err != nil {
+			os.Remove(helper.Name())
 			return err
 		}
+		_ = cmd.Process.Release()
 		stageName = ""
 		return nil
 	}

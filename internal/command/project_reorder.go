@@ -3,6 +3,7 @@ package command
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"regexp"
 	"strconv"
@@ -74,11 +75,18 @@ func selectOrder(projects []model.Project, in, out *os.File) ([]model.Project, b
 	defer term.Restore(int(in.Fd()), old)
 	fmt.Fprint(out, "\x1b[?25l")
 	defer fmt.Fprint(out, "\x1b[2J\x1b[H\x1b[?25h")
+	return selectOrderLoop(projects, in, out)
+}
+
+func selectOrderLoop(projects []model.Project, in io.Reader, out io.Writer) ([]model.Project, bool, error) {
 	s := reorderState{Projects: append([]model.Project(nil), projects...)}
 	buf := make([]byte, 16)
 	for {
 		fmt.Fprint(out, renderReorder(s))
 		n, e := in.Read(buf)
+		if errors.Is(e, io.EOF) {
+			return nil, false, nil
+		}
 		if e != nil {
 			return nil, false, e
 		}

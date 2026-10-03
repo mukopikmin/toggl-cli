@@ -45,3 +45,17 @@ func TestLoadErrorsAndDocument(t *testing.T) {
 		t.Fatalf("%+v %v", doc, err)
 	}
 }
+
+func TestEncodeInitialRoundTripsSpecialCharacters(t *testing.T) {
+	text, err := EncodeInitial(`work#"space`, `tok\en#value`, `Asia/Tokyo`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := Parse(text)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Workspace != `work#"space` || got.Token != `tok\en#value` {
+		t.Fatalf("%+v\n%s", got, text)
+	}
+}

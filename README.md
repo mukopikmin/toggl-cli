@@ -3,6 +3,10 @@
 A Go CLI that aggregates Toggl Track time entries by project and date. Results
 can be output as delimiter-separated values, JSON, or bordered terminal tables.
 
+Configuration is parsed with `github.com/BurntSushi/toml`, which is distributed
+under the permissive MIT license. Third-party license texts are recorded in
+`THIRD_PARTY_NOTICES.md` and included in release archives.
+
 ## Requirements
 
 - A Toggl Track API token and workspace ID
@@ -102,5 +106,8 @@ go test ./...
 go build ./...
 ```
 
-Build all release archives with `./scripts/build_release.sh 0.1.0`. CI uses the
-same formatting, shell syntax, static-analysis, test, and build checks.
+Build all release archives with `./scripts/build_release.sh --version 0.1.0`.
+The positional form `./scripts/build_release.sh 0.1.0` remains available, and
+`--target linux-x64` (or `darwin-arm64` / `windows-x64`) limits the build to one
+or more targets. CI uses the same formatting, shell syntax, static-analysis,
+test, and build checks.

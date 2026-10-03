@@ -20,6 +20,12 @@ jobs:
         run: test -z "$(gofmt -l .)"
       - name: Check installer syntax
         run: sh -n install.sh
+      - name: Check third-party notices
+        run: |
+          test -s THIRD_PARTY_NOTICES.md
+          grep -F 'github.com/BurntSushi/toml v1.4.0' go.mod
+          grep -F 'golang.org/x/term v0.28.0' go.mod
+          grep -F 'golang.org/x/sys v0.29.0' go.mod
       - name: Static analysis
         run: go vet ./...
       - name: Test
