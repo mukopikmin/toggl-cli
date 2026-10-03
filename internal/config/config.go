@@ -1,16 +1,26 @@
 package config
 
 import (
-	"bufio"
-	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/BurntSushi/toml"
 )
 
 const DisplayPath = "~/.config/toggl-cli/config.toml"
+
+type HomeNotSetError struct{}
+
+func (HomeNotSetError) Error() string { return "HOME environment variable not set" }
+
+type FileNotFoundError struct{}
+
+func (FileNotFoundError) Error() string { return DisplayPath + " file not found" }
 
 type Project struct {
 	DisplayName  string
@@ -25,103 +35,81 @@ type Document struct {
 	Path, Text string
 	Config     Config
 }
+type rawProject struct {
+	DisplayName  *string  `toml:"display_name"`
+	Hidden       *bool    `toml:"hidden"`
+	DisplayOrder *float64 `toml:"display_order"`
+}
+type rawConfig struct {
+	Workspace *string               `toml:"workspace"`
+	Token     *string               `toml:"token"`
+	Timezone  *string               `toml:"timezone"`
+	Projects  map[string]rawProject `toml:"projects"`
+}
 
 func Path(home string) string { return filepath.Join(home, ".config", "toggl-cli", "config.toml") }
 func Load() (Document, error) {
 	home := os.Getenv("HOME")
 	if home == "" {
-		return Document{}, errors.New("HOME environment variable not set")
+		return Document{}, HomeNotSetError{}
 	}
 	p := Path(home)
 	b, err := os.ReadFile(p)
 	if os.IsNotExist(err) {
-		return Document{}, fmt.Errorf("%s file not found", DisplayPath)
+		return Document{}, FileNotFoundError{}
 	}
 	if err != nil {
 		return Document{}, fmt.Errorf("Unable to read %s: %w", DisplayPath, err)
 	}
 	c, err := Parse(string(b))
-	return Document{p, string(b), c}, err
+	return Document{Path: p, Text: string(b), Config: c}, err
 }
 
 func Parse(text string) (Config, error) {
-	c := Config{Projects: map[int64]Project{}}
-	var current *int64
-	s := bufio.NewScanner(strings.NewReader(text))
-	for s.Scan() {
-		line := strings.TrimSpace(strings.SplitN(s.Text(), "#", 2)[0])
-		if line == "" {
+	var raw rawConfig
+	if _, err := toml.Decode(text, &raw); err != nil {
+		return Config{}, fmt.Errorf("Invalid configuration: %w", err)
+	}
+	var missing []string
+	if raw.Workspace == nil || *raw.Workspace == "" {
+		missing = append(missing, "workspace")
+	}
+	if raw.Token == nil || *raw.Token == "" {
+		missing = append(missing, "token")
+	}
+	if len(missing) > 0 {
+		return Config{}, fmt.Errorf("Missing required configuration: %s", strings.Join(missing, ", "))
+	}
+	cfg := Config{Workspace: *raw.Workspace, Token: *raw.Token, Projects: map[int64]Project{}}
+	if raw.Timezone != nil {
+		cfg.Timezone = *raw.Timezone
+	}
+	var invalid []string
+	for key, p := range raw.Projects {
+		id, err := strconv.ParseInt(key, 10, 64)
+		if err != nil || !regexp.MustCompile(`^\d+$`).MatchString(key) {
+			invalid = append(invalid, "projects."+key)
 			continue
 		}
-		if strings.HasPrefix(line, "[") {
-			raw := strings.Trim(line, "[] ")
-			if !strings.HasPrefix(raw, "projects.") {
-				return c, fmt.Errorf("Invalid configuration")
-			}
-			idtxt := strings.Trim(strings.TrimPrefix(raw, "projects."), "\"'")
-			id, err := strconv.ParseInt(idtxt, 10, 64)
-			if err != nil {
-				return c, fmt.Errorf("Invalid project configuration: projects.%s", idtxt)
-			}
-			current = &id
-			if _, ok := c.Projects[id]; !ok {
-				c.Projects[id] = Project{}
-			}
+		project := Project{DisplayOrder: p.DisplayOrder}
+		if p.DisplayOrder != nil && (math.IsNaN(*p.DisplayOrder) || math.IsInf(*p.DisplayOrder, 0)) {
+			invalid = append(invalid, "projects."+key)
 			continue
 		}
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) != 2 {
-			return c, fmt.Errorf("Invalid configuration")
+		if p.DisplayName != nil {
+			if *p.DisplayName == "" {
+				invalid = append(invalid, "projects."+key)
+				continue
+			}
+			project.DisplayName = *p.DisplayName
 		}
-		key, val := strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1])
-		unquote := func(v string) (string, error) { q, err := strconv.Unquote(v); return q, err }
-		if current == nil {
-			v, err := unquote(val)
-			if err != nil {
-				return c, fmt.Errorf("Invalid configuration")
-			}
-			switch key {
-			case "workspace":
-				c.Workspace = v
-			case "token":
-				c.Token = v
-			case "timezone":
-				c.Timezone = v
-			}
-		} else {
-			p := c.Projects[*current]
-			switch key {
-			case "display_name":
-				v, e := unquote(val)
-				if e != nil {
-					return c, fmt.Errorf("Invalid project configuration: projects.%d", *current)
-				}
-				p.DisplayName = v
-			case "hidden":
-				v, e := strconv.ParseBool(val)
-				if e != nil {
-					return c, fmt.Errorf("Invalid project configuration: projects.%d", *current)
-				}
-				p.Hidden = v
-			case "display_order":
-				v, e := strconv.ParseFloat(val, 64)
-				if e != nil {
-					return c, fmt.Errorf("Invalid project configuration: projects.%d", *current)
-				}
-				p.DisplayOrder = &v
-			}
-			c.Projects[*current] = p
+		if p.Hidden != nil {
+			project.Hidden = *p.Hidden
 		}
+		cfg.Projects[id] = project
 	}
-	if c.Workspace == "" || c.Token == "" {
-		var m []string
-		if c.Workspace == "" {
-			m = append(m, "workspace")
-		}
-		if c.Token == "" {
-			m = append(m, "token")
-		}
-		return c, fmt.Errorf("Missing required configuration: %s", strings.Join(m, ", "))
+	if len(invalid) > 0 {
+		return Config{}, fmt.Errorf("Invalid project configuration: %s", strings.Join(invalid, ", "))
 	}
-	return c, s.Err()
+	return cfg, nil
 }

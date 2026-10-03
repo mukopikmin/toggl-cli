@@ -48,6 +48,12 @@ optional. `display_name` changes output, `display_order` sorts configured
 projects first, and `hidden` excludes a project. The token is never shown by
 `toggl config`. Protect the file with `chmod 600`.
 
+To migrate an old `~/.toggl_config`, run this from a checkout:
+
+```sh
+go run ./cmd/migrate-config
+```
+
 ## Command compatibility
 
 The Go implementation preserves the command surface, defaults, output formats,
@@ -59,15 +65,24 @@ and successful/error exit codes of the previous implementation:
 | `time-entry list` | `<start-day> <end-day>`; `-f/--format`, `-s/--separator` | Entries as CSV, JSON, or table |
 | `project list` | `-f/--format` | Visible ordered project names, JSON, or table |
 | `project sync` | none | Adds missing active projects to the TOML file |
-| `project reorder` | none | Requires an interactive terminal |
+| `project reorder` | none | Interactively changes and saves visible-project order |
 | `config` | `-f/--format` | Non-sensitive settings as `KEY=VALUE`, JSON, or table |
 | `init` | none | Creates a mode-`0600` configuration interactively |
-| `update` | `--channel stable\|nightly` | Directs source builds to the verified installer |
+| `update` | `--channel stable\|nightly` | Checks, verifies, and installs a release update |
 | `--help`, `-h` | none | Help text |
 | `--version` | none | Build version |
 
 Date ranges are inclusive. Invalid usage, configuration, API, clipboard, and
 I/O errors exit with status 1; successful commands exit with status 0.
+
+`project reorder` requires an interactive terminal. Use `j`/`k` or the arrow
+keys to select, Space to pick or drop, uppercase `J`/`K` to move, Enter to save,
+and `q` or Escape to cancel.
+
+`toggl update` is available in compiled release binaries. It selects the stable
+or nightly channel, verifies the downloaded archive's SHA-256 checksum and
+embedded version, and only then replaces the current executable. Development
+builds such as `0.0.0-dev` must be updated by building or installing again.
 
 ## Architecture
 
@@ -84,7 +99,7 @@ go run ./cmd/toggl -- summary 2026-06-01 2026-06-15
 gofmt -w .
 go vet ./...
 go test ./...
-go build -o /tmp/toggl-cli ./cmd/toggl
+go build ./...
 ```
 
 Build all release archives with `./scripts/build_release.sh 0.1.0`. CI uses the

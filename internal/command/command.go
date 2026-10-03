@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strconv"
@@ -19,6 +20,7 @@ import (
 	"github.com/mukopikmin/toggl-cli/internal/config"
 	"github.com/mukopikmin/toggl-cli/internal/model"
 	"github.com/mukopikmin/toggl-cli/internal/toggl"
+	"golang.org/x/term"
 )
 
 const Help = `Usage:
@@ -58,6 +60,14 @@ type App struct {
 	Version  string
 }
 
+type UsageError struct{ Message string }
+
+func (e UsageError) Error() string { return e.Message }
+func usage(message string) error   { return UsageError{Message: message} }
+func usagef(format string, args ...any) error {
+	return UsageError{Message: fmt.Sprintf(format, args...)}
+}
+
 func (a App) Run(ctx context.Context, args []string) error {
 	if a.Out == nil {
 		a.Out = os.Stdout
@@ -72,12 +82,15 @@ func (a App) Run(ctx context.Context, args []string) error {
 		a.Now = time.Now
 	}
 	if len(args) == 0 || args[0] == "-h" || args[0] == "--help" {
+		if len(args) > 1 {
+			return usage("--help does not accept arguments")
+		}
 		fmt.Fprintln(a.Out, Help)
 		return nil
 	}
 	if args[0] == "--version" {
 		if len(args) > 1 {
-			return errors.New("--version does not accept arguments")
+			return usage("--version does not accept arguments")
 		}
 		fmt.Fprintln(a.Out, a.Version)
 		return nil
@@ -96,7 +109,7 @@ func (a App) Run(ctx context.Context, args []string) error {
 	case "update":
 		return a.update(args[1:])
 	default:
-		return fmt.Errorf("unknown command: %s", args[0])
+		return usagef("unknown command: %s", args[0])
 	}
 }
 
@@ -104,7 +117,17 @@ type opts struct {
 	format, sep                  string
 	days                         *int
 	noProject, noDate, clipboard bool
+	separatorSet                 bool
 	pos                          []string
+}
+
+type outputTimeEntry struct {
+	ID              int64   `json:"id"`
+	Description     string  `json:"description"`
+	ProjectID       *int64  `json:"project_id"`
+	Start           string  `json:"start"`
+	Stop            *string `json:"stop"`
+	DurationMinutes float64 `json:"duration_minutes"`
 }
 
 func parseOpts(args []string, allowed map[string]bool) (opts, error) {
@@ -120,7 +143,7 @@ func parseOpts(args []string, allowed map[string]bool) (opts, error) {
 				return val, nil
 			}
 			if i+1 >= len(args) {
-				return "", fmt.Errorf("option %s requires a value", key)
+				return "", usagef("option %s requires a value", key)
 			}
 			i++
 			return args[i], nil
@@ -128,7 +151,7 @@ func parseOpts(args []string, allowed map[string]bool) (opts, error) {
 		switch key {
 		case "-f", "--format":
 			if !allowed["format"] {
-				return o, fmt.Errorf("unknown option: %s", key)
+				return o, usagef("unknown option: %s", key)
 			}
 			v, e := take()
 			if e != nil {
@@ -137,16 +160,17 @@ func parseOpts(args []string, allowed map[string]bool) (opts, error) {
 			o.format = v
 		case "-s", "--separator":
 			if !allowed["separator"] {
-				return o, fmt.Errorf("unknown option: %s", key)
+				return o, usagef("unknown option: %s", key)
 			}
 			v, e := take()
 			if e != nil {
 				return o, e
 			}
 			o.sep = v
+			o.separatorSet = true
 		case "-d", "--days":
 			if !allowed["days"] {
-				return o, fmt.Errorf("unknown option: %s", key)
+				return o, usagef("unknown option: %s", key)
 			}
 			v, e := take()
 			if e != nil {
@@ -154,27 +178,36 @@ func parseOpts(args []string, allowed map[string]bool) (opts, error) {
 			}
 			n, e := strconv.Atoi(v)
 			if e != nil || n < 0 {
-				return o, errors.New("days must be a non-negative integer")
+				return o, usage("days must be a non-negative integer")
 			}
 			o.days = &n
 		case "--no-project":
+			if !allowed["no-project"] {
+				return o, usagef("unknown option: %s", key)
+			}
 			o.noProject = true
 		case "--no-date":
+			if !allowed["no-date"] {
+				return o, usagef("unknown option: %s", key)
+			}
 			o.noDate = true
 		case "--clipboard":
+			if !allowed["clipboard"] {
+				return o, usagef("unknown option: %s", key)
+			}
 			o.clipboard = true
 		default:
 			if strings.HasPrefix(arg, "-") {
-				return o, fmt.Errorf("unknown option: %s", arg)
+				return o, usagef("unknown option: %s", arg)
 			}
 			o.pos = append(o.pos, arg)
 		}
 	}
 	if o.format != "csv" && o.format != "json" && o.format != "table" {
-		return o, errors.New("format must be csv, json, or table")
+		return o, usage("format must be csv, json, or table")
 	}
 	if o.sep == "" {
-		return o, errors.New("separator must not be empty")
+		return o, usage("separator must not be empty")
 	}
 	return o, nil
 }
@@ -185,7 +218,7 @@ func (a App) showConfig(args []string) error {
 		return e
 	}
 	if len(o.pos) > 0 {
-		return errors.New("config does not accept positional arguments")
+		return usage("config does not accept positional arguments")
 	}
 	d, e := loadCfg()
 	if e != nil {
@@ -196,7 +229,11 @@ func (a App) showConfig(args []string) error {
 		v["TIMEZONE"] = d.Config.Timezone
 	}
 	if o.format == "json" {
-		b, _ := json.MarshalIndent(v, "", "  ")
+		visible := struct {
+			Workspace string `json:"WORKSPACE"`
+			Timezone  string `json:"TIMEZONE,omitempty"`
+		}{d.Config.Workspace, d.Config.Timezone}
+		b, _ := json.MarshalIndent(visible, "", "  ")
 		fmt.Fprintln(a.Out, string(b))
 		return nil
 	}
@@ -217,7 +254,7 @@ func (a App) showConfig(args []string) error {
 }
 func (a App) init(args []string) error {
 	if len(args) > 0 {
-		return errors.New("init does not accept arguments")
+		return usage("init does not accept arguments")
 	}
 	home := os.Getenv("HOME")
 	if home == "" {
@@ -228,14 +265,27 @@ func (a App) init(args []string) error {
 		return fmt.Errorf("%s already exists", config.DisplayPath)
 	}
 	r := bufio.NewReader(a.In)
-	ask := func(label, def string) (string, error) {
+	ask := func(label, def string, secret bool) (string, error) {
 		for {
 			if def != "" {
 				fmt.Fprintf(a.Out, "%s [%s]: ", label, def)
 			} else {
 				fmt.Fprintf(a.Out, "%s: ", label)
 			}
-			v, e := r.ReadString('\n')
+			var v string
+			var e error
+			if secret {
+				if in, ok := a.In.(*os.File); ok && term.IsTerminal(int(in.Fd())) {
+					var value []byte
+					value, e = term.ReadPassword(int(in.Fd()))
+					fmt.Fprintln(a.Out)
+					v = string(value)
+				} else {
+					v, e = r.ReadString('\n')
+				}
+			} else {
+				v, e = r.ReadString('\n')
+			}
 			v = strings.TrimSpace(v)
 			if v != "" {
 				return v, nil
@@ -248,15 +298,15 @@ func (a App) init(args []string) error {
 			}
 		}
 	}
-	w, e := ask("Workspace", "")
+	w, e := ask("Workspace", "", false)
 	if e != nil {
 		return e
 	}
-	t, e := ask("API token", "")
+	t, e := ask("API token", "", true)
 	if e != nil {
 		return e
 	}
-	z, e := ask("Timezone", "Asia/Tokyo")
+	z, e := ask("Timezone", "Asia/Tokyo", false)
 	if e != nil {
 		return e
 	}
@@ -273,7 +323,29 @@ func (a App) init(args []string) error {
 
 func (a App) project(ctx context.Context, args []string) error {
 	if len(args) == 0 {
-		return errors.New("project requires a subcommand: list, reorder, or sync")
+		return usage("project requires a subcommand: list, reorder, or sync")
+	}
+	var listOptions opts
+	switch args[0] {
+	case "list":
+		var err error
+		listOptions, err = parseOpts(args[1:], map[string]bool{"format": true})
+		if err != nil {
+			return err
+		}
+		if len(listOptions.pos) > 0 {
+			return usage("project list does not accept positional arguments")
+		}
+	case "sync":
+		if len(args) > 1 {
+			return usage("project sync does not accept arguments")
+		}
+	case "reorder":
+		if len(args) > 1 {
+			return usage("project reorder does not accept arguments")
+		}
+	default:
+		return usagef("unknown project subcommand: %s", args[0])
 	}
 	d, e := loadCfg()
 	if e != nil {
@@ -285,18 +357,11 @@ func (a App) project(ctx context.Context, args []string) error {
 	}
 	switch args[0] {
 	case "list":
-		o, e := parseOpts(args[1:], map[string]bool{"format": true})
-		if e != nil {
-			return e
-		}
-		if len(o.pos) > 0 {
-			return errors.New("project list does not accept positional arguments")
-		}
 		ps = model.VisibleSorted(ps)
-		if o.format == "json" {
+		if listOptions.format == "json" {
 			b, _ := json.MarshalIndent(ps, "", "  ")
 			fmt.Fprintln(a.Out, string(b))
-		} else if o.format == "table" {
+		} else if listOptions.format == "table" {
 			rows := [][]string{}
 			for _, p := range ps {
 				rows = append(rows, []string{p.DisplayName})
@@ -309,9 +374,6 @@ func (a App) project(ctx context.Context, args []string) error {
 		}
 		return nil
 	case "sync":
-		if len(args) > 1 {
-			return errors.New("project sync does not accept arguments")
-		}
 		configured := d.Config.Projects
 		sort.Slice(ps, func(i, j int) bool { return ps[i].ID < ps[j].ID })
 		text := d.Text
@@ -336,16 +398,18 @@ func (a App) project(ctx context.Context, args []string) error {
 		fmt.Fprintf(a.Out, "Added %d project(s) to the config file\n", count)
 		return nil
 	case "reorder":
-		return errors.New("project reorder requires an interactive terminal")
-	default:
-		return fmt.Errorf("unknown project subcommand: %s", args[0])
+		return a.reorderProjects(d, model.VisibleSorted(ps))
 	}
+	return nil
 }
 
 func parseDate(v string) (time.Time, error) {
+	if !regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`).MatchString(v) {
+		return time.Time{}, usage("start and end date must use YYYY-MM-DD")
+	}
 	t, e := time.Parse(time.DateOnly, v)
 	if e != nil {
-		return t, errors.New("start and end date must use YYYY-MM-DD")
+		return t, usage("start and end date must be valid dates")
 	}
 	return t, nil
 }
@@ -356,12 +420,12 @@ func location(c config.Config) (*time.Location, error) {
 	return time.LoadLocation(c.Timezone)
 }
 func (a App) summary(ctx context.Context, args []string) error {
-	o, e := parseOpts(args, map[string]bool{"format": true, "separator": true, "days": true})
+	o, e := parseOpts(args, map[string]bool{"format": true, "separator": true, "days": true, "no-project": true, "no-date": true, "clipboard": true})
 	if e != nil {
 		return e
 	}
-	if o.format == "table" && (o.noProject || o.noDate) {
-		return errors.New("--separator, --no-project, and --no-date cannot be used with table format")
+	if o.format == "table" && (o.separatorSet || o.noProject || o.noDate) {
+		return usage("--separator, --no-project, and --no-date cannot be used with table format")
 	}
 	d, e := loadCfg()
 	if e != nil {
@@ -374,14 +438,14 @@ func (a App) summary(ctx context.Context, args []string) error {
 	var from, to time.Time
 	if o.days != nil {
 		if len(o.pos) > 0 {
-			return errors.New("summary accepts either start and end date or --days, not both")
+			return usage("summary accepts either start and end date or --days, not both")
 		}
 		now := a.Now().In(loc)
 		to = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 		from = to.AddDate(0, 0, -*o.days)
 	} else {
 		if len(o.pos) != 2 {
-			return errors.New("summary requires start and end date or --days")
+			return usage("summary requires start and end date or --days")
 		}
 		from, e = parseDate(o.pos[0])
 		if e != nil {
@@ -393,7 +457,7 @@ func (a App) summary(ctx context.Context, args []string) error {
 		}
 	}
 	if from.After(to) {
-		return errors.New("start date must not be after end date")
+		return usage("start date must not be after end date")
 	}
 	entries, e := a.Client.TimeEntries(ctx, d.Config, from, to)
 	if e != nil {
@@ -457,35 +521,38 @@ func (a App) summary(ctx context.Context, args []string) error {
 
 func (a App) timeEntry(ctx context.Context, args []string) error {
 	if len(args) == 0 {
-		return errors.New("time-entry requires a subcommand: list")
+		return usage("time-entry requires a subcommand: list")
 	}
 	if args[0] != "list" {
-		return fmt.Errorf("unknown time-entry subcommand: %s", args[0])
+		return usagef("unknown time-entry subcommand: %s", args[0])
 	}
 	o, e := parseOpts(args[1:], map[string]bool{"format": true, "separator": true})
 	if e != nil {
 		return e
 	}
 	if len(o.pos) != 2 {
-		return errors.New("time-entry list requires start and end day")
+		return usage("time-entry list requires start and end day")
+	}
+	if o.format == "table" && o.separatorSet {
+		return usage("--separator cannot be used with table format")
 	}
 	now := a.Now()
 	y, m, _ := now.Date()
 	sd, e := strconv.Atoi(o.pos[0])
 	if e != nil {
-		return errors.New("start and end day must be valid integers")
+		return usage("start and end day must be valid integers")
 	}
 	ed, e := strconv.Atoi(o.pos[1])
 	if e != nil {
-		return errors.New("start and end day must be valid integers")
+		return usage("start and end day must be valid integers")
 	}
 	from := time.Date(y, m, sd, 0, 0, 0, 0, time.Local)
 	to := time.Date(y, m, ed, 0, 0, 0, 0, time.Local)
 	if from.Month() != m || to.Month() != m {
-		return errors.New("start and end day must be valid dates")
+		return usage("start and end day must be valid dates")
 	}
 	if from.After(to) {
-		return errors.New("start day must not be after end day")
+		return usage("start day must not be after end day")
 	}
 	d, e := loadCfg()
 	if e != nil {
@@ -499,7 +566,7 @@ func (a App) timeEntry(ctx context.Context, args []string) error {
 		return entries[i].Start < entries[j].Start || entries[i].Start == entries[j].Start && entries[i].ID < entries[j].ID
 	})
 	rows := [][]string{}
-	objects := []map[string]any{}
+	objects := []outputTimeEntry{}
 	for _, x := range entries {
 		seconds := x.DurationSeconds
 		if seconds < 0 {
@@ -507,19 +574,15 @@ func (a App) timeEntry(ctx context.Context, args []string) error {
 		}
 		minutes := float64(int(float64(seconds)/60*100+0.5)) / 100
 		pid := ""
-		var jp any = nil
 		if x.ProjectID != nil {
 			pid = strconv.FormatInt(*x.ProjectID, 10)
-			jp = *x.ProjectID
 		}
 		stop := ""
-		var js any = nil
 		if x.Stop != nil {
 			stop = *x.Stop
-			js = *x.Stop
 		}
 		rows = append(rows, []string{strconv.FormatInt(x.ID, 10), x.Description, pid, x.Start, stop, strconv.FormatFloat(minutes, 'f', -1, 64)})
-		objects = append(objects, map[string]any{"id": x.ID, "description": x.Description, "project_id": jp, "start": x.Start, "stop": js, "duration_minutes": minutes})
+		objects = append(objects, outputTimeEntry{ID: x.ID, Description: x.Description, ProjectID: x.ProjectID, Start: x.Start, Stop: x.Stop, DurationMinutes: minutes})
 	}
 	headers := []string{"id", "description", "project_id", "start", "stop", "duration_minutes"}
 	if o.format == "json" {
@@ -531,18 +594,6 @@ func (a App) timeEntry(ctx context.Context, args []string) error {
 		fmt.Fprintln(a.Out, csv(headers, rows, o.sep))
 	}
 	return nil
-}
-func (a App) update(args []string) error {
-	channel := "stable"
-	if len(args) == 2 && args[0] == "--channel" {
-		channel = args[1]
-	} else if len(args) > 0 {
-		return errors.New("update accepts only --channel stable|nightly")
-	}
-	if channel != "stable" && channel != "nightly" {
-		return errors.New("channel must be stable or nightly")
-	}
-	return errors.New("automatic update is unavailable in source builds; use install.sh")
 }
 func csv(h []string, rows [][]string, sep string) string {
 	all := append([][]string{h}, rows...)
@@ -556,41 +607,6 @@ func csv(h []string, rows [][]string, sep string) string {
 		lines = append(lines, strings.Join(r, sep))
 	}
 	return strings.Join(lines, "\n")
-}
-func table(h []string, rows [][]string) string {
-	width := make([]int, len(h))
-	for i, v := range h {
-		width[i] = len(v)
-	}
-	for _, r := range rows {
-		for i, v := range r {
-			if len(v) > width[i] {
-				width[i] = len(v)
-			}
-		}
-	}
-	border := func() string {
-		var b strings.Builder
-		b.WriteByte('+')
-		for _, w := range width {
-			b.WriteString(strings.Repeat("-", w+2))
-			b.WriteByte('+')
-		}
-		return b.String()
-	}
-	line := func(r []string) string {
-		var b strings.Builder
-		b.WriteByte('|')
-		for i, v := range r {
-			fmt.Fprintf(&b, " %-*s |", width[i], v)
-		}
-		return b.String()
-	}
-	out := []string{border(), line(h), border()}
-	for _, r := range rows {
-		out = append(out, line(r))
-	}
-	return strings.Join(append(out, border()), "\n")
 }
 func clipboard(text string) error {
 	var candidates [][]string

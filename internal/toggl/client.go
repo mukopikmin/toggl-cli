@@ -23,7 +23,7 @@ type HTTPClient struct {
 	Endpoint string
 }
 
-func (c HTTPClient) do(ctx context.Context, cfg config.Config, path string, out any) error {
+func (c HTTPClient) do(ctx context.Context, cfg config.Config, operation, path string, out any) error {
 	ep := c.Endpoint
 	if ep == "" {
 		ep = Endpoint
@@ -37,7 +37,7 @@ func (c HTTPClient) do(ctx context.Context, cfg config.Config, path string, out 
 	}
 	defer res.Body.Close()
 	if res.StatusCode/100 != 2 {
-		return fmt.Errorf("Failed to fetch Toggl data: HTTP %d %s", res.StatusCode, res.Status)
+		return fmt.Errorf("Failed to %s: HTTP %s", operation, res.Status)
 	}
 	return json.NewDecoder(res.Body).Decode(out)
 }
@@ -55,7 +55,7 @@ func (c HTTPClient) Projects(ctx context.Context, cfg config.Config) ([]model.Pr
 		Active        *bool  `json:"active"`
 		ProjectActive *bool  `json:"project_active"`
 	}
-	if err := c.do(ctx, cfg, "/workspaces/"+url.PathEscape(cfg.Workspace)+"/projects", &dto); err != nil {
+	if err := c.do(ctx, cfg, "fetch projects", "/workspaces/"+url.PathEscape(cfg.Workspace)+"/projects", &dto); err != nil {
 		return nil, err
 	}
 	var out []model.Project
@@ -104,7 +104,7 @@ func (c HTTPClient) TimeEntries(ctx context.Context, cfg config.Config, from, to
 		Duration    int64   `json:"duration"`
 		Description string  `json:"description"`
 	}
-	if err := c.do(ctx, cfg, "/me/time_entries?"+q.Encode(), &dto); err != nil {
+	if err := c.do(ctx, cfg, "fetch time entries", "/me/time_entries?"+q.Encode(), &dto); err != nil {
 		return nil, err
 	}
 	out := make([]model.TimeEntry, len(dto))

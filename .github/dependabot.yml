@@ -1,6 +1,6 @@
 version: 2
 updates:
-  - package-ecosystem: "deno"
+  - package-ecosystem: "gomod"
     directory: "/"
     schedule:
       interval: "weekly"
@@ -8,9 +8,9 @@ updates:
       default-days: 7
     labels:
       - "dependencies"
-      - "deno"
+      - "go"
     groups:
-      deno-dependencies:
+      go-dependencies:
         patterns:
           - "*"
     open-pull-requests-limit: 5
