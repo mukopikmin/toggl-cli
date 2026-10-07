@@ -1,39 +1,34 @@
 name: Test
-
 on:
+  workflow_dispatch:
   pull_request:
   push:
-    branches:
-      - main
-
 permissions:
   contents: read
-
 jobs:
   test:
-    name: Deno
+    name: Go
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Setup Deno
-        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+      - name: Setup Go
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
-          deno-version: v2.8.0
-
+          go-version: '1.23.x'
       - name: Check formatting
-        run: deno fmt --check
-
+        run: test -z "$(gofmt -l .)"
       - name: Check installer syntax
         run: sh -n install.sh
-
-      - name: Type check
-        run: deno task check
-
+      - name: Check third-party notices
+        run: |
+          test -s THIRD_PARTY_NOTICES.md
+          grep -F 'github.com/BurntSushi/toml v1.4.0' go.mod
+          grep -F 'golang.org/x/term v0.28.0' go.mod
+          grep -F 'golang.org/x/sys v0.29.0' go.mod
+      - name: Static analysis
+        run: go vet ./...
       - name: Test
-        run: deno task test
-
-      - name: Compile
-        run: deno task compile --output /tmp/toggl-cli
+        run: go test ./...
+      - name: Build
+        run: go build ./...

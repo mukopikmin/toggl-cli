@@ -75,14 +75,14 @@ jobs:
         with:
           ref: ${{ inputs.target_sha }}
 
-      - name: Setup Deno
-        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+      - name: Setup Go
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
-          deno-version: v2.8.0
+          go-version: '1.23.x'
 
       - name: Build and verify release artifacts
         run: |
-          deno task dist --version "${{ inputs.version }}"
+          ./scripts/build_release.sh "${{ inputs.version }}"
           (cd dist && sha256sum --check --strict checksums.txt)
           while read -r checksum name; do
             test "$(cat "dist/${name}.sha256")" = "${checksum}"

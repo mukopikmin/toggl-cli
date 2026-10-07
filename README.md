@@ -1,46 +1,40 @@
 # toggl-cli
 
-A Deno CLI that aggregates Toggl Track time entries by project and date. Results
+A Go CLI that aggregates Toggl Track time entries by project and date. Results
 can be output as delimiter-separated values, JSON, or bordered terminal tables.
+
+Configuration is parsed with `github.com/BurntSushi/toml`, which is distributed
+under the permissive MIT license. Third-party license texts are recorded in
+`THIRD_PARTY_NOTICES.md` and included in release archives.
 
 ## Requirements
 
-- A Toggl Track API token
-- A workspace ID
-- Deno 2.8 or later (when running from source)
+- A Toggl Track API token and workspace ID
+- Go 1.23 or later (only when building from source)
 
 ## Installation
 
-Install the latest release on Linux x64 or macOS arm64:
+Install the latest Linux x64 or macOS arm64 release:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/mukopikmin/toggl-cli/main/install.sh | sh
 ```
 
-The binary is installed to `$HOME/.local/bin/toggl`; make sure that directory is
-in your `PATH`. To install the latest tested nightly build, add `--nightly`:
+The binary is installed as `$HOME/.local/bin/toggl`. Add `--nightly` to install
+the latest tested nightly. Windows x64 archives are available on the release
+page.
+
+Build and install from source with:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/mukopikmin/toggl-cli/main/install.sh | sh -s -- --nightly
+go install github.com/mukopikmin/toggl-cli/cmd/toggl@latest
+# or from a checkout
+go build -o ./out/toggl ./cmd/toggl
 ```
-
-Windows users can download the `windows-x64` release archive and place
-`toggl.exe` in a directory on `PATH`.
 
 ## Configuration
 
-Create `~/.config/toggl-cli/config.toml` interactively:
-
-```sh
-toggl init
-```
-
-This asks for a workspace ID, API token, and timezone. The workspace ID and API
-token are required; interactive input retries empty values, while incomplete
-non-interactive input does not create the file. The timezone defaults to
-`Asia/Tokyo`. On POSIX systems, the file is created with permissions set to
-`0600`. The API token is not printed after entry. You can also create it
-manually:
+Run `toggl init`, or create `~/.config/toggl-cli/config.toml`:
 
 ```toml
 workspace = "your_workspace_id"
@@ -53,97 +47,84 @@ display_order = 10
 hidden = false
 ```
 
-Project settings are optional: `display_name` changes the displayed name,
-`display_order` sorts configured projects first in ascending order, and `hidden`
-excludes a project from project lists and CSV summaries. The timezone is used to
-calculate date ranges and defaults to the execution environment's timezone when
-loading a manually created file without one.
+The timezone defaults to the system timezone when omitted. Project settings are
+optional. `display_name` changes output, `display_order` sorts configured
+projects first, and `hidden` excludes a project. The token is never shown by
+`toggl config`. Protect the file with `chmod 600`.
 
-The config contains credentials, so restrict access to it:
+`toggl init` requires a workspace ID and API token. Enter a blank timezone to
+use `Asia/Tokyo`. If input ends before all three prompts are answered, no
+configuration file is created. The `projects` configuration must be a TOML
+table, such as `[projects.123456]` above; an empty table (`projects = {}`) is
+also accepted.
 
-```sh
-chmod 600 ~/.config/toggl-cli/config.toml
-```
-
-To import an old `~/.toggl_config` file, run `deno task migrate-config` from a
-repository checkout.
-
-## Usage
-
-```text
-toggl summary <start-date> <end-date> [options]
-toggl summary --days <days> [options]
-toggl time-entry list <start-day> <end-day> [options]
-toggl project list [options]
-toggl project reorder
-toggl project sync
-toggl config [options]
-toggl init
-toggl update [--channel stable|nightly]
-```
-
-Run `toggl --help` for the complete option list.
-
-### Examples
+To migrate an old `~/.toggl_config`, run this from a checkout:
 
 ```sh
-# Summarize an inclusive date range as tab-separated values.
-toggl summary 2026-06-01 2026-06-15
-
-# Summarize the previous seven days and today as JSON.
-toggl summary --days 7 --format json
-
-# Produce comma-separated values without project or date headings.
-toggl summary 2026-06-01 2026-06-15 -s "," --no-project --no-date
-
-# Print a summary and copy it to the clipboard.
-toggl summary 2026-06-01 2026-06-15 --clipboard
-
-# List entries from the 1st through the 15th of the current month.
-toggl time-entry list 1 15
-
-# List projects in a bordered table.
-toggl project list --format table
-
-# Reorder visible projects interactively.
-toggl project reorder
+go run ./cmd/migrate-config
 ```
 
-Summary dates and time-entry day ranges are inclusive. CSV output uses tabs by
-default; `--separator` (`-s`) changes the delimiter, and `--format json`
-(`-f json`) selects JSON output.
+## Command compatibility
 
-`toggl update` updates a compiled installation in place and verifies its
-checksum and version. Linux x64 and macOS arm64 are supported; source-based,
-Windows, and other installations must be updated manually.
+The Go implementation preserves the command surface, defaults, output formats,
+and successful/error exit codes of the previous implementation:
+
+| Command | Options / arguments | Output |
+| --- | --- | --- |
+| `summary` | `<start-date> <end-date>` or `--days N`; `-f/--format csv\|json\|table`, `-s/--separator`, `--no-project`, `--no-date`, `--clipboard` | Tab-separated CSV by default; JSON summary or bordered table |
+| `time-entry list` | `<start-day> <end-day>`; `-f/--format`, `-s/--separator` | Entries as CSV, JSON, or table |
+| `project list` | `-f/--format` | Visible ordered project names, JSON, or table |
+| `project sync` | none | Adds missing active projects to the TOML file |
+| `project reorder` | none | Interactively changes and saves visible-project order |
+| `config` | `-f/--format` | Non-sensitive settings as `KEY=VALUE`, JSON, or table |
+| `init` | none | Creates a mode-`0600` configuration interactively |
+| `update` | `--channel stable\|nightly` | Checks, verifies, and installs a release update |
+| `--help`, `-h` | none | Help text |
+| `--version` | none | Build version |
+
+Date ranges are inclusive. Invalid usage, configuration, API, clipboard, and
+I/O errors exit with status 1; successful commands exit with status 0.
+
+Short options accept attached values, such as `-fjson`, `-d7`, and `-s,`.
+Use `--` to end option parsing. Boolean flags such as `--no-date` do not accept
+values. For a separator starting with a dash, use `--separator=<text>`.
+The `--days` value must be a non-negative integer written using digits, and
+`time-entry list` days must exist in the current month. Invalid command usage
+is reported before configuration is loaded. An empty
+`project list --format json` result is `[]`.
+
+`project reorder` requires an interactive terminal. Use `j`/`k` or the arrow
+keys to select, Space to pick or drop, uppercase `J`/`K` to move, Enter to save,
+and `q` or Escape to cancel. The screen shows one project per line, with `>`
+marking the selected project and `*` marking a picked project.
+
+`toggl update` is available in compiled release binaries. It selects the stable
+or nightly channel, verifies the downloaded archive's SHA-256 checksum and
+embedded version, and only then replaces the current executable. Development
+builds such as `0.0.0-dev` must be updated by building or installing again.
+On Windows, the executable is replaced after the current process exits.
+
+## Architecture
+
+- `cmd/toggl/main.go`: argument entry point and dependency assembly.
+- `internal/command/`: CLI interpretation and output formatting. `options.go`
+  handles shared option parsing; `update_install.go` handles update installation.
+- `internal/model/`: API-independent models and pure aggregation.
+- `internal/toggl/`: HTTP client, private DTOs, and domain conversion.
+- `internal/config/`: configuration loading and validation.
 
 ## Development
 
-Run commands from a checkout with `deno task run --`, for example:
-
 ```sh
-deno task run -- summary 2026-06-01 2026-06-15
+go run ./cmd/toggl summary 2026-06-01 2026-06-15
+gofmt -w .
+go vet ./...
+go test ./...
+go build ./...
 ```
 
-Install or build a standalone binary:
-
-```sh
-deno task install --version 0.1.0
-deno task compile --version 0.1.0
-```
-
-Run the same checks as CI:
-
-```sh
-deno fmt --check
-sh -n install.sh
-deno task check
-deno task test
-deno task compile --output /tmp/toggl-cli
-```
-
-Build release archives for all supported platforms with
-`deno task dist --version 0.1.0`, or add `--target linux-x64` to build one
-target. Stable releases are prepared with `release_prepare.yml` and published
-from the approved candidate with `release.yml`; successful `main` builds publish
-the moving `nightly` release automatically.
+Build all release archives with `./scripts/build_release.sh --version 0.1.0`.
+The positional form `./scripts/build_release.sh 0.1.0` remains available, and
+`--target linux-x64` (or `darwin-arm64` / `windows-x64`) limits the build to one
+or more targets. CI uses the same formatting, shell syntax, static-analysis,
+test, and build checks.
