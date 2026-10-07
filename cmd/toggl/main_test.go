@@ -34,3 +34,14 @@ func TestMissingConfigErrorDoesNotPrintUsage(t *testing.T) {
 		t.Fatal(stderr.String())
 	}
 }
+
+func TestSummaryUsageErrorWithoutConfigPrintsHelp(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"summary"}, &stdout, &stderr); code != 1 {
+		t.Fatal(code)
+	}
+	if !strings.Contains(stderr.String(), "summary requires") || !strings.Contains(stderr.String(), "Usage:") || strings.Contains(stderr.String(), "Please create") {
+		t.Fatal(stderr.String())
+	}
+}

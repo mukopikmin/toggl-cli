@@ -52,6 +52,12 @@ optional. `display_name` changes output, `display_order` sorts configured
 projects first, and `hidden` excludes a project. The token is never shown by
 `toggl config`. Protect the file with `chmod 600`.
 
+`toggl init` requires a workspace ID and API token. Enter a blank timezone to
+use `Asia/Tokyo`. If input ends before all three prompts are answered, no
+configuration file is created. The `projects` configuration must be a TOML
+table, such as `[projects.123456]` above; an empty table (`projects = {}`) is
+also accepted.
+
 To migrate an old `~/.toggl_config`, run this from a checkout:
 
 ```sh
@@ -79,6 +85,14 @@ and successful/error exit codes of the previous implementation:
 Date ranges are inclusive. Invalid usage, configuration, API, clipboard, and
 I/O errors exit with status 1; successful commands exit with status 0.
 
+Short options accept attached values, such as `-fjson`, `-d7`, and `-s,`.
+Use `--` to end option parsing. Boolean flags such as `--no-date` do not accept
+values. For a separator starting with a dash, use `--separator=<text>`.
+The `--days` value must be a non-negative integer written using digits, and
+`time-entry list` days must exist in the current month. Invalid command usage
+is reported before configuration is loaded. An empty
+`project list --format json` result is `[]`.
+
 `project reorder` requires an interactive terminal. Use `j`/`k` or the arrow
 keys to select, Space to pick or drop, uppercase `J`/`K` to move, Enter to save,
 and `q` or Escape to cancel. The screen shows one project per line, with `>`
@@ -88,11 +102,13 @@ marking the selected project and `*` marking a picked project.
 or nightly channel, verifies the downloaded archive's SHA-256 checksum and
 embedded version, and only then replaces the current executable. Development
 builds such as `0.0.0-dev` must be updated by building or installing again.
+On Windows, the executable is replaced after the current process exits.
 
 ## Architecture
 
 - `cmd/toggl/main.go`: argument entry point and dependency assembly.
-- `internal/command/`: CLI interpretation and output formatting.
+- `internal/command/`: CLI interpretation and output formatting. `options.go`
+  handles shared option parsing; `update_install.go` handles update installation.
 - `internal/model/`: API-independent models and pure aggregation.
 - `internal/toggl/`: HTTP client, private DTOs, and domain conversion.
 - `internal/config/`: configuration loading and validation.
@@ -100,7 +116,7 @@ builds such as `0.0.0-dev` must be updated by building or installing again.
 ## Development
 
 ```sh
-go run ./cmd/toggl -- summary 2026-06-01 2026-06-15
+go run ./cmd/toggl summary 2026-06-01 2026-06-15
 gofmt -w .
 go vet ./...
 go test ./...

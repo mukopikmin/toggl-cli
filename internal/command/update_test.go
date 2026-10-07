@@ -56,7 +56,7 @@ func TestUpdateArgumentValidation(t *testing.T) {
 	tests := []struct {
 		args  []string
 		usage bool
-	}{{[]string{"--channel", "invalid"}, true}, {[]string{"--channel=invalid"}, true}, {[]string{"extra"}, true}, {nil, false}}
+	}{{[]string{"--channel", "invalid"}, true}, {[]string{"--channel=invalid"}, true}, {[]string{"--channel="}, true}, {[]string{"--channel", ""}, true}, {[]string{"--channel"}, true}, {[]string{"extra"}, true}, {[]string{"--"}, false}, {[]string{"--channel", "stable", "--"}, false}, {nil, false}}
 	for _, tt := range tests {
 		err := app.update(tt.args)
 		var got UsageError

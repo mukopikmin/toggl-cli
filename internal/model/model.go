@@ -24,7 +24,8 @@ type TimeEntry struct {
 type Summary map[string]map[int64]float64
 
 func VisibleSorted(projects []Project) []Project {
-	r := append([]Project(nil), projects...)
+	r := make([]Project, len(projects))
+	copy(r, projects)
 	r = slicesDeleteHidden(r)
 	sort.SliceStable(r, func(i, j int) bool {
 		a, b := r[i].DisplayOrder, r[j].DisplayOrder

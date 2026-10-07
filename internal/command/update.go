@@ -243,109 +243,16 @@ func extractBinary(archive []byte, name, target string) ([]byte, error) {
 	return nil, errors.New("Release archive does not contain the expected Toggl CLI binary.")
 }
 
-func windowsUpdateScript(pid int, staged, executable string) string {
-	quotedStage, quotedExecutable := strings.ReplaceAll(staged, "'", "''"), strings.ReplaceAll(executable, "'", "''")
-	return fmt.Sprintf(`$ErrorActionPreference = "Stop"
-$updated = $false
-try {
-  Wait-Process -Id %d -ErrorAction SilentlyContinue
-  Move-Item -LiteralPath '%s' -Destination '%s' -Force
-  $updated = $true
-} finally {
-  if (-not $updated) { Remove-Item -LiteralPath '%s' -Force -ErrorAction SilentlyContinue }
-  Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
-}
-`, pid, quotedStage, quotedExecutable, quotedStage)
-}
-
-func installUpdate(ctx context.Context, p updatePlan, client *http.Client) error {
-	type result struct {
-		data []byte
-		err  error
-	}
-	archiveResult, checksumResult := make(chan result, 1), make(chan result, 1)
-	go func() { b, e := download(ctx, client, p.DownloadURL); archiveResult <- result{b, e} }()
-	go func() { b, e := download(ctx, client, p.DownloadURL+".sha256"); checksumResult <- result{b, e} }()
-	a, c := <-archiveResult, <-checksumResult
-	if a.err != nil || c.err != nil {
-		return errors.New("Failed to download the update archive or checksum.")
-	}
-	archive, checksum := a.data, c.data
-	var err error
-	if err = verifyChecksum(archive, string(checksum)); err != nil {
-		return err
-	}
-	binary, err := extractBinary(archive, p.Archive, p.Target)
-	if err != nil {
-		return err
-	}
-	dir := filepath.Dir(p.Executable)
-	pattern := ".toggl-update-*"
-	if runtime.GOOS == "windows" {
-		pattern += ".exe"
-	}
-	stage, err := os.CreateTemp(dir, pattern)
-	if err != nil {
-		return err
-	}
-	stageName := stage.Name()
-	defer os.Remove(stageName)
-	if _, err = stage.Write(binary); err != nil {
-		stage.Close()
-		return err
-	}
-	if err = stage.Close(); err != nil {
-		return err
-	}
-	if err = os.Chmod(stageName, 0755); err != nil {
-		return err
-	}
-	out, err := exec.Command(stageName, "--version").Output()
-	if err != nil || strings.TrimSpace(string(out)) != p.TargetVersion {
-		return fmt.Errorf("Downloaded binary version mismatch (expected %s); the existing binary was not changed.", p.TargetVersion)
-	}
-	if runtime.GOOS == "windows" {
-		script := windowsUpdateScript(os.Getpid(), stageName, p.Executable)
-		helper, err := os.CreateTemp(dir, ".toggl-update-*.ps1")
-		if err != nil {
-			return err
-		}
-		if _, err = helper.WriteString(script); err != nil {
-			helper.Close()
-			os.Remove(helper.Name())
-			return err
-		}
-		if err = helper.Close(); err != nil {
-			os.Remove(helper.Name())
-			return err
-		}
-		cmd := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", helper.Name())
-		if err = cmd.Start(); err != nil {
-			os.Remove(helper.Name())
-			return err
-		}
-		_ = cmd.Process.Release()
-		stageName = ""
-		return nil
-	}
-	return os.Rename(stageName, p.Executable)
-}
-
 func (a App) update(args []string) error {
-	channel := ""
-	if len(args) == 1 && strings.HasPrefix(args[0], "--channel=") {
-		channel = strings.TrimPrefix(args[0], "--channel=")
-	} else if len(args) == 2 && args[0] == "--channel" {
-		channel = args[1]
-	} else if len(args) == 1 && args[0] == "--channel" {
-		return usage("option --channel requires a value")
-	} else if len(args) > 0 {
-		if strings.HasPrefix(args[0], "-") {
-			return usagef("unknown option: %s", args[0])
-		}
+	o, err := parseOpts(args, map[string]bool{"channel": true})
+	if err != nil {
+		return err
+	}
+	if len(o.pos) > 0 {
 		return usage("update does not accept positional arguments")
 	}
-	if channel != "" && channel != "stable" && channel != "nightly" {
+	channel := o.channel
+	if o.channelSet && channel != "stable" && channel != "nightly" {
 		return usage("channel must be stable or nightly")
 	}
 	client := http.DefaultClient

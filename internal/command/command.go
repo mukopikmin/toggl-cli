@@ -111,14 +111,6 @@ func (a App) Run(ctx context.Context, args []string) error {
 	}
 }
 
-type opts struct {
-	format, sep                  string
-	days                         *int
-	noProject, noDate, clipboard bool
-	separatorSet                 bool
-	pos                          []string
-}
-
 type outputTimeEntry struct {
 	ID              int64   `json:"id"`
 	Description     string  `json:"description"`
@@ -128,84 +120,6 @@ type outputTimeEntry struct {
 	DurationMinutes float64 `json:"duration_minutes"`
 }
 
-func parseOpts(args []string, allowed map[string]bool) (opts, error) {
-	o := opts{format: "csv", sep: "\t"}
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-		key, val, has := arg, "", false
-		if strings.HasPrefix(arg, "--") && strings.Contains(arg, "=") {
-			key, val, has = strings.Cut(arg, "=")
-		}
-		take := func() (string, error) {
-			if has {
-				return val, nil
-			}
-			if i+1 >= len(args) {
-				return "", usagef("option %s requires a value", key)
-			}
-			i++
-			return args[i], nil
-		}
-		switch key {
-		case "-f", "--format":
-			if !allowed["format"] {
-				return o, usagef("unknown option: %s", key)
-			}
-			v, e := take()
-			if e != nil {
-				return o, e
-			}
-			o.format = v
-		case "-s", "--separator":
-			if !allowed["separator"] {
-				return o, usagef("unknown option: %s", key)
-			}
-			v, e := take()
-			if e != nil {
-				return o, e
-			}
-			o.sep = v
-			o.separatorSet = true
-		case "-d", "--days":
-			if !allowed["days"] {
-				return o, usagef("unknown option: %s", key)
-			}
-			v, e := take()
-			if e != nil {
-				return o, e
-			}
-			n, e := strconv.Atoi(v)
-			if e != nil || n < 0 {
-				return o, usage("days must be a non-negative integer")
-			}
-			o.days = &n
-		case "--no-project":
-			if !allowed["no-project"] {
-				return o, usagef("unknown option: %s", key)
-			}
-			o.noProject = true
-		case "--no-date":
-			if !allowed["no-date"] {
-				return o, usagef("unknown option: %s", key)
-			}
-			o.noDate = true
-		case "--clipboard":
-			if !allowed["clipboard"] {
-				return o, usagef("unknown option: %s", key)
-			}
-			o.clipboard = true
-		default:
-			if strings.HasPrefix(arg, "-") {
-				return o, usagef("unknown option: %s", arg)
-			}
-			o.pos = append(o.pos, arg)
-		}
-	}
-	if o.format != "csv" && o.format != "json" && o.format != "table" {
-		return o, usage("format must be csv, json, or table")
-	}
-	return o, nil
-}
 func loadCfg() (config.Document, error) { return config.Load() }
 func (a App) showConfig(args []string) error {
 	o, e := parseOpts(args, map[string]bool{"format": true})
@@ -287,15 +201,18 @@ func (a App) init(args []string) error {
 			} else {
 				v, e = r.ReadString('\n')
 			}
+			if e != nil && !(errors.Is(e, io.EOF) && v != "") {
+				if errors.Is(e, io.EOF) {
+					return "", fmt.Errorf("Input ended before %s was provided", label)
+				}
+				return "", fmt.Errorf("Unable to read %s: %w", label, e)
+			}
 			v = strings.TrimSpace(v)
 			if v != "" {
 				return v, nil
 			}
 			if def != "" {
 				return def, nil
-			}
-			if e != nil {
-				return "", fmt.Errorf("Input ended before %s was provided", label)
 			}
 			if !interactive {
 				return "", fmt.Errorf("%s is required", label)
@@ -448,22 +365,11 @@ func (a App) summary(ctx context.Context, args []string) error {
 	if o.format == "table" && (o.separatorSet || o.noProject || o.noDate) {
 		return usage("--separator, --no-project, and --no-date cannot be used with table format")
 	}
-	d, e := loadCfg()
-	if e != nil {
-		return e
-	}
-	loc, e := location(d.Config)
-	if e != nil {
-		return e
-	}
 	var from, to time.Time
 	if o.days != nil {
 		if len(o.pos) > 0 {
 			return usage("summary accepts either start and end date or --days, not both")
 		}
-		now := a.Now().In(loc)
-		to = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
-		from = to.AddDate(0, 0, -*o.days)
 	} else {
 		if len(o.pos) != 2 {
 			return usage("summary requires start and end date or --days")
@@ -479,6 +385,19 @@ func (a App) summary(ctx context.Context, args []string) error {
 	}
 	if from.After(to) {
 		return usage("start date must not be after end date")
+	}
+	d, e := loadCfg()
+	if e != nil {
+		return e
+	}
+	loc, e := location(d.Config)
+	if e != nil {
+		return e
+	}
+	if o.days != nil {
+		now := a.Now().In(loc)
+		to = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+		from = to.AddDate(0, 0, -*o.days)
 	}
 	entries, e := a.Client.TimeEntries(ctx, d.Config, from, to)
 	if e != nil {
@@ -562,19 +481,20 @@ func (a App) timeEntry(ctx context.Context, args []string) error {
 	}
 	now := a.Now()
 	y, m, _ := now.Date()
-	sd, e := strconv.Atoi(o.pos[0])
-	if e != nil {
+	sd, ok := parseUnsignedInteger(o.pos[0])
+	if !ok {
 		return usage("start and end day must be valid integers")
 	}
-	ed, e := strconv.Atoi(o.pos[1])
-	if e != nil {
+	ed, ok := parseUnsignedInteger(o.pos[1])
+	if !ok {
 		return usage("start and end day must be valid integers")
+	}
+	lastDay := time.Date(y, m+1, 0, 0, 0, 0, 0, time.Local).Day()
+	if sd < 1 || ed < 1 || sd > lastDay || ed > lastDay {
+		return usage("start and end day must be valid dates")
 	}
 	from := time.Date(y, m, sd, 0, 0, 0, 0, time.Local)
 	to := time.Date(y, m, ed, 0, 0, 0, 0, time.Local)
-	if from.Month() != m || to.Month() != m {
-		return usage("start and end day must be valid dates")
-	}
 	if from.After(to) {
 		return usage("start day must not be after end day")
 	}

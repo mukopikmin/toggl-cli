@@ -68,8 +68,13 @@ func Load() (Document, error) {
 
 func Parse(text string) (Config, error) {
 	var raw rawConfig
-	if _, err := toml.Decode(text, &raw); err != nil {
+	metadata, err := toml.Decode(text, &raw)
+	if err != nil {
 		return Config{}, fmt.Errorf("Invalid configuration: %w", err)
+	}
+	// Implicit parent tables have no metadata type; explicit values must be tables.
+	if kind := metadata.Type("projects"); kind != "" && kind != "Hash" {
+		return Config{}, fmt.Errorf("Invalid project configuration: projects")
 	}
 	var missing []string
 	if raw.Workspace == nil || *raw.Workspace == "" {
@@ -88,7 +93,8 @@ func Parse(text string) (Config, error) {
 	var invalid []string
 	for key, p := range raw.Projects {
 		id, err := strconv.ParseInt(key, 10, 64)
-		if err != nil || !regexp.MustCompile(`^\d+$`).MatchString(key) {
+		kind := metadata.Type("projects", key)
+		if err != nil || !regexp.MustCompile(`^\d+$`).MatchString(key) || (kind != "" && kind != "Hash") {
 			invalid = append(invalid, "projects."+key)
 			continue
 		}

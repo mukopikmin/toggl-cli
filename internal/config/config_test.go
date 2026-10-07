@@ -59,3 +59,27 @@ func TestEncodeInitialRoundTripsSpecialCharacters(t *testing.T) {
 		t.Fatalf("%+v\n%s", got, text)
 	}
 }
+
+func TestProjectsMustBeTable(t *testing.T) {
+	tests := []struct {
+		name, text string
+		valid      bool
+	}{
+		{"omitted", "", true}, {"empty inline table", "projects = {}\n", true},
+		{"empty table", "[projects]\n", true},
+		{"project table", "[projects.1]\nhidden=false\n", true},
+		{"empty array", "projects = []\n", false},
+		{"array of tables", "[[projects]]\nhidden=false\n", false},
+		{"string", "projects = \"invalid\"\n", false},
+		{"project scalar", "[projects]\n1=\"invalid\"\n", false},
+		{"project array", "[projects]\n1=[]\n", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := Parse("workspace=\"1\"\ntoken=\"test-token\"\n" + tt.text)
+			if (err == nil) != tt.valid {
+				t.Fatalf("error=%v, valid=%v", err, tt.valid)
+			}
+		})
+	}
+}
