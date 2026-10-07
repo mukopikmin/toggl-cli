@@ -15,20 +15,16 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
-          go-version: '1.23.x'
+          go-version-file: 'go.mod'
       - name: Check formatting
-        run: test -z "$(gofmt -l .)"
+        run: make check-fmt
       - name: Check installer syntax
-        run: sh -n install.sh
+        run: make check-shell
       - name: Check third-party notices
-        run: |
-          test -s THIRD_PARTY_NOTICES.md
-          grep -F 'github.com/BurntSushi/toml v1.4.0' go.mod
-          grep -F 'golang.org/x/term v0.28.0' go.mod
-          grep -F 'golang.org/x/sys v0.29.0' go.mod
+        run: make check-notices
       - name: Static analysis
-        run: go vet ./...
+        run: make vet
       - name: Test
-        run: go test ./...
+        run: make test
       - name: Build
-        run: go build ./...
+        run: make check-build

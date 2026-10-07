@@ -10,7 +10,7 @@ under the permissive MIT license. Third-party license texts are recorded in
 ## Requirements
 
 - A Toggl Track API token and workspace ID
-- Go 1.23 or later (only when building from source)
+- The Go version required by `go.mod` or later (only when building from source)
 
 ## Installation
 
@@ -29,7 +29,7 @@ Build and install from source with:
 ```sh
 go install github.com/mukopikmin/toggl-cli/cmd/toggl@latest
 # or from a checkout
-go build -o ./out/toggl ./cmd/toggl
+make build
 ```
 
 ## Configuration
@@ -115,16 +115,31 @@ On Windows, the executable is replaced after the current process exits.
 
 ## Development
 
+Install Make and the Go version required by `go.mod`. From a checkout:
+
 ```sh
-go run ./cmd/toggl summary 2026-06-01 2026-06-15
-gofmt -w .
-go vet ./...
-go test ./...
-go build ./...
+make                     # Show available commands
+make run ARGS="summary 2026-06-01 2026-06-15"
+make fmt                 # Format Go source files
+make check               # Run all CI checks
+make build               # Build ./out/toggl
 ```
 
-Build all release archives with `./scripts/build_release.sh --version 0.1.0`.
-The positional form `./scripts/build_release.sh 0.1.0` remains available, and
-`--target linux-x64` (or `darwin-arm64` / `windows-x64`) limits the build to one
-or more targets. CI uses the same formatting, shell syntax, static-analysis,
-test, and build checks.
+`make check` runs `check-fmt`, `check-shell`, `check-notices`, `vet`, `test`,
+and `check-build`. Each target can also be run separately. CI calls these same
+targets for formatting, installer shell syntax, third-party notices, static
+analysis, tests, and package builds.
+
+Build all release archives with `make release VERSION=0.1.0`, or use
+`VERSION=nightly` for nightly archives. Add `TARGET=linux-x64` (or `darwin-arm64`
+/ `windows-x64`) to build a single target. Archives are written to `dist/`.
+The Make target delegates to `scripts/build_release.sh`, whose direct invocation
+still supports `--version` and repeated `--target` options. Release workflows
+use the same Make target.
+
+Dependabot checks Go modules and GitHub Actions weekly, groups updates by
+ecosystem, and waits seven days after new versions are released. CI and release
+workflows select Go from `go.mod`, so dependency updates can also raise the
+required Go version. The notices check verifies that every dependency module
+and its license text are covered by `THIRD_PARTY_NOTICES.md`; update the notices
+when adding a dependency or when an upstream license changes.

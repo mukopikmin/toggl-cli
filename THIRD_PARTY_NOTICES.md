@@ -1,10 +1,10 @@
 # Third-party notices
 
 The compiled Toggl CLI includes the following third-party software.
+Dependency versions are recorded in `go.mod` and embedded in the binary's Go
+build information.
 
 ## github.com/BurntSushi/toml
-
-Version: 1.4.0
 
 License: MIT
 
@@ -31,8 +31,6 @@ License: MIT
 > THE SOFTWARE.
 
 ## golang.org/x/term and golang.org/x/sys
-
-Versions: x/term 0.28.0 and x/sys 0.29.0
 
 License: BSD-3-Clause
 
