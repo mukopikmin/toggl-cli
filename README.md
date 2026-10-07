@@ -81,7 +81,8 @@ I/O errors exit with status 1; successful commands exit with status 0.
 
 `project reorder` requires an interactive terminal. Use `j`/`k` or the arrow
 keys to select, Space to pick or drop, uppercase `J`/`K` to move, Enter to save,
-and `q` or Escape to cancel.
+and `q` or Escape to cancel. The screen shows one project per line, with `>`
+marking the selected project and `*` marking a picked project.
 
 `toggl update` is available in compiled release binaries. It selects the stable
 or nightly channel, verifies the downloaded archive's SHA-256 checksum and

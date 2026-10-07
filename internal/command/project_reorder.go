@@ -58,7 +58,8 @@ func renderReorder(s reorderState) string {
 		}
 		lines = append(lines, fmt.Sprintf("%s %s", marker, p.DisplayName))
 	}
-	return strings.Join(lines, "\n")
+	// Raw mode disables the terminal's automatic carriage return on newline.
+	return strings.Join(lines, "\r\n")
 }
 
 func selectOrder(projects []model.Project, in, out *os.File) ([]model.Project, bool, error) {
