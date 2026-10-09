@@ -78,11 +78,13 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.23.x'
+          go-version-file: 'go.mod'
 
       - name: Build and verify release artifacts
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
-          ./scripts/build_release.sh "${{ inputs.version }}"
+          make release
           (cd dist && sha256sum --check --strict checksums.txt)
           while read -r checksum name; do
             test "$(cat "dist/${name}.sha256")" = "${checksum}"

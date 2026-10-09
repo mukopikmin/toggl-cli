@@ -31,10 +31,10 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.23.x'
+          go-version-file: 'go.mod'
 
       - name: Build nightly archives
-        run: ./scripts/build_release.sh nightly
+        run: make release VERSION=nightly
 
       - name: Create or update nightly release
         env:
