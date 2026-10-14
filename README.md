@@ -10,7 +10,7 @@ under the permissive MIT license. Third-party license texts are recorded in
 ## Requirements
 
 - A Toggl Track API token and workspace ID
-- Go 1.23 or later (only when building from source)
+- Go at the version specified in `go.mod` or later (only when building from source)
 
 ## Installation
 
@@ -128,3 +128,6 @@ The positional form `./scripts/build_release.sh 0.1.0` remains available, and
 `--target linux-x64` (or `darwin-arm64` / `windows-x64`) limits the build to one
 or more targets. CI uses the same formatting, shell syntax, static-analysis,
 test, and build checks.
+CI also checks that every dependency module in `go.mod` is named in
+`THIRD_PARTY_NOTICES.md`. When adding a dependency or changing its license,
+update the notices; dependency versions are maintained only in `go.mod`.
