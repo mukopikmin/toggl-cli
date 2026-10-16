@@ -15,7 +15,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.23.x'
+          go-version-file: go.mod
       - name: Check formatting
         run: test -z "$(gofmt -l .)"
       - name: Check installer syntax
@@ -23,9 +23,13 @@ jobs:
       - name: Check third-party notices
         run: |
           test -s THIRD_PARTY_NOTICES.md
-          grep -F 'github.com/BurntSushi/toml v1.4.0' go.mod
-          grep -F 'golang.org/x/term v0.28.0' go.mod
-          grep -F 'golang.org/x/sys v0.29.0' go.mod
+          modules="$(go list -m -f '{{if not .Main}}{{.Path}}{{end}}' all)"
+          for module in $modules; do
+            grep -Fq "$module" THIRD_PARTY_NOTICES.md || {
+              echo "Missing third-party notice for $module" >&2
+              exit 1
+            }
+          done
       - name: Static analysis
         run: go vet ./...
       - name: Test
