@@ -1,121 +1,119 @@
 ---
 name: toggl-cli-release
-description: Propose a semantic version, then prepare, publish, monitor, and verify Toggl CLI stable releases with explicit approval gates, exact-SHA checks, generated release-note review, and artifact verification. Use when asked to prepare, cut, publish, or verify a Toggl CLI stable release, whether or not a version is specified.
+description: Review changes, propose a semantic version, obtain approval for the exact main commit, then push a stable tag and monitor the automatic GitHub Actions release. Use when asked to prepare, cut, publish, or verify a Toggl CLI stable release, whether or not a version is specified.
 ---
 
 # Toggl CLI Release
 
-Treat a stable release as a guarded process. Communicate in the user's language
-and follow `AGENTS.md`. Use `.github/workflows/test.yml` as the source of truth
-for checks, `.github/workflows/release_prepare.yml` for candidate preparation,
-and `.github/workflows/release.yml` for publication.
+The skill handles release judgment, user approval, tag operations, and
+reporting. The `Release` workflow in `.github/workflows/release.yml` enforces
+every required machine check, builds and attests artifacts, generates notes, and
+publishes the GitHub release. Communicate in the user's language.
 
 ## Safety Rules
 
-- Release only the exact tested commit on `main` that equals `origin/main`.
-- Never delete, stash, commit, or overwrite user changes to clean the tree.
-- Never force, move, or reuse a stable release tag.
-- Never dispatch publication before the user approves the exact SHA, release
-  notes, and release-plan SHA-256.
-- Invalidate approval when the preparation run, SHA, baseline, title, body, plan
-  hash, or artifact set changes.
-- Never release from a failed or missing `Test` workflow run.
-- Exclude `nightly` and all prereleases from the stable notes baseline.
-- Do not repair or replace a failed published release without new approval.
+- Release only the exact tested tip of `main`. Local inspection is advisory;
+  GitHub Actions validates it again before building and publishing.
+- Never delete, stash, commit, or overwrite user changes to obtain a clean tree.
+  Do not switch branches or require local `HEAD` to match the release target.
+- Never force, move, delete, or reuse a stable release tag.
+- A stable tag push starts automatic publication. Obtain explicit approval for
+  the version, full target SHA, notes range, and omitted pull requests before
+  creating or pushing the tag. Approval of a legacy preparation run does not
+  authorize a tag push under this workflow.
+- Invalidate approval if the target, current `origin/main`, previous stable
+  release, or reviewed change range changes before the push.
+- Never bypass failed validation or publish locally built artifacts.
+- Ignore `nightly`, `v0.0.0-nightly`, drafts, and prereleases when selecting the
+  stable notes baseline.
+- Do not repair or overwrite a failed published release without new approval.
 
 ## Workflow
 
 ### 1. Inspect and Propose
 
-1. Read repository instructions. Without modifying anything, inspect status,
-   worktrees, local and remote branches, stable tags and releases, open pull
-   requests, and the test, preparation, and publication workflows.
-2. Find the latest non-draft, non-prerelease release. Use its tag as the notes
-   baseline. For the first stable release, use `release-notes-baseline`.
-3. Review commits and merged pull requests between the baseline and
-   `origin/main`. Propose one unprefixed semantic version: increment major for
-   breaking changes after `1.0.0`, minor for features or breaking changes during
-   `0.x`, and patch for fixes, documentation, or maintenance only.
-4. Choose the next unused version for that increment. Stop if the changes do not
-   justify a release. If the user supplied a version, check it against the
-   changes and require confirmation for a suspected mismatch.
-5. Present the current and proposed versions, rationale, important changes, and
-   open pull requests that would be omitted. Ask for approval before proceeding.
-6. Require an unprefixed `X.Y.Z` version and derive the tag as `vX.Y.Z`.
+1. Read repository instructions. Inspect status, worktrees, branches, remote
+   tags, releases, open pull requests, and release workflows without changing
+   the working tree. Confirm the tag-triggered workflow is already on
+   `origin/main`; workflow changes must be merged and tested before releasing.
+2. Fetch `origin/main` using `git fetch --no-tags origin main` and resolve its
+   full SHA. Do not use `git fetch --tags`: the rolling nightly tag moves.
+3. Identify the newest non-draft, non-prerelease stable release. For the first
+   stable release, use `release-notes-baseline`. Fetch only the fixed comparison
+   tag if it is missing locally.
+4. Review commits and merged pull requests from that tag through the exact
+   `origin/main` SHA. Stop if there are no changes that justify a release.
+5. Propose one unprefixed semantic version without leading zeroes, newer than
+   the previous stable release, with no existing tag or release. If the user
+   supplied a version, compare it with the changes and explain any suspected
+   semantic-version mismatch. Choose the increment as follows:
+   - increment major for breaking changes when the current major is at least 1;
+   - increment minor for backward-compatible features, and for breaking changes
+     while the project is on `0.x`;
+   - increment patch for fixes, documentation, or maintenance only.
+6. Inspect the successful `Test` push run on `main` for that exact SHA. A
+   pending or failed run is not sufficient; do not push a release tag while it
+   is pending or failed. Actions remains the authoritative validator.
+7. For the first stable release only, verify `release-notes-baseline` points to
+   the repository root commit. If absent, show the root SHA and ask for approval
+   before creating and pushing that lightweight non-release tag. If it points
+   elsewhere, stop.
 
-### 2. Synchronize and Preflight `main`
+### 2. Approve Publication
 
-1. Stop if tracked or untracked files would be overwritten.
-2. Run `git fetch origin --prune` without `--tags`; the moving `nightly` tag can
-   differ locally and remotely.
-3. Switch to `main` and fast-forward only to `origin/main`. Never merge a
-   divergent branch.
-4. For the first release, verify that `release-notes-baseline` points to the
-   root commit. If absent, show the root SHA and ask before creating and pushing
-   that lightweight, non-release tag. Stop if it points elsewhere.
-5. Confirm the tree is clean and `HEAD` equals `origin/main`; confirm the stable
-   tag and release are unused; and verify a successful `Test` run exists for the
-   exact full SHA with `gh run list` and `gh run view`.
-6. Re-read `.github/workflows/test.yml` and run every applicable CI command
-   exactly as declared there.
+Present the current stable version, proposed version and increment rationale,
+full target SHA, comparison tag, principal changes and merged pull requests,
+successful Test run URL, and all open pull requests the release will omit.
 
-### 3. Prepare and Review the Candidate
+Explain that approving the tag push authorizes automatic build and publication:
+release notes will be generated in Actions from the displayed range, with no
+later notes/digest approval gate. Ask the user to approve that concrete release
+or provide another version. This is a mandatory gate before tag creation/push.
+Existing explicit approval of these details need not be requested again unless
+one of the reviewed inputs changes.
 
-1. Dispatch preparation with the unprefixed version and full SHA:
+### 3. Push the Approved Tag
 
-   ```sh
-   gh workflow run release_prepare.yml \
-     -f version=<version> \
-     -f target_sha=<full-sha>
-   ```
-
-2. Locate the dispatched run, record its run ID, and monitor it until it
-   succeeds. Download the `release-candidate` artifact from that exact run.
-3. Verify its checksums. Calculate the SHA-256 of `release-plan.json` and
-   compare it with the preparation run summary.
-4. Present the run ID, exact target SHA, baseline, title, complete generated
-   notes, plan SHA-256, and artifact names and hashes. Confirm expected merged
-   pull requests are present, open pull requests are absent, and the notes
-   contain nothing private or unsuitable.
-5. Ask the user to explicitly approve the exact SHA, notes, and plan SHA-256.
-   This is a mandatory blocking gate. Any changed approved value requires a new
-   review and approval.
-
-### 4. Publish the Approved Candidate
-
-1. After approval, dispatch publication using only the approved preparation run
-   and plan hash:
+1. Immediately before pushing, fetch `origin/main` with `--no-tags` and verify
+   its full SHA, the previous stable release, and tag/release absence still
+   match the proposal. If anything changed, return to inspection and approval.
+2. Create an annotated tag on the approved SHA, without checking out that
+   commit:
 
    ```sh
-   gh workflow run release.yml \
-     -f prepare_run_id=<run-id> \
-     -f plan_sha256=<approved-plan-sha256>
+   git tag --annotate v<version> <approved-full-sha> --message "Release v<version>"
+   git push origin refs/tags/v<version>
    ```
 
-2. Never create or push the stable tag locally. The workflow revalidates current
-   `main`, the baseline, and tag and release absence; verifies the approved
-   plan, checksums, sidecar files, and attestations; then creates the annotated
-   tag and publishes only the approved candidate.
+3. Use the user's authorized Git credentials. A tag pushed with the repository's
+   `GITHUB_TOKEN` does not trigger another workflow; use an authorized user or
+   GitHub App credential instead. Never print credentials.
+4. Push only that tag. Do not dispatch a legacy Prepare/Publish workflow, create
+   a GitHub release directly, or download candidate artifacts locally.
 
-### 5. Monitor and Verify
+### 4. Monitor and Verify
 
-1. Monitor the `Publish Release` workflow until completion.
-2. On failure, report the failing step and relevant logs. Do not move the tag or
-   replace the release automatically.
-3. On success, verify that the release is stable, points to the approved SHA,
-   and has the approved title and notes.
-4. Verify that all three platform archives, their three `.sha256` files, and
-   `checksums.txt` are attached and validate the downloaded checksums.
-5. Report the release URL, tag, SHA, notes baseline, assets, verification
+1. Find the exact `Release` run for the tag push and approved SHA, using its
+   event, tag/head branch, head SHA, and creation time. Monitor until
+   completion.
+2. On failure, report the run URL, failing step, and relevant logs. Leave the
+   tag and any partial release intact. Do not move the tag or overwrite assets.
+3. On success, inspect the workflow verification and release metadata. Confirm
+   it is stable and latest, uses the approved target and notes range, contains
+   the expected merged pull requests, and omits open pull requests.
+4. Confirm all three platform archives, their individual SHA-256 files, and
+   `checksums.txt` are attached. Actions verifies checksums and provenance for
+   this workflow and the tagged source commit before publication. Local artifact
+   downloads or local attestation verification are not required.
+5. Report the release URL, tag, full SHA, notes range, assets, verification
    results, and omitted open pull requests.
 
 ## Retry Rules
 
-- Before publication creates the stable tag, prepare a new candidate whenever
-  any approved field or current repository state changes and approve its new
-  plan hash.
-- Reuse the first-release baseline only when it points to the root commit.
-- If the stable tag exists at the approved SHA but no release exists, stop and
-  ask whether to rerun publication; do not recreate, move, or push the tag
-  locally.
-- If a release already exists, verify and report it instead of duplicating it.
+- If a tag exists but no release exists, inspect its exact run and report the
+  partial state. Never delete/recreate the tag to retrigger publication.
+- After explaining a failed run, obtain approval before rerunning it. Reuse only
+  an unchanged tag and target; Actions must still pass every check. A fix on a
+  new commit requires a new unused version/tag and a new approval.
+- If a release already exists, verify and report it instead of publishing a
+  duplicate. Do not rerun publication over an existing release.

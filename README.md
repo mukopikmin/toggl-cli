@@ -143,3 +143,31 @@ workflows select Go from `go.mod`, so dependency updates can also raise the
 required Go version. The notices check verifies that every dependency module
 and its license text are covered by `THIRD_PARTY_NOTICES.md`; update the notices
 when adding a dependency or when an upstream license changes.
+
+## Stable releases
+
+Stable releases follow the same tag-driven flow as `mukopikmin/sadoku`.
+Use the `toggl-cli-release` skill to review changes, propose a semantic version,
+and approve the exact tested `main` commit, notes range, and omitted pull requests.
+Pushing an annotated `vMAJOR.MINOR.PATCH` tag starts the `Release` workflow and
+authorizes automatic build and publication; there is no separate preparation
+run or release-plan hash approval.
+
+Actions validates that the unchanged tag points to the current tip of `main`,
+that the exact commit passed the `Test` push workflow, and that the version is
+newer than the previous stable release. For the first release,
+`release-notes-baseline` must point to the repository root commit. Drafts,
+prereleases, and nightly releases are excluded from the notes baseline.
+
+The build job creates and attests the three platform archives. The publish job
+verifies their names, checksums, and provenance, generates notes from the previous
+stable tag, and revalidates the target immediately before creating the latest
+stable GitHub release. It then verifies the published notes, assets, and tag.
+Failed runs leave the stable tag intact; never move or recreate it.
+
+The workflow uses `go run ./scripts/release check --version 0.1.0` for validation
+and `go run ./scripts/release notes --version 0.1.0 --output release-notes.json`
+for notes. These commands require Git, an authenticated GitHub CLI, and a checkout
+with the release and comparison tags available. Notes generation uses GitHub's
+generate-notes API. Nightly publication continues independently after successful
+tests on `main`.
