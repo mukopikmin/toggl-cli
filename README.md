@@ -71,7 +71,7 @@ and successful/error exit codes of the previous implementation:
 
 | Command | Options / arguments | Output |
 | --- | --- | --- |
-| `summary` | `<start-date> <end-date>` or `--days N`; `-f/--format csv\|json\|table`, `-s/--separator`, `--no-project`, `--no-date`, `--clipboard` | Tab-separated CSV by default; JSON summary or bordered table |
+| `summary` | `<start-date> <end-date>` or `--days N`; `-f/--format csv\|json\|table`, `-s/--separator`, `--no-project`, `--no-date`, `--daily-total`, `--clipboard` | Tab-separated CSV by default; JSON summary or bordered table |
 | `time-entry list` | `<start-day> <end-day>`; `-f/--format`, `-s/--separator` | Entries as CSV, JSON, or table |
 | `project list` | `-f/--format` | Visible ordered project names, JSON, or table |
 | `project sync` | none | Adds missing active projects to the TOML file |
@@ -92,6 +92,21 @@ The `--days` value must be a non-negative integer written using digits, and
 `time-entry list` days must exist in the current month. Invalid command usage
 is reported before configuration is loaded. An empty
 `project list --format json` result is `[]`.
+
+Add `--daily-total` to `summary` to append a `Total` row to CSV or table output:
+
+```sh
+toggl summary 2026-06-01 2026-06-15 --daily-total
+toggl summary --days 7 --daily-total --format table
+```
+
+Totals are in minutes and include only the projects shown in the output.
+Hidden projects, projects absent from the visible project list, and entries
+without a project are excluded. Dates follow the configured timezone and the
+entry's start date, as in the project rows. Days without time entries total `0`.
+Totals are computed before rounding and displayed to at most two decimal places.
+The flag works with `--no-project`, `--no-date`, `--separator`, and `--clipboard`
+where those options are supported; JSON does not support `--daily-total`.
 
 `project reorder` requires an interactive terminal. Use `j`/`k` or the arrow
 keys to select, Space to pick or drop, uppercase `J`/`K` to move, Enter to save,
