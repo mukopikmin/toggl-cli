@@ -17,22 +17,14 @@ jobs:
         with:
           go-version-file: go.mod
       - name: Check formatting
-        run: test -z "$(gofmt -l .)"
+        run: make check-fmt
       - name: Check installer syntax
-        run: sh -n install.sh
+        run: make check-shell
       - name: Check third-party notices
-        run: |
-          test -s THIRD_PARTY_NOTICES.md
-          modules="$(go list -m -f '{{if not .Main}}{{.Path}}{{end}}' all)"
-          for module in $modules; do
-            grep -Fq "$module" THIRD_PARTY_NOTICES.md || {
-              echo "Missing third-party notice for $module" >&2
-              exit 1
-            }
-          done
+        run: make check-notices
       - name: Static analysis
-        run: go vet ./...
+        run: make vet
       - name: Test
-        run: go test ./...
+        run: make test
       - name: Build
-        run: go build ./...
+        run: make check-build

@@ -34,7 +34,7 @@ jobs:
           go-version-file: go.mod
 
       - name: Build nightly archives
-        run: ./scripts/build_release.sh nightly
+        run: make release VERSION=nightly
 
       - name: Create or update nightly release
         env:

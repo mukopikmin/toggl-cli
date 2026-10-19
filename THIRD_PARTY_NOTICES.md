@@ -1,7 +1,8 @@
 # Third-party notices
 
 The compiled Toggl CLI includes the following third-party software.
-Dependency versions are recorded in `go.mod`.
+Dependency versions are recorded in `go.mod` and embedded in the binary's Go
+build information.
 
 ## github.com/BurntSushi/toml
 
