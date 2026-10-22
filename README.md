@@ -10,7 +10,7 @@ under the permissive MIT license. Third-party license texts are recorded in
 ## Requirements
 
 - A Toggl Track API token and workspace ID
-- The Go version required by `go.mod` or later (only when building from source)
+- Go 1.27.3 or later, as required by `go.mod` (only when building from source)
 
 ## Installation
 
@@ -126,9 +126,15 @@ make build               # Build ./out/toggl
 ```
 
 `make check` runs `check-fmt`, `check-shell`, `check-notices`, `vet`, `test`,
-and `check-build`. Each target can also be run separately. CI calls these same
-targets for formatting, installer shell syntax, third-party notices, static
-analysis, tests, and package builds.
+`check-build`, and `check-vuln`. Each target can also be run separately. CI calls
+these same targets for formatting, installer shell syntax, third-party notices,
+static analysis, tests, package builds, and known vulnerabilities.
+
+`make check-vuln` runs `govulncheck` v1.9.0 for the current platform, checking the
+Go standard library and dependencies for known vulnerabilities reachable from
+the code. It downloads the scanner and queries the Go vulnerability database,
+so network access is required. Vulnerability findings fail the check.
+Set `VULNDB` to use another database URL or a local database with a `file://` URL.
 
 Build all release archives with `make release VERSION=0.1.0`, or use
 `VERSION=nightly` for nightly archives. Add `TARGET=linux-x64` (or `darwin-arm64`

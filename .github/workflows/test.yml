@@ -28,3 +28,5 @@ jobs:
         run: make test
       - name: Build
         run: make check-build
+      - name: Check vulnerabilities
+        run: make check-vuln
