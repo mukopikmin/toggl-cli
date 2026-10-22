@@ -3,8 +3,9 @@
 VERSION ?=
 TARGET ?=
 ARGS ?=
+VULNDB ?= https://vuln.go.dev
 
-.PHONY: help fmt check-fmt check-shell check-notices vet test check-build check build run release
+.PHONY: help fmt check-fmt check-shell check-notices check-vuln vet test check-build check build run release
 
 help:
 	@printf '%s\n' \
@@ -14,6 +15,7 @@ help:
 	  'make run ARGS="..."  Run the CLI from source' \
 	  'make test           Run all tests' \
 	  'make vet            Run static analysis' \
+	  'make check-vuln     Scan for known Go vulnerabilities' \
 	  'make release VERSION=0.1.0 [TARGET=linux-x64]' \
 	  '                    Build release archives in dist/'
 
@@ -38,7 +40,10 @@ test:
 check-build:
 	go build ./...
 
-check: check-fmt check-shell check-notices vet test check-build
+check-vuln:
+	go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 -db "$(VULNDB)" ./...
+
+check: check-fmt check-shell check-notices vet test check-build check-vuln
 
 build:
 	go build -o ./out/toggl ./cmd/toggl
