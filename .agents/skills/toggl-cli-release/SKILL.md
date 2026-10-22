@@ -40,7 +40,9 @@ publishes the GitHub release. Communicate in the user's language.
    full SHA. Do not use `git fetch --tags`: the rolling nightly tag moves.
 3. Identify the newest non-draft, non-prerelease stable release. For the first
    stable release, use `release-notes-baseline`. Fetch only the fixed comparison
-   tag if it is missing locally.
+   tag if it is missing locally. If the release list has no stable release but
+   other stable version tags already exist, stop and investigate the inconsistent
+   history rather than treating it as a first release.
 4. Review commits and merged pull requests from that tag through the exact
    `origin/main` SHA. Stop if there are no changes that justify a release.
 5. Propose one unprefixed semantic version without leading zeroes, newer than
@@ -81,9 +83,16 @@ one of the reviewed inputs changes.
    commit:
 
    ```sh
-   git tag --annotate v<version> <approved-full-sha> --message "Release v<version>"
+   git tag --annotate v<version> <approved-full-sha> \
+     --message "Release v<version>" \
+     --message "Previous-Stable-Tag: <approved-comparison-tag>"
    git push origin refs/tags/v<version>
    ```
+
+   The `Previous-Stable-Tag` trailer must contain the approved comparison tag
+   (`release-notes-baseline` only for a confirmed first stable release). Actions
+   reads this immutable approval input at every validation and notes step. Missing
+   or duplicate trailers fail validation; never modify an existing release tag.
 
 3. Use the user's authorized Git credentials. A tag pushed with the repository's
    `GITHUB_TOKEN` does not trigger another workflow; use an authorized user or

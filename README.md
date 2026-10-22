@@ -155,7 +155,16 @@ when adding a dependency or when an upstream license changes.
 Stable releases follow the same tag-driven flow as `mukopikmin/sadoku`.
 Use the `toggl-cli-release` skill to review changes, propose a semantic version,
 and approve the exact tested `main` commit, notes range, and omitted pull requests.
-Pushing an annotated `vMAJOR.MINOR.PATCH` tag starts the `Release` workflow and
+Record the approved comparison tag in the annotated tag's `Previous-Stable-Tag`
+trailer, for example:
+
+```sh
+git tag --annotate v0.5.2 <approved-full-sha> \
+  --message "Release v0.5.2" \
+  --message "Previous-Stable-Tag: v0.5.0"
+```
+
+Pushing that annotated `vMAJOR.MINOR.PATCH` tag starts the `Release` workflow and
 authorizes automatic build and publication; there is no separate preparation
 run or release-plan hash approval.
 
@@ -163,7 +172,13 @@ Actions validates that the unchanged tag points to the current tip of `main`,
 that the exact commit passed the `Test` push workflow, and that the version is
 newer than the previous stable release. For the first release,
 `release-notes-baseline` must point to the repository root commit. Drafts,
-prereleases, and nightly releases are excluded from the notes baseline.
+prereleases, and nightly releases are excluded from the notes baseline. Each
+validation and notes step reads the approved baseline from the tag trailer and
+compares it with a fresh GitHub lookup. An empty stable-release lookup with other
+stable version tags on the remote fails instead of implying a first release.
+Missing, duplicate, or invalid trailers also fail. Validation JSON includes the
+release candidates, selection reason, remote stable tags, and returned CI runs
+(ID, workflow, branch, event, status, conclusion, SHA, and URL) for diagnosis.
 
 The build job creates and attests the three platform archives. The publish job
 verifies their names, checksums, and provenance, generates notes from the previous
@@ -174,6 +189,7 @@ Failed runs leave the stable tag intact; never move or recreate it.
 The workflow uses `go run ./scripts/release check --version 0.1.0` for validation
 and `go run ./scripts/release notes --version 0.1.0 --output release-notes.json`
 for notes. These commands require Git, an authenticated GitHub CLI, and a checkout
-with the release and comparison tags available. Notes generation uses GitHub's
+with the annotated release tag (including its `Previous-Stable-Tag` trailer) and
+comparison tag available. Notes generation uses GitHub's
 generate-notes API. Nightly publication continues independently after successful
 tests on `main`.

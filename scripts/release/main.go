@@ -38,10 +38,23 @@ type release struct {
 }
 
 type context struct {
-	HeadSHA           string `json:"headSha"`
-	PreviousStableTag string `json:"previousStableTag"`
-	repository        string
-	releases          []release
+	HeadSHA                   string    `json:"headSha"`
+	PreviousStableTag         string    `json:"previousStableTag"`
+	ApprovedPreviousStableTag string    `json:"approvedPreviousStableTag"`
+	BaselineSelection         string    `json:"baselineSelection"`
+	Releases                  []release `json:"releases"`
+	StableTags                []string  `json:"stableTags"`
+	repository                string
+}
+
+const approvedBaselineFormat = "%(objecttype)%0a%(contents:trailers:key=Previous-Stable-Tag,valueonly)"
+
+func approvedBaseline(tagInfo string) (string, error) {
+	lines := strings.Split(strings.TrimSpace(tagInfo), "\n")
+	if len(lines) != 2 || lines[0] != "tag" || (lines[1] != baselineTag && !(strings.HasPrefix(lines[1], "v") && stableVersion.MatchString(lines[1][1:]))) {
+		return "", errors.New("release requires an annotated tag with exactly one Previous-Stable-Tag trailer containing a stable tag or release-notes-baseline")
+	}
+	return lines[1], nil
 }
 
 func previousStableTag(releases []release) string {
@@ -69,13 +82,20 @@ func newerVersion(version, previousTag string) bool {
 	return false
 }
 
-func releaseContext(execute runner) (context, error) {
-	var c context
+func releaseContext(version string, execute runner) (context, error) {
+	c := context{Releases: []release{}, StableTags: []string{}}
 	var err error
 	if c.HeadSHA, err = execute("git", "rev-parse", "HEAD"); err != nil {
 		return c, err
 	}
 	if c.repository, err = execute("gh", "repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"); err != nil {
+		return c, err
+	}
+	tagInfo, err := execute("git", "for-each-ref", "--format="+approvedBaselineFormat, "refs/tags/v"+version)
+	if err != nil {
+		return c, err
+	}
+	if c.ApprovedPreviousStableTag, err = approvedBaseline(tagInfo); err != nil {
 		return c, err
 	}
 	// Include drafts and every page. API failures must never mean absence.
@@ -91,9 +111,34 @@ func releaseContext(execute runner) (context, error) {
 		} else if err != nil {
 			return c, fmt.Errorf("decode releases: %w", err)
 		}
-		c.releases = append(c.releases, r)
+		c.Releases = append(c.Releases, r)
 	}
-	c.PreviousStableTag = previousStableTag(c.releases)
+	c.PreviousStableTag = previousStableTag(c.Releases)
+	c.BaselineSelection = "first stable release in GitHub API order"
+	tags, err := execute("git", "ls-remote", "--tags", "origin", "refs/tags/v*")
+	if err != nil {
+		return c, err
+	}
+	for _, line := range strings.Split(tags, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) != 2 || !strings.HasPrefix(fields[1], "refs/tags/v") {
+			continue
+		}
+		tag := strings.TrimPrefix(fields[1], "refs/tags/")
+		if tag != "v"+version && stableVersion.MatchString(tag[1:]) {
+			c.StableTags = append(c.StableTags, tag)
+		}
+	}
+	if c.PreviousStableTag == baselineTag {
+		c.BaselineSelection = "no stable release returned by GitHub"
+	}
+	diagnostics, _ := json.Marshal(c)
+	if c.PreviousStableTag == baselineTag && len(c.StableTags) != 0 {
+		return c, fmt.Errorf("cannot infer a first release: stable tags exist but no stable releases were returned: %s", diagnostics)
+	}
+	if c.PreviousStableTag != c.ApprovedPreviousStableTag {
+		return c, fmt.Errorf("notes baseline differs from the approved tag trailer: %s", diagnostics)
+	}
 	return c, nil
 }
 
@@ -111,6 +156,18 @@ type inspection struct {
 	Tag       string  `json:"tag"`
 	TagObject string  `json:"tagObject"`
 	Checks    []check `json:"checks"`
+	CIRuns    []ciRun `json:"ciRuns"`
+}
+
+type ciRun struct {
+	DatabaseID   int64  `json:"databaseId"`
+	WorkflowName string `json:"workflowName"`
+	HeadBranch   string `json:"headBranch"`
+	Event        string `json:"event"`
+	Status       string `json:"status"`
+	Conclusion   string `json:"conclusion"`
+	HeadSHA      string `json:"headSha"`
+	URL          string `json:"url"`
 }
 
 func inspectRelease(version string, execute runner) (inspection, error) {
@@ -118,7 +175,7 @@ func inspectRelease(version string, execute runner) (inspection, error) {
 	if !stableVersion.MatchString(version) {
 		return result, fmt.Errorf("invalid semantic version: %s", version)
 	}
-	c, err := releaseContext(execute)
+	c, err := releaseContext(version, execute)
 	if err != nil {
 		return result, err
 	}
@@ -158,26 +215,22 @@ func inspectRelease(version string, execute runner) (inspection, error) {
 		}
 		baselineOK = baselineOK && root == previousCommit
 	}
-	ciOutput, err := execute("gh", "run", "list", "--repo", c.repository, "--workflow", "test.yml", "--branch", "main", "--event", "push", "--commit", c.HeadSHA, "--limit", "1", "--json", "conclusion,headSha,url")
+	ciOutput, err := execute("gh", "run", "list", "--repo", c.repository, "--workflow", "test.yml", "--branch", "main", "--event", "push", "--commit", c.HeadSHA, "--limit", "1", "--json", "databaseId,workflowName,headBranch,event,status,conclusion,headSha,url")
 	if err != nil {
 		return result, err
 	}
-	var runs []struct {
-		Conclusion string `json:"conclusion"`
-		HeadSHA    string `json:"headSha"`
-		URL        string `json:"url"`
-	}
-	if err := json.Unmarshal([]byte(ciOutput), &runs); err != nil {
+	result.CIRuns = []ciRun{}
+	if err := json.Unmarshal([]byte(ciOutput), &result.CIRuns); err != nil {
 		return result, fmt.Errorf("decode Test runs: %w", err)
 	}
 	ciURL := ""
-	for _, r := range runs {
-		if r.Conclusion == "success" && r.HeadSHA == c.HeadSHA {
+	for _, r := range result.CIRuns {
+		if r.DatabaseID > 0 && r.WorkflowName == "Test" && r.HeadBranch == "main" && r.Event == "push" && r.Status == "completed" && r.Conclusion == "success" && r.HeadSHA == c.HeadSHA {
 			ciURL = r.URL
 		}
 	}
 	absent := true
-	for _, r := range c.releases {
+	for _, r := range c.Releases {
 		absent = absent && r.TagName != result.Tag
 	}
 	result.Checks = []check{
@@ -186,7 +239,7 @@ func inspectRelease(version string, execute runner) (inspection, error) {
 		{"releaseAbsent", absent, fmt.Sprintf("absent: %t", absent), "absent, including drafts"},
 		{"notesBaseline", baselineOK, c.PreviousStableTag + " at " + previousCommit, "an earlier ancestor; the root commit for the first release"},
 		{"newerVersion", newerVersion(version, c.PreviousStableTag), version, "newer than " + c.PreviousStableTag},
-		{"ci", ciURL != "", ciURL, "successful Test push run on main for " + c.HeadSHA},
+		{"ci", ciURL != "", "selected URL: " + ciURL + "; returned runs: " + ciOutput, "successful completed Test push run on main for " + c.HeadSHA},
 	}
 	result.OK = true
 	for _, check := range result.Checks {
@@ -208,7 +261,7 @@ func generateNotes(version string, execute runner) (notes, error) {
 	if !stableVersion.MatchString(version) {
 		return result, fmt.Errorf("invalid semantic version: %s", version)
 	}
-	c, err := releaseContext(execute)
+	c, err := releaseContext(version, execute)
 	if err != nil {
 		return result, err
 	}

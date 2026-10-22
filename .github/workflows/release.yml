@@ -52,6 +52,7 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           go run ./scripts/release check --version "${RELEASE_TAG#v}" > release-check.json || { cat release-check.json; exit 1; }
+          cat release-check.json
           echo "version=$(jq -er .version release-check.json)" >> "${GITHUB_OUTPUT}"
           echo "target-sha=$(jq -er .headSha release-check.json)" >> "${GITHUB_OUTPUT}"
           echo "tag-object=$(jq -er .tagObject release-check.json)" >> "${GITHUB_OUTPUT}"
