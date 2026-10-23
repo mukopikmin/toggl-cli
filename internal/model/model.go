@@ -72,6 +72,19 @@ func Summarize(entries []TimeEntry, location *time.Location, now time.Time) (Sum
 	return r, nil
 }
 
+// DailyTotals sums unrounded minutes for the supplied projects and dates.
+func DailyTotals(summary Summary, projects []Project, days []string) map[string]float64 {
+	totals := make(map[string]float64, len(days))
+	for _, day := range days {
+		var total float64
+		for _, p := range projects {
+			total += summary[day][p.ID]
+		}
+		totals[day] = total
+	}
+	return totals
+}
+
 func DateRange(start, end time.Time) []string {
 	var r []string
 	for d := start; !d.After(end); d = d.AddDate(0, 0, 1) {

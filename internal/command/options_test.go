@@ -8,7 +8,7 @@ import (
 )
 
 func TestParseOptsCompatibleForms(t *testing.T) {
-	allowed := map[string]bool{"format": true, "separator": true, "days": true, "no-date": true}
+	allowed := map[string]bool{"format": true, "separator": true, "days": true, "no-date": true, "daily-total": true}
 	one := 1
 	maxSafe := 9007199254740991
 	tests := []struct {
@@ -17,6 +17,7 @@ func TestParseOptsCompatibleForms(t *testing.T) {
 		want opts
 	}{
 		{"attached format", []string{"-fjson"}, opts{format: "json", sep: "\t"}},
+		{"daily total", []string{"--daily-total"}, opts{format: "csv", sep: "\t", dailyTotal: true}},
 		{"attached days", []string{"-d1", "-fjson"}, opts{format: "json", sep: "\t", days: &one}},
 		{"attached separator", []string{"-s,"}, opts{format: "csv", sep: ",", separatorSet: true}},
 		{"end of options", []string{"--", "--no-date", "-fjson"}, opts{format: "csv", sep: "\t", pos: []string{"--no-date", "-fjson"}}},
@@ -37,9 +38,10 @@ func TestParseOptsCompatibleForms(t *testing.T) {
 }
 
 func TestParseOptsRejectsInvalidValues(t *testing.T) {
-	allowed := map[string]bool{"format": true, "separator": true, "days": true, "no-project": true, "no-date": true, "clipboard": true}
+	allowed := map[string]bool{"format": true, "separator": true, "days": true, "no-project": true, "no-date": true, "clipboard": true, "daily-total": true}
 	tests := [][]string{
 		{"--no-date=false"}, {"--no-project=true"}, {"--clipboard=false"},
+		{"--daily-total=true"}, {"--daily-total=false"}, {"--daily-total="},
 		{"--days", "+1"}, {"--days=-1"}, {"--days", "1.5"}, {"--days", ""},
 		{"--days", "9007199254740992"}, {"--days", "999999999999999999999999"},
 		{"--separator", "--no-date"}, {"--separator", "--"}, {"--separator", "-fjson"},
