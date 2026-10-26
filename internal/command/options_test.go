@@ -16,15 +16,17 @@ func TestParseOptsCompatibleForms(t *testing.T) {
 		args []string
 		want opts
 	}{
+		{"default format", nil, opts{format: "table", sep: "\t"}},
+		{"explicit csv", []string{"--format", "csv"}, opts{format: "csv", sep: "\t"}},
 		{"attached format", []string{"-fjson"}, opts{format: "json", sep: "\t"}},
 		{"attached days", []string{"-d1", "-fjson"}, opts{format: "json", sep: "\t", days: &one}},
-		{"attached separator", []string{"-s,"}, opts{format: "csv", sep: ",", separatorSet: true}},
-		{"end of options", []string{"--", "--no-date", "-fjson"}, opts{format: "csv", sep: "\t", pos: []string{"--no-date", "-fjson"}}},
-		{"trailing end marker", []string{"--"}, opts{format: "csv", sep: "\t"}},
-		{"explicit dash value", []string{"--separator=--no-date"}, opts{format: "csv", sep: "--no-date", separatorSet: true}},
-		{"single dash value", []string{"-s", "-"}, opts{format: "csv", sep: "-", separatorSet: true}},
-		{"leading zero days", []string{"--days", "01"}, opts{format: "csv", sep: "\t", days: &one}},
-		{"safe integer boundary", []string{"--days", "9007199254740991"}, opts{format: "csv", sep: "\t", days: &maxSafe}},
+		{"attached separator", []string{"-s,"}, opts{format: "table", sep: ",", separatorSet: true}},
+		{"end of options", []string{"--", "--no-date", "-fjson"}, opts{format: "table", sep: "\t", pos: []string{"--no-date", "-fjson"}}},
+		{"trailing end marker", []string{"--"}, opts{format: "table", sep: "\t"}},
+		{"explicit dash value", []string{"--separator=--no-date"}, opts{format: "table", sep: "--no-date", separatorSet: true}},
+		{"single dash value", []string{"-s", "-"}, opts{format: "table", sep: "-", separatorSet: true}},
+		{"leading zero days", []string{"--days", "01"}, opts{format: "table", sep: "\t", days: &one}},
+		{"safe integer boundary", []string{"--days", "9007199254740991"}, opts{format: "table", sep: "\t", days: &maxSafe}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
