@@ -9,10 +9,12 @@ import (
 type opts struct {
 	format, sep                  string
 	channel                      string
+	month                        string
 	days                         *int
 	noProject, noDate, clipboard bool
 	separatorSet                 bool
 	channelSet                   bool
+	monthSet                     bool
 	pos                          []string
 }
 
@@ -76,6 +78,15 @@ func parseOpts(args []string, allowed map[string]bool) (opts, error) {
 				return o, usage("days must be a non-negative integer")
 			}
 			o.days = &n
+		case "--month":
+			if !allowed["month"] {
+				return o, usagef("unknown option: %s", key)
+			}
+			v, e := take()
+			if e != nil {
+				return o, e
+			}
+			o.month, o.monthSet = v, true
 		case "--channel":
 			if !allowed["channel"] {
 				return o, usagef("unknown option: %s", key)

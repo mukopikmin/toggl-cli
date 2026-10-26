@@ -14,7 +14,15 @@ import (
 )
 
 func TestTimeEntriesDateRange(t *testing.T) {
-	tests := []struct{ name, zone, from, to, wantStart, wantEnd string }{{"UTC month start", "UTC", "2026-05-01", "2026-05-02", "2026-05-01T00:00:00Z", "2026-05-03T00:00:00Z"}, {"Tokyo UTC difference", "Asia/Tokyo", "2026-05-01", "2026-05-02", "2026-04-30T15:00:00Z", "2026-05-02T15:00:00Z"}, {"New York month end", "America/New_York", "2026-01-31", "2026-01-31", "2026-01-31T05:00:00Z", "2026-02-01T05:00:00Z"}}
+	tests := []struct{ name, zone, from, to, wantStart, wantEnd string }{
+		{"UTC month start", "UTC", "2026-05-01", "2026-05-02", "2026-05-01T00:00:00Z", "2026-05-03T00:00:00Z"},
+		{"Tokyo UTC difference", "Asia/Tokyo", "2026-05-01", "2026-05-02", "2026-04-30T15:00:00Z", "2026-05-02T15:00:00Z"},
+		{"New York month end", "America/New_York", "2026-01-31", "2026-01-31", "2026-01-31T05:00:00Z", "2026-02-01T05:00:00Z"},
+		{"Tokyo full month", "Asia/Tokyo", "2026-05-01", "2026-05-31", "2026-04-30T15:00:00Z", "2026-05-31T15:00:00Z"},
+		{"New York DST month", "America/New_York", "2026-03-01", "2026-03-31", "2026-03-01T05:00:00Z", "2026-04-01T04:00:00Z"},
+		{"leap February", "UTC", "2024-02-01", "2024-02-29", "2024-02-01T00:00:00Z", "2024-03-01T00:00:00Z"},
+		{"year end", "UTC", "2026-12-01", "2026-12-31", "2026-12-01T00:00:00Z", "2027-01-01T00:00:00Z"},
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var q url.Values
