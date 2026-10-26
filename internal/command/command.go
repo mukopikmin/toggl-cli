@@ -41,13 +41,12 @@ Commands:
   update      Update the installed Toggl CLI binary
 
 Options:
-  -s, --separator <text> Set the CSV delimiter (default: tab; CSV only)
-  -f, --format <format>  Set the output format: csv, json, or table (default: csv)
+  -f, --format <format>  Set the output format: csv, tsv, json, or table (default: tsv)
   -d, --days <days>      Aggregate from this many days ago through today
       --clipboard        Copy the output to the clipboard as well as stdout
   -h, --help             Show this help
-      --no-project       Omit the project column (summary CSV only)
-      --no-date          Omit the date header row from CSV output
+      --no-project       Omit the project column (summary CSV/TSV only)
+      --no-date          Omit the date header row (summary CSV/TSV only)
       --version          Show the version`
 
 type App struct {
@@ -155,9 +154,7 @@ func (a App) showConfig(args []string) error {
 	if o.format == "table" {
 		fmt.Fprintln(a.Out, table([]string{"Setting", "Value"}, rows))
 	} else {
-		for _, r := range rows {
-			fmt.Fprintf(a.Out, "%s=%s\n", r[0], r[1])
-		}
+		fmt.Fprintln(a.Out, delimited([]string{"Setting", "Value"}, rows, o.format))
 	}
 	return nil
 }
@@ -303,11 +300,11 @@ func (a App) project(ctx context.Context, args []string) error {
 			}
 			fmt.Fprintln(a.Out, table([]string{"Project"}, rows))
 		} else {
-			names := make([]string, len(ps))
+			rows := make([][]string, len(ps))
 			for i, p := range ps {
-				names[i] = p.DisplayName
+				rows[i] = []string{p.DisplayName}
 			}
-			fmt.Fprintln(a.Out, strings.Join(names, "\n"))
+			fmt.Fprintln(a.Out, delimited(nil, rows, listOptions.format))
 		}
 		return nil
 	case "sync":
@@ -358,12 +355,12 @@ func location(c config.Config) (*time.Location, error) {
 	return time.LoadLocation(c.Timezone)
 }
 func (a App) summary(ctx context.Context, args []string) error {
-	o, e := parseOpts(args, map[string]bool{"format": true, "separator": true, "days": true, "no-project": true, "no-date": true, "clipboard": true})
+	o, e := parseOpts(args, map[string]bool{"format": true, "days": true, "no-project": true, "no-date": true, "clipboard": true})
 	if e != nil {
 		return e
 	}
-	if o.format == "table" && (o.separatorSet || o.noProject || o.noDate) {
-		return usage("--separator, --no-project, and --no-date cannot be used with table format")
+	if o.format == "table" && (o.noProject || o.noDate) {
+		return usage("--no-project and --no-date cannot be used with table format")
 	}
 	var from, to time.Time
 	if o.days != nil {
@@ -435,21 +432,16 @@ func (a App) summary(ctx context.Context, args []string) error {
 		if o.format == "table" {
 			text = table(headers, rows)
 		} else {
-			var lines []string
-			if !o.noDate {
-				h := headers
-				if o.noProject {
-					h = days
+			if o.noProject {
+				headers = days
+				for i, r := range rows {
+					rows[i] = r[1:]
 				}
-				lines = append(lines, strings.Join(h, o.sep))
 			}
-			for _, r := range rows {
-				if o.noProject {
-					r = r[1:]
-				}
-				lines = append(lines, strings.Join(r, o.sep))
+			if o.noDate {
+				headers = nil
 			}
-			text = strings.Join(lines, "\n")
+			text = delimited(headers, rows, o.format)
 		}
 	}
 	fmt.Fprintln(a.Out, text)
@@ -466,18 +458,12 @@ func (a App) timeEntry(ctx context.Context, args []string) error {
 	if args[0] != "list" {
 		return usagef("unknown time-entry subcommand: %s", args[0])
 	}
-	o, e := parseOpts(args[1:], map[string]bool{"format": true, "separator": true})
+	o, e := parseOpts(args[1:], map[string]bool{"format": true})
 	if e != nil {
 		return e
 	}
 	if len(o.pos) != 2 {
 		return usage("time-entry list requires start and end day")
-	}
-	if o.sep == "" {
-		return usage("separator must not be empty")
-	}
-	if o.format == "table" && o.separatorSet {
-		return usage("--separator cannot be used with table format")
 	}
 	now := a.Now()
 	y, m, _ := now.Date()
@@ -535,20 +521,7 @@ func (a App) timeEntry(ctx context.Context, args []string) error {
 	} else if o.format == "table" {
 		fmt.Fprintln(a.Out, table(headers, rows))
 	} else {
-		fmt.Fprintln(a.Out, csv(headers, rows, o.sep))
+		fmt.Fprintln(a.Out, delimited(headers, rows, o.format))
 	}
 	return nil
-}
-func csv(h []string, rows [][]string, sep string) string {
-	all := append([][]string{h}, rows...)
-	var lines []string
-	for _, r := range all {
-		for i, v := range r {
-			if strings.ContainsAny(v, "\r\n\"") || strings.Contains(v, sep) {
-				r[i] = "\"" + strings.ReplaceAll(v, "\"", "\"\"") + "\""
-			}
-		}
-		lines = append(lines, strings.Join(r, sep))
-	}
-	return strings.Join(lines, "\n")
 }

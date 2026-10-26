@@ -1,7 +1,7 @@
 # toggl-cli
 
 A Go CLI that aggregates Toggl Track time entries by project and date. Results
-can be output as delimiter-separated values, JSON, or bordered terminal tables.
+can be output as TSV (the default), CSV, JSON, or bordered terminal tables.
 
 Configuration is parsed with `github.com/BurntSushi/toml`, which is distributed
 under the permissive MIT license. Third-party license texts are recorded in
@@ -64,19 +64,20 @@ To migrate an old `~/.toggl_config`, run this from a checkout:
 go run ./cmd/migrate-config
 ```
 
-## Command compatibility
+## Commands
 
-The Go implementation preserves the command surface, defaults, output formats,
-and successful/error exit codes of the previous implementation:
+Use `-f/--format tsv|csv|json|table` to select an output format. TSV uses tabs
+and CSV uses commas; both delimiters are fixed. Fields containing the delimiter,
+quotes, or line breaks are quoted, and embedded quotes are doubled.
 
 | Command | Options / arguments | Output |
 | --- | --- | --- |
-| `summary` | `<start-date> <end-date>` or `--days N`; `-f/--format csv\|json\|table`, `-s/--separator`, `--no-project`, `--no-date`, `--clipboard` | Tab-separated CSV by default; JSON summary or bordered table |
-| `time-entry list` | `<start-day> <end-day>`; `-f/--format`, `-s/--separator` | Entries as CSV, JSON, or table |
-| `project list` | `-f/--format` | Visible ordered project names, JSON, or table |
+| `summary` | `<start-date> <end-date>` or `--days N`; `-f/--format`, `--no-project`, `--no-date`, `--clipboard` | TSV or CSV with a date header; JSON summary or bordered table |
+| `time-entry list` | `<start-day> <end-day>`; `-f/--format` | Entries as TSV or CSV with a header, JSON, or table |
+| `project list` | `-f/--format` | Visible ordered project names as single-column TSV or CSV without a header, JSON, or table |
 | `project sync` | none | Adds missing active projects to the TOML file |
 | `project reorder` | none | Interactively changes and saves visible-project order |
-| `config` | `-f/--format` | Non-sensitive settings as `KEY=VALUE`, JSON, or table |
+| `config` | `-f/--format` | Non-sensitive settings as two-column TSV or CSV with a `Setting`/`Value` header, JSON, or table |
 | `init` | none | Creates a mode-`0600` configuration interactively |
 | `update` | `--channel stable\|nightly` | Checks, verifies, and installs a release update |
 | `--help`, `-h` | none | Help text |
@@ -85,9 +86,25 @@ and successful/error exit codes of the previous implementation:
 Date ranges are inclusive. Invalid usage, configuration, API, clipboard, and
 I/O errors exit with status 1; successful commands exit with status 0.
 
-Short options accept attached values, such as `-fjson`, `-d7`, and `-s,`.
+```sh
+toggl summary --days 7              # TSV (default)
+toggl summary --days 7 --format csv # Comma-separated CSV
+toggl time-entry list 1 15 -ftsv    # Explicit TSV
+```
+
+Compared with earlier versions, `--format csv` now uses commas instead of tabs.
+Use `--format tsv` for tab-separated output. The `-s/--separator` option has been
+removed; replace `--separator ,` with `--format csv`. The default summary and
+time-entry output remains tab-separated. `config` now uses two columns with a
+header instead of `KEY=VALUE` lines. Project names and summary fields are now
+escaped when needed.
+
+`--no-project` and `--no-date` apply to summary CSV/TSV output, omitting the
+project column and date header respectively; neither can be used with `table`.
+
+Short options accept attached values, such as `-fjson`, `-ftsv`, and `-d7`.
 Use `--` to end option parsing. Boolean flags such as `--no-date` do not accept
-values. For a separator starting with a dash, use `--separator=<text>`.
+values.
 The `--days` value must be a non-negative integer written using digits, and
 `time-entry list` days must exist in the current month. Invalid command usage
 is reported before configuration is loaded. An empty
