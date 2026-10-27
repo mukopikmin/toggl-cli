@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
+	"strconv"
 
 	"github.com/mukopikmin/toggl-cli/internal/model"
 )
@@ -16,12 +16,18 @@ func (a App) client(ctx context.Context, args []string) error {
 	if args[0] != "list" {
 		return usagef("unknown client subcommand: %s", args[0])
 	}
-	o, err := parseOpts(args[1:], map[string]bool{"format": true})
+	o, err := parseOpts(args[1:], map[string]bool{"format": true, "separator": true})
 	if err != nil {
 		return err
 	}
 	if len(o.pos) > 0 {
 		return usage("client list does not accept positional arguments")
+	}
+	if o.sep == "" {
+		return usage("separator must not be empty")
+	}
+	if o.format == "table" && o.separatorSet {
+		return usage("--separator cannot be used with table format")
 	}
 	d, err := loadCfg()
 	if err != nil {
@@ -50,11 +56,11 @@ func (a App) client(ctx context.Context, args []string) error {
 		_, err = fmt.Fprintln(a.Out, table([]string{"Client"}, rows))
 		return err
 	default:
-		names := make([]string, len(clients))
+		rows := make([][]string, len(clients))
 		for i, c := range clients {
-			names[i] = c.Name
+			rows[i] = []string{strconv.FormatInt(c.ID, 10), c.Name}
 		}
-		_, err = fmt.Fprintln(a.Out, strings.Join(names, "\n"))
+		_, err = fmt.Fprintln(a.Out, csv([]string{"id", "name"}, rows, o.sep))
 		return err
 	}
 }

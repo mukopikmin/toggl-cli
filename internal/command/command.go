@@ -35,7 +35,7 @@ const Help = `Usage:
 
 Commands:
   init        Create the configuration file
-  client      List workspace clients
+  client      List workspace clients as CSV, JSON, or a table
   project     List, reorder, and sync projects
   time-entry  List individual time entries for a range of days
   config      Show configuration values

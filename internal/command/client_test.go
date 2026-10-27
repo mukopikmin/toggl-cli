@@ -3,6 +3,7 @@ package command
 import (
 	"bytes"
 	"context"
+	stdcsv "encoding/csv"
 	"encoding/json"
 	"errors"
 	"os"
@@ -39,7 +40,7 @@ func TestClientListFormats(t *testing.T) {
 					t.Fatal(out.String())
 				}
 			default:
-				if out.String() != "Beta\n取引先 A\n" {
+				if out.String() != "id\tname\n2\tBeta\n1\t取引先 A\n" {
 					t.Fatalf("%q", out.String())
 				}
 			}
@@ -61,8 +62,10 @@ func TestClientListDefaultAndEmptyOutput(t *testing.T) {
 		options []string
 		want    string
 	}{
-		{"default", []model.Client{{ID: 1, Name: "Client A"}}, nil, "Client A\n"},
-		{"empty default", nil, nil, "\n"},
+		{"default", []model.Client{{ID: 1, Name: "Client A"}}, nil, "id\tname\n1\tClient A\n"},
+		{"empty default", nil, nil, "id\tname\n"},
+		{"CSV", []model.Client{{ID: 1, Name: "Client A"}}, []string{"-fcsv", "-s,"}, "id,name\n1,Client A\n"},
+		{"empty CSV", nil, []string{"--separator", ","}, "id,name\n"},
 		{"nil JSON", nil, []string{"-fjson"}, "[]\n"},
 		{"empty JSON", []model.Client{}, []string{"--format=json"}, "[]\n"},
 	}
@@ -83,7 +86,9 @@ func TestClientUsageBeforeConfiguration(t *testing.T) {
 	tests := [][]string{
 		{"client"}, {"client", "get"}, {"client", "list", "extra"},
 		{"client", "list", "--format", "xml"}, {"client", "list", "--format"},
-		{"client", "list", "--separator", ","}, {"client", "list", "--clipboard"},
+		{"client", "list", "--separator", ""}, {"client", "list", "--separator"},
+		{"client", "list", "--format", "table", "--separator", ","},
+		{"client", "list", "--clipboard"},
 	}
 	for _, args := range tests {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
@@ -94,6 +99,28 @@ func TestClientUsageBeforeConfiguration(t *testing.T) {
 			var usageError UsageError
 			if !errors.As(err, &usageError) || client.clientCalls != 0 {
 				t.Fatalf("expected usage error without API access, got %v", err)
+			}
+		})
+	}
+}
+
+func TestClientListDelimitedOutputEscapesNames(t *testing.T) {
+	clients := []model.Client{
+		{ID: 1, Name: "Client, A"}, {ID: 2, Name: "Client\tB"},
+		{ID: 3, Name: "Client \"C\""}, {ID: 4, Name: "Client\nD"},
+	}
+	want := [][]string{{"id", "name"}, {"1", clients[0].Name}, {"2", clients[1].Name}, {"3", clients[2].Name}, {"4", clients[3].Name}}
+	for _, sep := range []string{",", "\t"} {
+		t.Run(sep, func(t *testing.T) {
+			app, out := configuredApp(t, &fakeClient{clients: clients}, "")
+			if err := app.Run(context.Background(), []string{"client", "list", "--format", "csv", "--separator", sep}); err != nil {
+				t.Fatal(err)
+			}
+			reader := stdcsv.NewReader(out)
+			reader.Comma = []rune(sep)[0]
+			got, err := reader.ReadAll()
+			if err != nil || !reflect.DeepEqual(got, want) {
+				t.Fatalf("got %q, %v; want %q", got, err, want)
 			}
 		})
 	}
