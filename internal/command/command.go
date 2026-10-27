@@ -9,7 +9,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -17,6 +16,7 @@ import (
 
 	"github.com/mukopikmin/toggl-cli/internal/config"
 	"github.com/mukopikmin/toggl-cli/internal/model"
+	"github.com/mukopikmin/toggl-cli/internal/template"
 	"github.com/mukopikmin/toggl-cli/internal/toggl"
 	"golang.org/x/term"
 )
@@ -24,6 +24,11 @@ import (
 const Help = `Usage:
   toggl summary <start-date> <end-date> [options]
   toggl summary --days <days> [options]
+  toggl summary --template <name> [options]
+  toggl template add <name> [<start-date> <end-date> | --days <days>] [options] [--force]
+  toggl template list
+  toggl template show <name>
+  toggl template delete <name>
   toggl time-entry list <start-day> <end-day> [options]
   toggl project list [options]
   toggl project reorder
@@ -38,6 +43,7 @@ Commands:
   time-entry  List individual time entries for a range of days
   config      Show configuration values
   summary     Summarize time entries for a range of days
+  template    Add, list, show, and delete summary templates
   update      Update the installed Toggl CLI binary
 
 Options:
@@ -45,9 +51,14 @@ Options:
   -f, --format <format>  Set the output format: csv, json, or table (default: csv)
   -d, --days <days>      Aggregate from this many days ago through today
       --clipboard        Copy the output to the clipboard as well as stdout
+      --no-clipboard     Disable clipboard copying (summary/template add)
+      --template <name>  Use a saved summary template
+      --force            Replace an existing template (template add only)
   -h, --help             Show this help
       --no-project       Omit the project column (summary CSV only)
       --no-date          Omit the date header row from CSV output
+      --project          Include the project column (summary/template add)
+      --date             Include the date header (summary/template add)
       --version          Show the version`
 
 type App struct {
@@ -102,6 +113,8 @@ func (a App) Run(ctx context.Context, args []string) error {
 		return a.project(ctx, args[1:])
 	case "summary":
 		return a.summary(ctx, args[1:])
+	case "template":
+		return a.template(args[1:])
 	case "time-entry":
 		return a.timeEntry(ctx, args[1:])
 	case "update":
@@ -341,16 +354,6 @@ func (a App) project(ctx context.Context, args []string) error {
 	return nil
 }
 
-func parseDate(v string) (time.Time, error) {
-	if !regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`).MatchString(v) {
-		return time.Time{}, usage("start and end date must use YYYY-MM-DD")
-	}
-	t, e := time.Parse(time.DateOnly, v)
-	if e != nil {
-		return t, usage("start and end date must be valid dates")
-	}
-	return t, nil
-}
 func location(c config.Config) (*time.Location, error) {
 	if c.Timezone == "" {
 		return time.Local, nil
@@ -358,33 +361,33 @@ func location(c config.Config) (*time.Location, error) {
 	return time.LoadLocation(c.Timezone)
 }
 func (a App) summary(ctx context.Context, args []string) error {
-	o, e := parseOpts(args, map[string]bool{"format": true, "separator": true, "days": true, "no-project": true, "no-date": true, "clipboard": true})
+	allowed := summaryFlags()
+	allowed["template"] = true
+	o, e := parseOpts(args, allowed)
 	if e != nil {
 		return e
 	}
-	if o.format == "table" && (o.separatorSet || o.noProject || o.noDate) {
-		return usage("--separator, --no-project, and --no-date cannot be used with table format")
-	}
-	var from, to time.Time
-	if o.days != nil {
-		if len(o.pos) > 0 {
-			return usage("summary accepts either start and end date or --days, not both")
+	base := model.SummaryOptions{}
+	if o.templateSet {
+		if err := template.ValidateName(o.template); err != nil {
+			return usage(err.Error())
 		}
-	} else {
-		if len(o.pos) != 2 {
-			return usage("summary requires start and end date or --days")
+		d, err := template.Load()
+		if err != nil {
+			return err
 		}
-		from, e = parseDate(o.pos[0])
-		if e != nil {
-			return e
-		}
-		to, e = parseDate(o.pos[1])
-		if e != nil {
-			return e
+		var exists bool
+		base, exists = d.Templates[o.template]
+		if !exists {
+			return fmt.Errorf("unknown template: %s", o.template)
 		}
 	}
-	if from.After(to) {
-		return usage("start date must not be after end date")
+	settings, e := summaryOptions(base, o)
+	if e != nil {
+		return e
+	}
+	if e = settings.Validate(true); e != nil {
+		return usage(e.Error())
 	}
 	d, e := loadCfg()
 	if e != nil {
@@ -394,25 +397,29 @@ func (a App) summary(ctx context.Context, args []string) error {
 	if e != nil {
 		return e
 	}
-	if o.days != nil {
-		now := a.Now().In(loc)
-		to = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
-		from = to.AddDate(0, 0, -*o.days)
+	now := a.Now()
+	from, to, e := settings.DateRange(now, loc)
+	if e != nil {
+		return usage(e.Error())
 	}
 	entries, e := a.Client.TimeEntries(ctx, d.Config, from, to)
 	if e != nil {
 		return e
 	}
-	sum, e := model.Summarize(entries, loc, a.Now())
+	sum, e := model.Summarize(entries, loc, now)
 	if e != nil {
 		return e
 	}
+	return a.writeSummary(ctx, d.Config, settings, from, to, sum)
+}
+
+func (a App) writeSummary(ctx context.Context, cfg config.Config, settings model.SummaryOptions, from, to time.Time, sum model.Summary) error {
 	var text string
-	if o.format == "json" {
+	if settings.Format == "json" {
 		b, _ := json.MarshalIndent(sum, "", "  ")
 		text = string(b)
 	} else {
-		ps, e := a.Client.Projects(ctx, d.Config)
+		ps, e := a.Client.Projects(ctx, cfg)
 		if e != nil {
 			return e
 		}
@@ -432,28 +439,32 @@ func (a App) summary(ctx context.Context, args []string) error {
 			rows = append(rows, r)
 		}
 		headers := append([]string{"Project"}, days...)
-		if o.format == "table" {
+		if settings.Format == "table" {
 			text = table(headers, rows)
 		} else {
+			separator := "\t"
+			if settings.Separator != nil {
+				separator = *settings.Separator
+			}
 			var lines []string
-			if !o.noDate {
+			if !settings.NoDate {
 				h := headers
-				if o.noProject {
+				if settings.NoProject {
 					h = days
 				}
-				lines = append(lines, strings.Join(h, o.sep))
+				lines = append(lines, strings.Join(h, separator))
 			}
 			for _, r := range rows {
-				if o.noProject {
+				if settings.NoProject {
 					r = r[1:]
 				}
-				lines = append(lines, strings.Join(r, o.sep))
+				lines = append(lines, strings.Join(r, separator))
 			}
 			text = strings.Join(lines, "\n")
 		}
 	}
 	fmt.Fprintln(a.Out, text)
-	if o.clipboard {
+	if settings.Clipboard {
 		return clipboard(text)
 	}
 	return nil
