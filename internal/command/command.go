@@ -25,6 +25,7 @@ const Help = `Usage:
   toggl summary <start-date> <end-date> [options]
   toggl summary --days <days> [options]
   toggl time-entry list <start-day> <end-day> [options]
+  toggl client list [options]
   toggl project list [options]
   toggl project reorder
   toggl project sync
@@ -34,6 +35,7 @@ const Help = `Usage:
 
 Commands:
   init        Create the configuration file
+  client      List workspace clients
   project     List, reorder, and sync projects
   time-entry  List individual time entries for a range of days
   config      Show configuration values
@@ -100,6 +102,8 @@ func (a App) Run(ctx context.Context, args []string) error {
 		return a.showConfig(args[1:])
 	case "project":
 		return a.project(ctx, args[1:])
+	case "client":
+		return a.client(ctx, args[1:])
 	case "summary":
 		return a.summary(ctx, args[1:])
 	case "time-entry":

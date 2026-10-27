@@ -15,10 +15,17 @@ import (
 )
 
 type fakeClient struct {
+	clients                  []model.Client
+	clientCalls              int
 	projects                 []model.Project
 	entries                  []model.TimeEntry
 	err                      error
 	projectCalls, entryCalls int
+}
+
+func (f *fakeClient) Clients(context.Context, config.Config) ([]model.Client, error) {
+	f.clientCalls++
+	return f.clients, f.err
 }
 
 func (f *fakeClient) Projects(context.Context, config.Config) ([]model.Project, error) {

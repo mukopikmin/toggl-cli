@@ -15,6 +15,7 @@ import (
 const Endpoint = "https://api.track.toggl.com/api/v9"
 
 type Client interface {
+	Clients(context.Context, config.Config) ([]model.Client, error)
 	Projects(context.Context, config.Config) ([]model.Project, error)
 	TimeEntries(context.Context, config.Config, time.Time, time.Time) ([]model.TimeEntry, error)
 }
@@ -47,6 +48,21 @@ func (c HTTPClient) http() *http.Client {
 	}
 	return http.DefaultClient
 }
+func (c HTTPClient) Clients(ctx context.Context, cfg config.Config) ([]model.Client, error) {
+	var dto []struct {
+		ID   int64  `json:"id"`
+		Name string `json:"name"`
+	}
+	if err := c.do(ctx, cfg, "fetch clients", "/workspaces/"+url.PathEscape(cfg.Workspace)+"/clients", &dto); err != nil {
+		return nil, err
+	}
+	out := make([]model.Client, len(dto))
+	for i, d := range dto {
+		out[i] = model.Client{ID: d.ID, Name: d.Name}
+	}
+	return out, nil
+}
+
 func (c HTTPClient) Projects(ctx context.Context, cfg config.Config) ([]model.Project, error) {
 	var dto []struct {
 		ID            int64  `json:"id"`
