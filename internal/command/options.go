@@ -72,8 +72,8 @@ func parseOpts(args []string, allowed map[string]bool) (opts, error) {
 				return o, e
 			}
 			n, ok := parseUnsignedInteger(v)
-			if !ok {
-				return o, usage("days must be a non-negative integer")
+			if !ok || n == 0 {
+				return o, usage("days must be a positive integer")
 			}
 			o.days = &n
 		case "--channel":
