@@ -26,6 +26,7 @@ const Help = `Usage:
   toggl summary --days <days> [options]
   toggl summary --month <month> [options]
   toggl time-entry list <start-day> <end-day> [options]
+  toggl client list [options]
   toggl project list [options]
   toggl project reorder
   toggl project sync
@@ -35,6 +36,7 @@ const Help = `Usage:
 
 Commands:
   init        Create the configuration file
+  client      List workspace clients as CSV, JSON, or a table
   project     List, reorder, and sync projects
   time-entry  List individual time entries for a range of days
   config      Show configuration values
@@ -44,7 +46,7 @@ Commands:
 Options:
   -s, --separator <text> Set the CSV delimiter (default: tab; CSV only)
   -f, --format <format>  Set the output format: csv, json, or table (default: csv)
-  -d, --days <days>      Aggregate from this many days ago through today
+  -d, --days <days>      Aggregate this many calendar days, including today (>= 1)
       --month <month>   Aggregate the entire specified calendar month (summary only)
                         Formats: YYYY-MM, YYYYMM, or YYYY/MM
       --clipboard        Copy the output to the clipboard as well as stdout
@@ -103,6 +105,8 @@ func (a App) Run(ctx context.Context, args []string) error {
 		return a.showConfig(args[1:])
 	case "project":
 		return a.project(ctx, args[1:])
+	case "client":
+		return a.client(ctx, args[1:])
 	case "summary":
 		return a.summary(ctx, args[1:])
 	case "time-entry":
@@ -423,7 +427,7 @@ func (a App) summary(ctx context.Context, args []string) error {
 	if o.days != nil {
 		now := a.Now().In(loc)
 		to = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
-		from = to.AddDate(0, 0, -*o.days)
+		from = to.AddDate(0, 0, 1-*o.days)
 	}
 	entries, e := a.Client.TimeEntries(ctx, d.Config, from, to)
 	if e != nil {
