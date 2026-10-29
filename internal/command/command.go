@@ -45,7 +45,7 @@ Commands:
 Options:
   -s, --separator <text> Set the CSV delimiter (default: tab; CSV only)
   -f, --format <format>  Set the output format: csv, json, or table (default: csv)
-  -d, --days <days>      Aggregate from this many days ago through today
+  -d, --days <days>      Aggregate this many calendar days, including today (>= 1)
       --clipboard        Copy the output to the clipboard as well as stdout
   -h, --help             Show this help
       --no-project       Omit the project column (summary CSV only)
@@ -401,7 +401,7 @@ func (a App) summary(ctx context.Context, args []string) error {
 	if o.days != nil {
 		now := a.Now().In(loc)
 		to = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
-		from = to.AddDate(0, 0, -*o.days)
+		from = to.AddDate(0, 0, 1-*o.days)
 	}
 	entries, e := a.Client.TimeEntries(ctx, d.Config, from, to)
 	if e != nil {

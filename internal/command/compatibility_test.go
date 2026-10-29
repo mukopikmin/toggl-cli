@@ -17,6 +17,7 @@ import (
 func TestSummaryUsageBeforeConfiguration(t *testing.T) {
 	tests := [][]string{
 		{"summary"}, {"summary", "2026-05-01"},
+		{"summary", "--days", "0"},
 		{"summary", "2026-05-01", "2026-05-02", "--days", "1"},
 		{"summary", "2026-02-30", "2026-03-01"},
 		{"summary", "2026-05-02", "2026-05-01"},

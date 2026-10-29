@@ -89,9 +89,12 @@ I/O errors exit with status 1; successful commands exit with status 0.
 Short options accept attached values, such as `-fjson`, `-d7`, and `-s,`.
 Use `--` to end option parsing. Boolean flags such as `--no-date` do not accept
 values. For a separator starting with a dash, use `--separator=<text>`.
-The `--days` value must be a non-negative integer written using digits, and
-`time-entry list` days must exist in the current month. Invalid command usage
-is reported before configuration is loaded. An empty
+The `--days N` option includes exactly N calendar days ending today in the
+configured timezone (or the system timezone when omitted). For example,
+`--days 1` includes only today, and `--days 7` includes today and the previous
+six days. The value must be a positive integer written using digits; zero is
+invalid. `time-entry list` days must exist in the current month. Invalid command
+usage is reported before configuration is loaded. An empty
 `project list --format json` or `client list --format json` result is `[]`.
 
 `toggl client list` fetches clients from the configured workspace in API order.
