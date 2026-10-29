@@ -27,8 +27,8 @@ func (o SummaryOptions) Validate(requirePeriod bool) error {
 		return fmt.Errorf("--separator, --no-project, and --no-date cannot be used with table format")
 	}
 	if o.Days != nil {
-		if *o.Days < 0 || int64(*o.Days) > 9007199254740991 {
-			return fmt.Errorf("days must be a non-negative safe integer")
+		if *o.Days <= 0 || int64(*o.Days) > 9007199254740991 {
+			return fmt.Errorf("days must be a positive safe integer")
 		}
 		if o.StartDate != "" || o.EndDate != "" {
 			return fmt.Errorf("summary accepts either start and end date or --days, not both")
@@ -74,7 +74,7 @@ func (o SummaryOptions) DateRange(now time.Time, loc *time.Location) (time.Time,
 	if o.Days != nil {
 		now = now.In(loc)
 		to := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
-		return to.AddDate(0, 0, -*o.Days), to, nil
+		return to.AddDate(0, 0, 1-*o.Days), to, nil
 	}
 	from, _ := summaryDate(o.StartDate)
 	to, _ := summaryDate(o.EndDate)

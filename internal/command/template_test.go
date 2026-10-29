@@ -47,16 +47,16 @@ func TestTemplateLifecycleWithoutConfigurationOrAPI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := app.Run(context.Background(), []string{"template", "add", "weekly", "--days", "0"}); err == nil || !strings.Contains(err.Error(), "--force") {
+	if err := app.Run(context.Background(), []string{"template", "add", "weekly", "--days", "1"}); err == nil || !strings.Contains(err.Error(), "--force") {
 		t.Fatalf("duplicate = %v", err)
 	}
 	after, _ := os.ReadFile(p)
 	if !bytes.Equal(before, after) {
 		t.Fatal("duplicate add changed file")
 	}
-	run("template", "add", "weekly", "--days", "0", "--force")
+	run("template", "add", "weekly", "--days", "1", "--force")
 	doc, err = template.Load()
-	if err != nil || *doc.Templates["weekly"].Days != 0 || doc.Templates["weekly"].Format != "csv" {
+	if err != nil || *doc.Templates["weekly"].Days != 1 || doc.Templates["weekly"].Format != "csv" {
 		t.Fatalf("force did not replace the template: %+v, %v", doc, err)
 	}
 	if !doc.Templates["spreadsheet"].NoDate {
@@ -83,6 +83,8 @@ func TestTemplateUsageErrorsDoNotWrite(t *testing.T) {
 		{"template", "add", "weekly", "2026-05-02", "2026-05-01"},
 		{"template", "add", "weekly", "2026-05-01", "2026-05-02", "--days", "1"},
 		{"template", "add", "weekly", "--days=-1"},
+		{"template", "add", "weekly", "--days", "0"},
+		{"summary", "--days", "0"},
 		{"template", "add", "weekly", "--format", "table", "--separator", ","},
 		{"template", "add", "weekly", "--format", "table", "--no-date"},
 		{"template", "add", "weekly", "--template", "other"},
@@ -90,7 +92,7 @@ func TestTemplateUsageErrorsDoNotWrite(t *testing.T) {
 		{"template", "show"}, {"template", "show", "a", "b"},
 		{"template", "delete"}, {"template", "delete", "a", "--force"},
 		{"summary", "--template="}, {"summary", "--template", "../escape"},
-		{"summary", "--days", "0", "--force"},
+		{"summary", "--days", "1", "--force"},
 	}
 	for _, args := range tests {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
@@ -137,7 +139,7 @@ func TestSummaryTemplateMatchesDirectExecution(t *testing.T) {
 		{"clear booleans", []string{"--days", "1", "--no-project", "--no-date", "--clipboard"}, []string{"--project", "--date", "--no-clipboard"}, []string{"--days", "1"}},
 		{"empty separator", []string{"--days", "1", "--separator", ""}, nil, []string{"--days", "1", "--separator", ""}},
 		{"override separator", []string{"--days", "1", "--separator", ","}, []string{"--separator", "|"}, []string{"--days", "1", "--separator", "|"}},
-		{"json", []string{"--days", "0", "--format", "json"}, nil, []string{"--days", "0", "--format", "json"}},
+		{"json", []string{"--days", "1", "--format", "json"}, nil, []string{"--days", "1", "--format", "json"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -178,7 +180,7 @@ func TestSummaryTemplateMatchesDirectExecution(t *testing.T) {
 
 func TestCorruptTemplatesAreNotOverwritten(t *testing.T) {
 	for _, args := range [][]string{
-		{"template", "add", "weekly", "--days", "0", "--force"},
+		{"template", "add", "weekly", "--days", "1", "--force"},
 		{"template", "list"}, {"template", "show", "weekly"},
 		{"template", "delete", "weekly"}, {"summary", "--template", "weekly"},
 	} {
@@ -197,7 +199,7 @@ func TestCorruptTemplatesAreNotOverwritten(t *testing.T) {
 			if err != nil || !bytes.Equal(before, after) || fake.entryCalls != 0 || fake.projectCalls != 0 {
 				t.Fatalf("corrupt file was changed or API called: %v", err)
 			}
-			if err := app.Run(context.Background(), []string{"summary", "--days", "0"}); err != nil {
+			if err := app.Run(context.Background(), []string{"summary", "--days", "1"}); err != nil {
 				t.Fatalf("ordinary summary should not load templates: %v", err)
 			}
 		})
@@ -206,11 +208,11 @@ func TestCorruptTemplatesAreNotOverwritten(t *testing.T) {
 
 func TestSummaryValidatesMergedTemplateBeforeAPI(t *testing.T) {
 	tests := []struct{ settings, overrides []string }{
-		{[]string{"--days", "0", "--no-date"}, []string{"--format", "table"}},
-		{[]string{"--days", "0", "--separator", ""}, []string{"--format", "table"}},
+		{[]string{"--days", "1", "--no-date"}, []string{"--format", "table"}},
+		{[]string{"--days", "1", "--separator", ""}, []string{"--format", "table"}},
 		{[]string{"--format", "table"}, nil},
-		{[]string{"--days", "0"}, []string{"2026-05-01"}},
-		{[]string{"--days", "0"}, []string{"2026-05-01", "2026-05-02", "--days", "1"}},
+		{[]string{"--days", "1"}, []string{"2026-05-01"}},
+		{[]string{"--days", "1"}, []string{"2026-05-01", "2026-05-02", "--days", "1"}},
 	}
 	for _, tt := range tests {
 		t.Run(strings.Join(tt.overrides, " "), func(t *testing.T) {
@@ -237,7 +239,7 @@ func TestSummaryTemplateResolvesDaysAtExecution(t *testing.T) {
 	if err := os.WriteFile(p, []byte("workspace='1'\ntoken='test'\ntimezone='Asia/Tokyo'\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := app.Run(context.Background(), []string{"template", "add", "rolling", "--days", "1", "--format", "json"}); err != nil {
+	if err := app.Run(context.Background(), []string{"template", "add", "rolling", "--days", "2", "--format", "json"}); err != nil {
 		t.Fatal(err)
 	}
 	for _, tt := range []struct{ now, from, to string }{

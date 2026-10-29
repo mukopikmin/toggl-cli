@@ -78,6 +78,7 @@ and successful/error exit codes of the previous implementation:
 | `template delete` | `<name>` | Deletes the named template |
 | `time-entry list` | `<start-day> <end-day>`; `-f/--format`, `-s/--separator` | Entries as CSV, JSON, or table |
 | `project list` | `-f/--format` | Visible ordered project names, JSON, or table |
+| `client list` | `-f/--format`, `-s/--separator` | Client IDs and names as CSV/TSV or JSON; names as a table |
 | `project sync` | none | Adds missing active projects to the TOML file |
 | `project reorder` | none | Interactively changes and saves visible-project order |
 | `config` | `-f/--format` | Non-sensitive settings as `KEY=VALUE`, JSON, or table |
@@ -92,10 +93,27 @@ I/O errors exit with status 1; successful commands exit with status 0.
 Short options accept attached values, such as `-fjson`, `-d7`, and `-s,`.
 Use `--` to end option parsing. Boolean flags such as `--no-date` do not accept
 values. For a separator starting with a dash, use `--separator=<text>`.
-The `--days` value must be a non-negative integer written using digits, and
-`time-entry list` days must exist in the current month. Invalid command usage
-is reported before configuration is loaded. An empty
-`project list --format json` result is `[]`.
+The `--days N` option includes exactly N calendar days ending today in the
+configured timezone (or the system timezone when omitted). For example,
+`--days 1` includes only today, and `--days 7` includes today and the previous
+six days. The value must be a positive integer written using digits; zero is
+invalid. `time-entry list` days must exist in the current month. Invalid command
+usage is reported before configuration is loaded. An empty
+`project list --format json` or `client list --format json` result is `[]`.
+
+`toggl client list` fetches clients from the configured workspace in API order.
+The default output is TSV with `id` and `name` headers. The `csv` format uses
+`--separator` to select the delimiter, with tab as the default. Fields containing
+the delimiter, quotes, or newlines are quoted. Empty CSV/TSV output contains only
+the header. The separator must not be empty and cannot be used with table format.
+This command does not change the configuration file.
+
+```sh
+toggl client list                   # TSV: id and name columns
+toggl client list --separator ,     # CSV: id and name columns
+toggl client list --format json     # Objects with id and name
+toggl client list --format table    # Bordered table of names
+```
 
 `project reorder` requires an interactive terminal. Use `j`/`k` or the arrow
 keys to select, Space to pick or drop, uppercase `J`/`K` to move, Enter to save,
@@ -114,22 +132,22 @@ Store frequently used summary settings, then run them by name:
 
 ```sh
 # Store a rolling seven-day summary, including today; no API request is made.
-toggl template add weekly --days 6 --format table
+toggl template add weekly --days 7 --format table
 toggl template list
 toggl template show weekly
 toggl summary --template weekly
 
 # Override settings for this execution only.
-toggl summary --template weekly --days 13 --format csv
+toggl summary --template weekly --days 14 --format csv
 toggl summary --template weekly 2026-10-01 2026-10-31
 
 # Store only output settings and supply a period when running the summary.
 toggl template add spreadsheet --no-project --no-date --clipboard
 toggl summary --template spreadsheet 2026-10-01 2026-10-31
-toggl summary --template spreadsheet --days 0 --project --date --no-clipboard
+toggl summary --template spreadsheet --days 1 --project --date --no-clipboard
 
 # Replace all settings of an existing template, or delete it.
-toggl template add weekly --days 6 --format json --force
+toggl template add weekly --days 7 --format json --force
 toggl template delete weekly
 ```
 
@@ -145,7 +163,7 @@ The file uses named TOML tables, for example:
 
 ```toml
 [templates.weekly]
-days = 6
+days = 7
 format = "table"
 no_project = false
 no_date = false
@@ -160,8 +178,8 @@ clipboard = true
 ```
 
 Periods can use `days`, or both `start_date` and `end_date` in `YYYY-MM-DD`
-format, or be omitted. `days = 0` means today; `days = 6` means six days ago
-through today (seven inclusive dates). Relative dates are calculated each time
+format, or be omitted. `days = 1` means today; `days = 7` means seven calendar days
+ending today (seven inclusive dates). Relative dates are calculated each time
 the summary runs, using the configured timezone or system timezone. Fixed dates
 remain fixed. A period must be available when executing a summary.
 
@@ -202,6 +220,10 @@ make build               # Build ./out/toggl
 `check-build`, and `check-vuln`. Each target can also be run separately. CI calls
 these same targets for formatting, installer shell syntax, third-party notices,
 static analysis, tests, package builds, and known vulnerabilities.
+
+The `Test` workflow runs for pull requests, pushes to `main`, and manual dispatches.
+Feature-branch pushes use the pull request run to avoid duplicate checks. Successful
+checks on `main` continue to trigger the Nightly workflow.
 
 `make check-vuln` runs `govulncheck` v1.9.0 for the current platform, checking the
 Go standard library and dependencies for known vulnerabilities reachable from

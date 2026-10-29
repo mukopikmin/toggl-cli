@@ -13,9 +13,9 @@ import (
 
 func TestDocumentRoundTrip(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
-	zero, empty, separator := 0, "", "\"\\\t\n#"
+	one, empty, separator := 1, "", "\"\\\t\n#"
 	d := Document{Templates: map[string]model.SummaryOptions{
-		"today":           {Days: &zero, Format: "json", Clipboard: true},
+		"today":           {Days: &one, Format: "json", Clipboard: true},
 		"fixed":           {StartDate: "2026-05-01", EndDate: "2026-05-31", Separator: &separator, NoDate: true},
 		"empty-separator": {Separator: &empty, NoProject: true},
 		"output-only":     {Format: "table"},
@@ -51,7 +51,7 @@ func TestDocumentRoundTrip(t *testing.T) {
 func TestParseRejectsInvalidTemplates(t *testing.T) {
 	for _, text := range []string{
 		"[", "templates = []", "templates = 1", "[templates.bad]\ndays = '1'",
-		"[templates.bad]\ndays = -1", "[templates.bad]\ndays = 9007199254740992",
+		"[templates.bad]\ndays = -1", "[templates.bad]\ndays = 0", "[templates.bad]\ndays = 9007199254740992",
 		"[templates.bad]\nformat = 'xml'", "[templates.bad]\nformat = 'table'\nno_date = true",
 		"[templates.bad]\nformat = 'table'\nseparator = ''",
 		"[templates.bad]\nstart_date = '2026-05-01'",
