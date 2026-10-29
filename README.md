@@ -148,6 +148,10 @@ make build               # Build ./out/toggl
 these same targets for formatting, installer shell syntax, third-party notices,
 static analysis, tests, package builds, and known vulnerabilities.
 
+The `Test` workflow runs for pull requests, pushes to `main`, and manual dispatches.
+Feature-branch pushes use the pull request run to avoid duplicate checks. Successful
+checks on `main` continue to trigger the Nightly workflow.
+
 `make check-vuln` runs `govulncheck` v1.9.0 for the current platform, checking the
 Go standard library and dependencies for known vulnerabilities reachable from
 the code. It downloads the scanner and queries the Go vulnerability database,
