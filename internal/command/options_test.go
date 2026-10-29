@@ -42,6 +42,7 @@ func TestParseOptsRejectsInvalidValues(t *testing.T) {
 	allowed := map[string]bool{"format": true, "days": true, "no-project": true, "no-date": true, "clipboard": true}
 	tests := [][]string{
 		{"--no-date=false"}, {"--no-project=true"}, {"--clipboard=false"},
+		{"--days", "0"}, {"--days=00"}, {"-d0"},
 		{"--days", "+1"}, {"--days=-1"}, {"--days", "1.5"}, {"--days", ""},
 		{"--days", "9007199254740992"}, {"--days", "999999999999999999999999"},
 		{"--format", "xml"}, {"--format", "CSV"}, {"--format="},

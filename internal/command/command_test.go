@@ -15,10 +15,17 @@ import (
 )
 
 type fakeClient struct {
+	clients                  []model.Client
+	clientCalls              int
 	projects                 []model.Project
 	entries                  []model.TimeEntry
 	err                      error
 	projectCalls, entryCalls int
+}
+
+func (f *fakeClient) Clients(context.Context, config.Config) ([]model.Client, error) {
+	f.clientCalls++
+	return f.clients, f.err
 }
 
 func (f *fakeClient) Projects(context.Context, config.Config) ([]model.Project, error) {
@@ -124,8 +131,8 @@ func TestSummaryFormatsAndBoundaries(t *testing.T) {
 		{"default tsv", []string{"summary", "2026-05-01", "2026-05-02"}, "Project\t2026-05-01\t2026-05-02\nP\t1.5\t"},
 		{"tsv", []string{"summary", "2026-05-01", "2026-05-02", "--format", "tsv"}, "Project\t2026-05-01\t2026-05-02\nP\t1.5\t"},
 		{"csv", []string{"summary", "2026-05-01", "2026-05-02", "--format", "csv"}, "Project,2026-05-01,2026-05-02\nP,1.5,"},
-		{"json", []string{"summary", "--days", "1", "--format", "json"}, `"2026-05-01"`},
-		{"table", []string{"summary", "--days", "1", "--format", "table"}, "│ Project"},
+		{"json", []string{"summary", "--days", "2", "--format", "json"}, `"2026-05-01"`},
+		{"table", []string{"summary", "--days", "2", "--format", "table"}, "│ Project"},
 		{"no headers tsv", []string{"summary", "2026-05-01", "2026-05-02", "--no-project", "--no-date"}, "1.5\t"},
 		{"no headers csv", []string{"summary", "2026-05-01", "2026-05-02", "-fcsv", "--no-project", "--no-date"}, "1.5,"},
 	}
