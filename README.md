@@ -74,6 +74,7 @@ and successful/error exit codes of the previous implementation:
 | `summary` | `<start-date> <end-date>` or `--days N`; `-f/--format csv\|json\|table`, `-s/--separator`, `--no-project`, `--no-date`, `--clipboard` | Tab-separated CSV by default; JSON summary or bordered table |
 | `time-entry list` | `<start-day> <end-day>`; `-f/--format`, `-s/--separator` | Entries as CSV, JSON, or table |
 | `project list` | `-f/--format` | Visible ordered project names, JSON, or table |
+| `client list` | `-f/--format`, `-s/--separator` | Client IDs and names as CSV/TSV or JSON; names as a table |
 | `project sync` | none | Adds missing active projects to the TOML file |
 | `project reorder` | none | Interactively changes and saves visible-project order |
 | `config` | `-f/--format` | Non-sensitive settings as `KEY=VALUE`, JSON, or table |
@@ -91,7 +92,21 @@ values. For a separator starting with a dash, use `--separator=<text>`.
 The `--days` value must be a non-negative integer written using digits, and
 `time-entry list` days must exist in the current month. Invalid command usage
 is reported before configuration is loaded. An empty
-`project list --format json` result is `[]`.
+`project list --format json` or `client list --format json` result is `[]`.
+
+`toggl client list` fetches clients from the configured workspace in API order.
+The default output is TSV with `id` and `name` headers. The `csv` format uses
+`--separator` to select the delimiter, with tab as the default. Fields containing
+the delimiter, quotes, or newlines are quoted. Empty CSV/TSV output contains only
+the header. The separator must not be empty and cannot be used with table format.
+This command does not change the configuration file.
+
+```sh
+toggl client list                   # TSV: id and name columns
+toggl client list --separator ,     # CSV: id and name columns
+toggl client list --format json     # Objects with id and name
+toggl client list --format table    # Bordered table of names
+```
 
 `project reorder` requires an interactive terminal. Use `j`/`k` or the arrow
 keys to select, Space to pick or drop, uppercase `J`/`K` to move, Enter to save,
