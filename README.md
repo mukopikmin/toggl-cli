@@ -89,9 +89,12 @@ I/O errors exit with status 1; successful commands exit with status 0.
 Short options accept attached values, such as `-fjson`, `-d7`, and `-s,`.
 Use `--` to end option parsing. Boolean flags such as `--no-date` do not accept
 values. For a separator starting with a dash, use `--separator=<text>`.
-The `--days` value must be a non-negative integer written using digits, and
-`time-entry list` days must exist in the current month. Invalid command usage
-is reported before configuration is loaded. An empty
+The `--days N` option includes exactly N calendar days ending today in the
+configured timezone (or the system timezone when omitted). For example,
+`--days 1` includes only today, and `--days 7` includes today and the previous
+six days. The value must be a positive integer written using digits; zero is
+invalid. `time-entry list` days must exist in the current month. Invalid command
+usage is reported before configuration is loaded. An empty
 `project list --format json` or `client list --format json` result is `[]`.
 
 `toggl client list` fetches clients from the configured workspace in API order.
@@ -144,6 +147,10 @@ make build               # Build ./out/toggl
 `check-build`, and `check-vuln`. Each target can also be run separately. CI calls
 these same targets for formatting, installer shell syntax, third-party notices,
 static analysis, tests, package builds, and known vulnerabilities.
+
+The `Test` workflow runs for pull requests, pushes to `main`, and manual dispatches.
+Feature-branch pushes use the pull request run to avoid duplicate checks. Successful
+checks on `main` continue to trigger the Nightly workflow.
 
 `make check-vuln` runs `govulncheck` v1.9.0 for the current platform, checking the
 Go standard library and dependencies for known vulnerabilities reachable from

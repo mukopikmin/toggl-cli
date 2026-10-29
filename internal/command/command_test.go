@@ -127,7 +127,7 @@ func TestSummaryFormatsAndBoundaries(t *testing.T) {
 		name string
 		args []string
 		want string
-	}{{"csv", []string{"summary", "2026-05-01", "2026-05-02"}, "Project\t2026-05-01\t2026-05-02\nP\t1.5\t"}, {"json", []string{"summary", "--days", "1", "--format", "json"}, `"2026-05-01"`}, {"no headers", []string{"summary", "2026-05-01", "2026-05-02", "--no-project", "--no-date"}, "1.5\t"}}
+	}{{"csv", []string{"summary", "2026-05-01", "2026-05-02"}, "Project\t2026-05-01\t2026-05-02\nP\t1.5\t"}, {"json", []string{"summary", "--days", "2", "--format", "json"}, `"2026-05-01"`}, {"no headers", []string{"summary", "2026-05-01", "2026-05-02", "--no-project", "--no-date"}, "1.5\t"}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app, out := configuredApp(t, client, "")
