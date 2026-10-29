@@ -11,6 +11,7 @@ type opts struct {
 	channel                      string
 	days                         *int
 	noProject, noDate, clipboard bool
+	dailyTotal                   bool
 	separatorSet                 bool
 	channelSet                   bool
 	pos                          []string
@@ -109,6 +110,14 @@ func parseOpts(args []string, allowed map[string]bool) (opts, error) {
 				return o, usagef("Option '%s' does not take an argument", key)
 			}
 			o.clipboard = true
+		case "--daily-total":
+			if !allowed["daily-total"] {
+				return o, usagef("unknown option: %s", key)
+			}
+			if has {
+				return o, usagef("Option '%s' does not take an argument", key)
+			}
+			o.dailyTotal = true
 		default:
 			if strings.HasPrefix(arg, "-") {
 				return o, usagef("unknown option: %s", arg)

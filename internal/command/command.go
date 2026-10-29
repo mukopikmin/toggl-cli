@@ -50,6 +50,7 @@ Options:
   -h, --help             Show this help
       --no-project       Omit the project column (summary CSV only)
       --no-date          Omit the date header row from CSV output
+      --daily-total      Append daily totals in minutes (summary CSV/table only)
       --version          Show the version`
 
 type App struct {
@@ -362,12 +363,15 @@ func location(c config.Config) (*time.Location, error) {
 	return time.LoadLocation(c.Timezone)
 }
 func (a App) summary(ctx context.Context, args []string) error {
-	o, e := parseOpts(args, map[string]bool{"format": true, "separator": true, "days": true, "no-project": true, "no-date": true, "clipboard": true})
+	o, e := parseOpts(args, map[string]bool{"format": true, "separator": true, "days": true, "no-project": true, "no-date": true, "clipboard": true, "daily-total": true})
 	if e != nil {
 		return e
 	}
 	if o.format == "table" && (o.separatorSet || o.noProject || o.noDate) {
 		return usage("--separator, --no-project, and --no-date cannot be used with table format")
+	}
+	if o.dailyTotal && o.format == "json" {
+		return usage("--daily-total cannot be used with json format")
 	}
 	var from, to time.Time
 	if o.days != nil {
@@ -432,6 +436,15 @@ func (a App) summary(ctx context.Context, args []string) error {
 				} else {
 					r = append(r, strconv.FormatFloat(float64(int(v*100+0.5))/100, 'f', -1, 64))
 				}
+			}
+			rows = append(rows, r)
+		}
+		if o.dailyTotal {
+			totals := model.DailyTotals(sum, ps, days)
+			r := []string{"Total"}
+			for _, day := range days {
+				v := totals[day]
+				r = append(r, strconv.FormatFloat(float64(int(v*100+0.5))/100, 'f', -1, 64))
 			}
 			rows = append(rows, r)
 		}
