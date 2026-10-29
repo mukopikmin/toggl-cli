@@ -24,6 +24,7 @@ import (
 const Help = `Usage:
   toggl summary <start-date> <end-date> [options]
   toggl summary --days <days> [options]
+  toggl summary --month <month> [options]
   toggl time-entry list <start-day> <end-day> [options]
   toggl client list [options]
   toggl project list [options]
@@ -46,6 +47,8 @@ Options:
   -s, --separator <text> Set the CSV delimiter (default: tab; CSV only)
   -f, --format <format>  Set the output format: csv, json, or table (default: csv)
   -d, --days <days>      Aggregate this many calendar days, including today (>= 1)
+      --month <month>   Aggregate the entire specified calendar month (summary only)
+                        Formats: YYYY-MM, YYYYMM, or YYYY/MM
       --clipboard        Copy the output to the clipboard as well as stdout
   -h, --help             Show this help
       --no-project       Omit the project column (summary CSV only)
@@ -355,6 +358,20 @@ func parseDate(v string) (time.Time, error) {
 	}
 	return t, nil
 }
+func parseMonth(v string) (time.Time, error) {
+	if !regexp.MustCompile(`^\d{4}[-/]?\d{2}$`).MatchString(v) {
+		return time.Time{}, usage("month must use YYYY-MM, YYYYMM, or YYYY/MM")
+	}
+	v = strings.ReplaceAll(v, "/", "-")
+	if len(v) == 6 {
+		v = v[:4] + "-" + v[4:]
+	}
+	t, e := time.Parse("2006-01", v)
+	if e != nil {
+		return t, usage("month must be a valid month")
+	}
+	return t, nil
+}
 func location(c config.Config) (*time.Location, error) {
 	if c.Timezone == "" {
 		return time.Local, nil
@@ -362,7 +379,7 @@ func location(c config.Config) (*time.Location, error) {
 	return time.LoadLocation(c.Timezone)
 }
 func (a App) summary(ctx context.Context, args []string) error {
-	o, e := parseOpts(args, map[string]bool{"format": true, "separator": true, "days": true, "no-project": true, "no-date": true, "clipboard": true})
+	o, e := parseOpts(args, map[string]bool{"format": true, "separator": true, "days": true, "month": true, "no-project": true, "no-date": true, "clipboard": true})
 	if e != nil {
 		return e
 	}
@@ -370,13 +387,22 @@ func (a App) summary(ctx context.Context, args []string) error {
 		return usage("--separator, --no-project, and --no-date cannot be used with table format")
 	}
 	var from, to time.Time
-	if o.days != nil {
+	if o.monthSet {
+		if o.days != nil || len(o.pos) > 0 {
+			return usage("summary accepts only one of start and end date, --days, or --month")
+		}
+		from, e = parseMonth(o.month)
+		if e != nil {
+			return e
+		}
+		to = from.AddDate(0, 1, -1)
+	} else if o.days != nil {
 		if len(o.pos) > 0 {
 			return usage("summary accepts either start and end date or --days, not both")
 		}
 	} else {
 		if len(o.pos) != 2 {
-			return usage("summary requires start and end date or --days")
+			return usage("summary requires start and end date, --days, or --month")
 		}
 		from, e = parseDate(o.pos[0])
 		if e != nil {

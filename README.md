@@ -71,7 +71,7 @@ and successful/error exit codes of the previous implementation:
 
 | Command | Options / arguments | Output |
 | --- | --- | --- |
-| `summary` | `<start-date> <end-date>` or `--days N`; `-f/--format csv\|json\|table`, `-s/--separator`, `--no-project`, `--no-date`, `--clipboard` | Tab-separated CSV by default; JSON summary or bordered table |
+| `summary` | `<start-date> <end-date>`, `--days N`, or `--month MONTH`; `-f/--format csv\|json\|table`, `-s/--separator`, `--no-project`, `--no-date`, `--clipboard` | Tab-separated CSV by default; JSON summary or bordered table |
 | `time-entry list` | `<start-day> <end-day>`; `-f/--format`, `-s/--separator` | Entries as CSV, JSON, or table |
 | `project list` | `-f/--format` | Visible ordered project names, JSON, or table |
 | `client list` | `-f/--format`, `-s/--separator` | Client IDs and names as CSV/TSV or JSON; names as a table |
@@ -85,6 +85,14 @@ and successful/error exit codes of the previous implementation:
 
 Date ranges are inclusive. Invalid usage, configuration, API, clipboard, and
 I/O errors exit with status 1; successful commands exit with status 0.
+
+Use `toggl summary --month 2026-10` to summarize October 1 through October 31,
+2026. Months accept `YYYY-MM`, `YYYYMM`, and `YYYY/MM`, with a four-digit year and
+two-digit month: `2026-10`, `202610`, and `2026/10` select the same month.
+The range includes the entire month in the configured time zone (or the system
+time zone when unset), even for the current month. `--month`, `--days`, and
+explicit start/end dates are mutually exclusive.
+The `--month` option is available only for `summary`.
 
 Short options accept attached values, such as `-fjson`, `-d7`, and `-s,`.
 Use `--` to end option parsing. Boolean flags such as `--no-date` do not accept
