@@ -71,7 +71,11 @@ and successful/error exit codes of the previous implementation:
 
 | Command | Options / arguments | Output |
 | --- | --- | --- |
-| `summary` | `<start-date> <end-date>` or `--days N`; `-f/--format csv\|json\|table`, `-s/--separator`, `--no-project`, `--no-date`, `--clipboard` | Tab-separated CSV by default; JSON summary or bordered table |
+| `summary` | `<start-date> <end-date>`, `--days N`, or `--template NAME`; `-f/--format csv\|json\|table`, `-s/--separator`, `--no-project`/`--project`, `--no-date`/`--date`, `--clipboard`/`--no-clipboard` | Tab-separated CSV by default; JSON summary or bordered table |
+| `template add` | `<name> [<start-date> <end-date> or --days N]`; summary output options, `--force` | Stores a summary template without running it |
+| `template list` | none | Template names in alphabetical order |
+| `template show` | `<name>` | Template settings as TOML |
+| `template delete` | `<name>` | Deletes the named template |
 | `time-entry list` | `<start-day> <end-day>`; `-f/--format`, `-s/--separator` | Entries as CSV, JSON, or table |
 | `project list` | `-f/--format` | Visible ordered project names, JSON, or table |
 | `client list` | `-f/--format`, `-s/--separator` | Client IDs and names as CSV/TSV or JSON; names as a table |
@@ -122,12 +126,81 @@ embedded version, and only then replaces the current executable. Development
 builds such as `0.0.0-dev` must be updated by building or installing again.
 On Windows, the executable is replaced after the current process exits.
 
+## Summary templates
+
+Store frequently used summary settings, then run them by name:
+
+```sh
+# Store a rolling seven-day summary, including today; no API request is made.
+toggl template add weekly --days 7 --format table
+toggl template list
+toggl template show weekly
+toggl summary --template weekly
+
+# Override settings for this execution only.
+toggl summary --template weekly --days 14 --format csv
+toggl summary --template weekly 2026-10-01 2026-10-31
+
+# Store only output settings and supply a period when running the summary.
+toggl template add spreadsheet --no-project --no-date --clipboard
+toggl summary --template spreadsheet 2026-10-01 2026-10-31
+toggl summary --template spreadsheet --days 1 --project --date --no-clipboard
+
+# Replace all settings of an existing template, or delete it.
+toggl template add weekly --days 7 --format json --force
+toggl template delete weekly
+```
+
+Templates are stored in `~/.config/toggl-cli/templates.toml`, separately from
+credentials and project settings. Management commands do not require `toggl init`
+or API access. A missing templates file is treated as an empty collection.
+Names must start with an ASCII letter or digit and contain only ASCII letters,
+digits, underscores, or hyphens. Names are case-sensitive. Adding an existing
+name fails unless `--force` is given. Unknown names and invalid template files
+produce errors; an invalid file is never overwritten by a management command.
+
+The file uses named TOML tables, for example:
+
+```toml
+[templates.weekly]
+days = 7
+format = "table"
+no_project = false
+no_date = false
+clipboard = false
+
+[templates.spreadsheet]
+format = "csv"
+separator = "\t"
+no_project = true
+no_date = true
+clipboard = true
+```
+
+Periods can use `days`, or both `start_date` and `end_date` in `YYYY-MM-DD`
+format, or be omitted. `days = 1` means today; `days = 7` means seven calendar days
+ending today (seven inclusive dates). Relative dates are calculated each time
+the summary runs, using the configured timezone or system timezone. Fixed dates
+remain fixed. A period must be available when executing a summary.
+
+Explicit command-line settings override the template, followed by the existing
+defaults (CSV, tab separator, project column and date header, no clipboard).
+A command-line period replaces the saved period entirely. Supplying both a date
+range and `--days` on the command line is still an error. Use `--project`,
+`--date`, and `--no-clipboard` to reverse saved boolean settings; opposing flags
+use the last value specified. Boolean flags do not accept `=true` or `=false`.
+Merged settings are validated before API access, including the restriction on
+using `--separator`, `--no-project`, or `--no-date` with table output. Overrides
+do not modify the stored template. `template add --force` replaces all settings,
+rather than merging them with the previous template.
+
 ## Architecture
 
 - `cmd/toggl/main.go`: argument entry point and dependency assembly.
 - `internal/command/`: CLI interpretation and output formatting. `options.go`
   handles shared option parsing; `update_install.go` handles update installation.
 - `internal/model/`: API-independent models and pure aggregation.
+- `internal/template/`: validated TOML storage for named summary settings.
 - `internal/toggl/`: HTTP client, private DTOs, and domain conversion.
 - `internal/config/`: configuration loading and validation.
 
