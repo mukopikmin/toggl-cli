@@ -42,6 +42,7 @@ func TestParseOptsRejectsInvalidValues(t *testing.T) {
 	tests := [][]string{
 		{"--no-date=false"}, {"--no-project=true"}, {"--clipboard=false"},
 		{"--daily-total=true"}, {"--daily-total=false"}, {"--daily-total="},
+		{"--days", "0"}, {"--days=00"}, {"-d0"},
 		{"--days", "+1"}, {"--days=-1"}, {"--days", "1.5"}, {"--days", ""},
 		{"--days", "9007199254740992"}, {"--days", "999999999999999999999999"},
 		{"--separator", "--no-date"}, {"--separator", "--"}, {"--separator", "-fjson"},

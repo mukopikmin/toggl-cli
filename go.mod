@@ -1,10 +1,10 @@
 module github.com/mukopikmin/toggl-cli
 
-go 1.26.0
+go 1.27.3
 
 require (
 	github.com/BurntSushi/toml v1.6.0
-	golang.org/x/term v0.46.0
+	golang.org/x/term v0.47.0
 )
 
-require golang.org/x/sys v0.48.0 // indirect
+require golang.org/x/sys v0.49.0 // indirect

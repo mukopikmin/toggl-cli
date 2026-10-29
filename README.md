@@ -10,7 +10,7 @@ under the permissive MIT license. Third-party license texts are recorded in
 ## Requirements
 
 - A Toggl Track API token and workspace ID
-- The Go version required by `go.mod` or later (only when building from source)
+- Go 1.27.3 or later, as required by `go.mod` (only when building from source)
 
 ## Installation
 
@@ -74,6 +74,7 @@ and successful/error exit codes of the previous implementation:
 | `summary` | `<start-date> <end-date>` or `--days N`; `-f/--format csv\|json\|table`, `-s/--separator`, `--no-project`, `--no-date`, `--daily-total`, `--clipboard` | Tab-separated CSV by default; JSON summary or bordered table |
 | `time-entry list` | `<start-day> <end-day>`; `-f/--format`, `-s/--separator` | Entries as CSV, JSON, or table |
 | `project list` | `-f/--format` | Visible ordered project names, JSON, or table |
+| `client list` | `-f/--format`, `-s/--separator` | Client IDs and names as CSV/TSV or JSON; names as a table |
 | `project sync` | none | Adds missing active projects to the TOML file |
 | `project reorder` | none | Interactively changes and saves visible-project order |
 | `config` | `-f/--format` | Non-sensitive settings as `KEY=VALUE`, JSON, or table |
@@ -88,10 +89,27 @@ I/O errors exit with status 1; successful commands exit with status 0.
 Short options accept attached values, such as `-fjson`, `-d7`, and `-s,`.
 Use `--` to end option parsing. Boolean flags such as `--no-date` do not accept
 values. For a separator starting with a dash, use `--separator=<text>`.
-The `--days` value must be a non-negative integer written using digits, and
-`time-entry list` days must exist in the current month. Invalid command usage
-is reported before configuration is loaded. An empty
-`project list --format json` result is `[]`.
+The `--days N` option includes exactly N calendar days ending today in the
+configured timezone (or the system timezone when omitted). For example,
+`--days 1` includes only today, and `--days 7` includes today and the previous
+six days. The value must be a positive integer written using digits; zero is
+invalid. `time-entry list` days must exist in the current month. Invalid command
+usage is reported before configuration is loaded. An empty
+`project list --format json` or `client list --format json` result is `[]`.
+
+`toggl client list` fetches clients from the configured workspace in API order.
+The default output is TSV with `id` and `name` headers. The `csv` format uses
+`--separator` to select the delimiter, with tab as the default. Fields containing
+the delimiter, quotes, or newlines are quoted. Empty CSV/TSV output contains only
+the header. The separator must not be empty and cannot be used with table format.
+This command does not change the configuration file.
+
+```sh
+toggl client list                   # TSV: id and name columns
+toggl client list --separator ,     # CSV: id and name columns
+toggl client list --format json     # Objects with id and name
+toggl client list --format table    # Bordered table of names
+```
 
 Add `--daily-total` to `summary` to append a `Total` row to CSV or table output:
 
@@ -141,9 +159,19 @@ make build               # Build ./out/toggl
 ```
 
 `make check` runs `check-fmt`, `check-shell`, `check-notices`, `vet`, `test`,
-and `check-build`. Each target can also be run separately. CI calls these same
-targets for formatting, installer shell syntax, third-party notices, static
-analysis, tests, and package builds.
+`check-build`, and `check-vuln`. Each target can also be run separately. CI calls
+these same targets for formatting, installer shell syntax, third-party notices,
+static analysis, tests, package builds, and known vulnerabilities.
+
+The `Test` workflow runs for pull requests, pushes to `main`, and manual dispatches.
+Feature-branch pushes use the pull request run to avoid duplicate checks. Successful
+checks on `main` continue to trigger the Nightly workflow.
+
+`make check-vuln` runs `govulncheck` v1.9.0 for the current platform, checking the
+Go standard library and dependencies for known vulnerabilities reachable from
+the code. It downloads the scanner and queries the Go vulnerability database,
+so network access is required. Vulnerability findings fail the check.
+Set `VULNDB` to use another database URL or a local database with a `file://` URL.
 
 Build all release archives with `make release VERSION=0.1.0`, or use
 `VERSION=nightly` for nightly archives. Add `TARGET=linux-x64` (or `darwin-arm64`
@@ -164,7 +192,16 @@ when adding a dependency or when an upstream license changes.
 Stable releases follow the same tag-driven flow as `mukopikmin/sadoku`.
 Use the `toggl-cli-release` skill to review changes, propose a semantic version,
 and approve the exact tested `main` commit, notes range, and omitted pull requests.
-Pushing an annotated `vMAJOR.MINOR.PATCH` tag starts the `Release` workflow and
+Record the approved comparison tag in the annotated tag's `Previous-Stable-Tag`
+trailer, for example:
+
+```sh
+git tag --annotate v0.5.2 <approved-full-sha> \
+  --message "Release v0.5.2" \
+  --message "Previous-Stable-Tag: v0.5.0"
+```
+
+Pushing that annotated `vMAJOR.MINOR.PATCH` tag starts the `Release` workflow and
 authorizes automatic build and publication; there is no separate preparation
 run or release-plan hash approval.
 
@@ -172,7 +209,13 @@ Actions validates that the unchanged tag points to the current tip of `main`,
 that the exact commit passed the `Test` push workflow, and that the version is
 newer than the previous stable release. For the first release,
 `release-notes-baseline` must point to the repository root commit. Drafts,
-prereleases, and nightly releases are excluded from the notes baseline.
+prereleases, and nightly releases are excluded from the notes baseline. Each
+validation and notes step reads the approved baseline from the tag trailer and
+compares it with a fresh GitHub lookup. An empty stable-release lookup with other
+stable version tags on the remote fails instead of implying a first release.
+Missing, duplicate, or invalid trailers also fail. Validation JSON includes the
+release candidates, selection reason, remote stable tags, and returned CI runs
+(ID, workflow, branch, event, status, conclusion, SHA, and URL) for diagnosis.
 
 The build job creates and attests the three platform archives. The publish job
 verifies their names, checksums, and provenance, generates notes from the previous
@@ -183,6 +226,7 @@ Failed runs leave the stable tag intact; never move or recreate it.
 The workflow uses `go run ./scripts/release check --version 0.1.0` for validation
 and `go run ./scripts/release notes --version 0.1.0 --output release-notes.json`
 for notes. These commands require Git, an authenticated GitHub CLI, and a checkout
-with the release and comparison tags available. Notes generation uses GitHub's
+with the annotated release tag (including its `Previous-Stable-Tag` trailer) and
+comparison tag available. Notes generation uses GitHub's
 generate-notes API. Nightly publication continues independently after successful
 tests on `main`.

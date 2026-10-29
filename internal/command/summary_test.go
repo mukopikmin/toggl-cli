@@ -92,7 +92,7 @@ func TestSummaryDailyTotalMonthBoundaries(t *testing.T) {
 				t.Fatal(err)
 			}
 			app.Now = func() time.Time { return time.Date(2026, 2, 1, 12, 0, 0, 0, time.UTC) }
-			if err := app.Run(context.Background(), []string{"summary", "--days", "1", "--daily-total"}); err != nil {
+			if err := app.Run(context.Background(), []string{"summary", "--days", "2", "--daily-total"}); err != nil {
 				t.Fatal(err)
 			}
 			if !strings.HasPrefix(out.String(), "Project\t2026-01-31\t2026-02-01\n") || !strings.HasSuffix(out.String(), tt.want) {
