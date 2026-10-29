@@ -17,7 +17,7 @@ type opts struct {
 }
 
 func parseOpts(args []string, allowed map[string]bool) (opts, error) {
-	o := opts{format: "csv", sep: "\t"}
+	o := opts{format: "table", sep: "\t"}
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		if arg == "--" {

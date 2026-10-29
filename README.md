@@ -66,27 +66,33 @@ go run ./cmd/migrate-config
 
 ## Command compatibility
 
-The Go implementation preserves the command surface, defaults, output formats,
+The Go implementation preserves the command surface, supported output formats,
 and successful/error exit codes of the previous implementation:
 
 | Command | Options / arguments | Output |
 | --- | --- | --- |
-| `summary` | `<start-date> <end-date>` or `--days N`; `-f/--format csv\|json\|table`, `-s/--separator`, `--no-project`, `--no-date`, `--clipboard` | Tab-separated CSV by default; JSON summary or bordered table |
-| `time-entry list` | `<start-day> <end-day>`; `-f/--format`, `-s/--separator` | Entries as CSV, JSON, or table |
-| `project list` | `-f/--format` | Visible ordered project names, JSON, or table |
-| `client list` | `-f/--format`, `-s/--separator` | Client IDs and names as CSV/TSV or JSON; names as a table |
+| `summary` | `<start-date> <end-date>` or `--days N`; `-f/--format csv\|json\|table`, `-s/--separator`, `--no-project`, `--no-date`, `--clipboard` | Bordered table by default; CSV or JSON summary |
+| `time-entry list` | `<start-day> <end-day>`; `-f/--format`, `-s/--separator` | Entries as a bordered table by default; CSV or JSON |
+| `project list` | `-f/--format` | Visible ordered projects as a table by default; names or JSON |
+| `client list` | `-f/--format`, `-s/--separator` | Client names as a table by default; IDs and names as CSV/TSV or JSON |
 | `project sync` | none | Adds missing active projects to the TOML file |
 | `project reorder` | none | Interactively changes and saves visible-project order |
-| `config` | `-f/--format` | Non-sensitive settings as `KEY=VALUE`, JSON, or table |
+| `config` | `-f/--format` | Non-sensitive settings as a table by default; `KEY=VALUE` or JSON |
 | `init` | none | Creates a mode-`0600` configuration interactively |
 | `update` | `--channel stable\|nightly` | Checks, verifies, and installs a release update |
 | `--help`, `-h` | none | Help text |
 | `--version` | none | Build version |
 
+The default output format is `table` for `summary`, `time-entry list`,
+`project list`, and `config`. Use `--format csv` for the previous plain-text
+output or `--format json` for JSON. CSV output uses a tab separator by default.
+Specify `--format csv` when using `--separator`, `--no-project`, or `--no-date`;
+these options cannot be used with table output.
+
 Date ranges are inclusive. Invalid usage, configuration, API, clipboard, and
 I/O errors exit with status 1; successful commands exit with status 0.
 
-Short options accept attached values, such as `-fjson`, `-d7`, and `-s,`.
+Short options accept attached values, such as `-fjson`, `-d7`, and `-fcsv -s,`.
 Use `--` to end option parsing. Boolean flags such as `--no-date` do not accept
 values. For a separator starting with a dash, use `--separator=<text>`.
 The `--days N` option includes exactly N calendar days ending today in the
@@ -98,15 +104,16 @@ usage is reported before configuration is loaded. An empty
 `project list --format json` or `client list --format json` result is `[]`.
 
 `toggl client list` fetches clients from the configured workspace in API order.
-The default output is TSV with `id` and `name` headers. The `csv` format uses
+The default output is a bordered table of client names. Use `--format csv`
+for IDs and names with `id` and `name` headers. The `csv` format uses
 `--separator` to select the delimiter, with tab as the default. Fields containing
 the delimiter, quotes, or newlines are quoted. Empty CSV/TSV output contains only
 the header. The separator must not be empty and cannot be used with table format.
 This command does not change the configuration file.
 
 ```sh
-toggl client list                   # TSV: id and name columns
-toggl client list --separator ,     # CSV: id and name columns
+toggl client list                   # Bordered table of names
+toggl client list -fcsv -s,          # CSV: id and name columns
 toggl client list --format json     # Objects with id and name
 toggl client list --format table    # Bordered table of names
 ```
