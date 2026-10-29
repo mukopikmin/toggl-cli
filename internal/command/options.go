@@ -7,17 +7,16 @@ import (
 )
 
 type opts struct {
-	format, sep                  string
+	format                       string
 	channel                      string
 	days                         *int
 	noProject, noDate, clipboard bool
-	separatorSet                 bool
 	channelSet                   bool
 	pos                          []string
 }
 
 func parseOpts(args []string, allowed map[string]bool) (opts, error) {
-	o := opts{format: "csv", sep: "\t"}
+	o := opts{format: "tsv"}
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		if arg == "--" {
@@ -27,7 +26,7 @@ func parseOpts(args []string, allowed map[string]bool) (opts, error) {
 		key, val, has := arg, "", false
 		if strings.HasPrefix(arg, "--") && strings.Contains(arg, "=") {
 			key, val, has = strings.Cut(arg, "=")
-		} else if len(arg) > 2 && arg[0] == '-' && strings.ContainsRune("fsd", rune(arg[1])) {
+		} else if len(arg) > 2 && arg[0] == '-' && strings.ContainsRune("fd", rune(arg[1])) {
 			key, val, has = arg[:2], arg[2:], true
 		}
 		take := func() (string, error) {
@@ -53,16 +52,6 @@ func parseOpts(args []string, allowed map[string]bool) (opts, error) {
 				return o, e
 			}
 			o.format = v
-		case "-s", "--separator":
-			if !allowed["separator"] {
-				return o, usagef("unknown option: %s", key)
-			}
-			v, e := take()
-			if e != nil {
-				return o, e
-			}
-			o.sep = v
-			o.separatorSet = true
 		case "-d", "--days":
 			if !allowed["days"] {
 				return o, usagef("unknown option: %s", key)
@@ -116,8 +105,8 @@ func parseOpts(args []string, allowed map[string]bool) (opts, error) {
 			o.pos = append(o.pos, arg)
 		}
 	}
-	if o.format != "csv" && o.format != "json" && o.format != "table" {
-		return o, usage("format must be csv, json, or table")
+	if o.format != "csv" && o.format != "tsv" && o.format != "json" && o.format != "table" {
+		return o, usage("format must be csv, tsv, json, or table")
 	}
 	return o, nil
 }

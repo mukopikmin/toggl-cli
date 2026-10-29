@@ -16,18 +16,12 @@ func (a App) client(ctx context.Context, args []string) error {
 	if args[0] != "list" {
 		return usagef("unknown client subcommand: %s", args[0])
 	}
-	o, err := parseOpts(args[1:], map[string]bool{"format": true, "separator": true})
+	o, err := parseOpts(args[1:], map[string]bool{"format": true})
 	if err != nil {
 		return err
 	}
 	if len(o.pos) > 0 {
 		return usage("client list does not accept positional arguments")
-	}
-	if o.sep == "" {
-		return usage("separator must not be empty")
-	}
-	if o.format == "table" && o.separatorSet {
-		return usage("--separator cannot be used with table format")
 	}
 	d, err := loadCfg()
 	if err != nil {
@@ -60,7 +54,7 @@ func (a App) client(ctx context.Context, args []string) error {
 		for i, c := range clients {
 			rows[i] = []string{strconv.FormatInt(c.ID, 10), c.Name}
 		}
-		_, err = fmt.Fprintln(a.Out, csv([]string{"id", "name"}, rows, o.sep))
+		_, err = fmt.Fprintln(a.Out, delimited([]string{"id", "name"}, rows, o.format))
 		return err
 	}
 }

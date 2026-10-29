@@ -17,7 +17,7 @@ import (
 
 func TestClientListFormats(t *testing.T) {
 	clients := []model.Client{{ID: 2, Name: "Beta"}, {ID: 1, Name: "取引先 A"}}
-	for _, format := range []string{"csv", "json", "table"} {
+	for _, format := range []string{"csv", "tsv", "json", "table"} {
 		t.Run(format, func(t *testing.T) {
 			client := &fakeClient{clients: clients}
 			app, out := configuredApp(t, client, "")
@@ -40,7 +40,11 @@ func TestClientListFormats(t *testing.T) {
 					t.Fatal(out.String())
 				}
 			default:
-				if out.String() != "id\tname\n2\tBeta\n1\t取引先 A\n" {
+				want := "id\tname\n2\tBeta\n1\t取引先 A\n"
+				if format == "csv" {
+					want = strings.ReplaceAll(want, "\t", ",")
+				}
+				if out.String() != want {
 					t.Fatalf("%q", out.String())
 				}
 			}
@@ -64,8 +68,8 @@ func TestClientListDefaultAndEmptyOutput(t *testing.T) {
 	}{
 		{"default", []model.Client{{ID: 1, Name: "Client A"}}, nil, "id\tname\n1\tClient A\n"},
 		{"empty default", nil, nil, "id\tname\n"},
-		{"CSV", []model.Client{{ID: 1, Name: "Client A"}}, []string{"-fcsv", "-s,"}, "id,name\n1,Client A\n"},
-		{"empty CSV", nil, []string{"--separator", ","}, "id,name\n"},
+		{"CSV", []model.Client{{ID: 1, Name: "Client A"}}, []string{"-fcsv"}, "id,name\n1,Client A\n"},
+		{"empty CSV", nil, []string{"--format", "csv"}, "id,name\n"},
 		{"nil JSON", nil, []string{"-fjson"}, "[]\n"},
 		{"empty JSON", []model.Client{}, []string{"--format=json"}, "[]\n"},
 	}
@@ -110,14 +114,16 @@ func TestClientListDelimitedOutputEscapesNames(t *testing.T) {
 		{ID: 3, Name: "Client \"C\""}, {ID: 4, Name: "Client\nD"},
 	}
 	want := [][]string{{"id", "name"}, {"1", clients[0].Name}, {"2", clients[1].Name}, {"3", clients[2].Name}, {"4", clients[3].Name}}
-	for _, sep := range []string{",", "\t"} {
-		t.Run(sep, func(t *testing.T) {
+	for _, format := range []string{"csv", "tsv"} {
+		t.Run(format, func(t *testing.T) {
 			app, out := configuredApp(t, &fakeClient{clients: clients}, "")
-			if err := app.Run(context.Background(), []string{"client", "list", "--format", "csv", "--separator", sep}); err != nil {
+			if err := app.Run(context.Background(), []string{"client", "list", "--format", format}); err != nil {
 				t.Fatal(err)
 			}
 			reader := stdcsv.NewReader(out)
-			reader.Comma = []rune(sep)[0]
+			if format == "tsv" {
+				reader.Comma = '\t'
+			}
 			got, err := reader.ReadAll()
 			if err != nil || !reflect.DeepEqual(got, want) {
 				t.Fatalf("got %q, %v; want %q", got, err, want)
