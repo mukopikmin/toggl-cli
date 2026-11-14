@@ -10,7 +10,7 @@ under the permissive MIT license. Third-party license texts are recorded in
 ## Requirements
 
 - A Toggl Track API token and workspace ID
-- Go 1.27.3 or later, as required by `go.mod` (only when building from source)
+- Go 1.27.4 or later, as required by `go.mod` (only when building from source)
 
 ## Installation
 
