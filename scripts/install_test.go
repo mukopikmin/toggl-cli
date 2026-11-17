@@ -50,6 +50,11 @@ func TestInstallerCompletions(t *testing.T) {
 			archive := filepath.Join(root, "release.tar.gz")
 			files := map[string]string{"toggl": "#!/bin/sh\necho fixture\n"}
 			if !tc.legacy {
+				installer, err := os.ReadFile("install-completions.sh")
+				if err != nil {
+					t.Fatal(err)
+				}
+				files["install-completions.sh"] = string(installer)
 				for _, shell := range []string{"bash", "zsh", "fish"} {
 					files["completions/"+shell] = "# " + shell + " fixture\n"
 				}
@@ -154,6 +159,23 @@ esac
 			}
 			if tc.blocked && !strings.Contains(string(output), "Could not install bash completion") {
 				t.Fatal(string(output))
+			}
+			if !tc.legacy {
+				// Manual installation uses the same script; it is repeatable and
+				// reports failures even though the main installer is best-effort.
+				completionDir := filepath.Join(root, "manual completions")
+				if err := os.Mkdir(completionDir, 0700); err != nil {
+					t.Fatal(err)
+				}
+				for _, shell := range []string{"bash", "zsh", "fish"} {
+					write(filepath.Join(completionDir, shell), files["completions/"+shell], 0600)
+				}
+				manual := exec.Command(sh, "install-completions.sh", completionDir)
+				manual.Env = cmd.Env
+				b, err := manual.CombinedOutput()
+				if (err != nil) != tc.blocked {
+					t.Fatalf("manual install err=%v output=%s", err, b)
+				}
 			}
 			for _, name := range []string{".bashrc", ".zshrc", ".config.fish"} {
 				if b, _ := os.ReadFile(filepath.Join(home, name)); string(b) != "# keep my settings\n" {

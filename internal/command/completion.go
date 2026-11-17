@@ -10,12 +10,6 @@ import (
 var completionScripts embed.FS
 
 func (a App) completion(args []string) error {
-	if len(args) > 0 && args[0] == "install" {
-		if len(args) != 2 {
-			return usage("completion install requires exactly one shell: bash, zsh, or fish")
-		}
-		return a.installCompletion(args[1])
-	}
 	if len(args) != 1 {
 		return usage("completion requires exactly one shell: bash, zsh, or fish")
 	}
@@ -80,9 +74,6 @@ func completionCandidates(words []string) []string {
 		args = args[1:]
 	case "completion":
 		if len(args) == 0 {
-			return filter("bash zsh fish install", "")
-		}
-		if len(args) == 1 && args[0] == "install" {
 			return filter("bash zsh fish", "")
 		}
 		return nil

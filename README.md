@@ -56,20 +56,25 @@ directory to `fpath` before running `compinit`. A shell without its completion
 framework enabled still needs that framework configured; installing a CLI cannot
 enable it in the parent shell.
 
-Source builds and manual installations can install completion files directly
-to the same locations, without editing shell startup files or using `sudo`:
+A separate `install-completions.sh` is included in each release archive. The
+Linux/macOS installer and `toggl update` both run this script. After extracting
+a release manually, run it from the release directory:
 
 ```sh
-toggl completion install bash
-toggl completion install zsh
-toggl completion install fish
+sh ./install-completions.sh
 ```
 
-Specify the shell explicitly. The command prints the destination and any
-necessary loading instructions. Repeating it replaces the completion file with
-the current script. Installation errors return a nonzero exit status; zsh falls
-back to the user directory and prints instructions if no writable default
-`site-functions` directory is available.
+From a source checkout, with `toggl` already on your PATH:
+
+```sh
+sh scripts/install-completions.sh internal/command/completions
+```
+
+The script installs all three shells, prints loading instructions, and can be
+rerun to replace completion files. It returns a nonzero status if installation
+fails. Initial installation and updates report completion failures while
+preserving a successful binary installation. Windows updates replace only the
+binary; users of POSIX shells on Windows can run the script manually.
 
 To print a script instead of installing it:
 
@@ -85,9 +90,11 @@ For example, load completion in the current bash or zsh session with
 completion, save the output in the corresponding directory above. Release
 archives also include all three scripts in `completions/`. Completion scripts
 ask the installed binary for candidates, so `toggl update` keeps the candidates
-current without reinstalling the scripts. Older releases without completion
-files remain installable; completion installation failures are reported but do
-not undo binary installation.
+current. On Linux/macOS, updates also refresh the scripts using the installer
+from the checksum-verified release archive. Releases without the installer remain
+installable and skip completion installation. Upgrading from a version that
+predates this update behavior requires running the script manually once, or
+rerunning the main installer.
 
 ## Configuration
 
@@ -138,7 +145,6 @@ and successful/error exit codes of the previous implementation:
 | `init` | none | Creates a mode-`0600` configuration interactively |
 | `update` | `--channel stable\|nightly` | Checks, verifies, and installs a release update |
 | `completion` | `bash\|zsh\|fish` | Prints a shell completion script without loading configuration |
-| `completion install` | `bash\|zsh\|fish` | Installs completion and prints loading instructions without editing shell settings |
 | `--help`, `-h` | none | Help text |
 | `--version` | none | Build version |
 

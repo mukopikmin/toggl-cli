@@ -45,6 +45,7 @@ for spec in darwin-arm64:darwin:arm64 linux-x64:linux:amd64 windows-x64:windows:
   mkdir -p "$current_stage/$root"
   binary=toggl; [ "$os" = windows ] && binary=toggl.exe
   GOOS=$os GOARCH=$arch CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$version" -o "$current_stage/$root/$binary" ./cmd/toggl
+  cp scripts/install-completions.sh "$current_stage/$root/"
   cp README.md THIRD_PARTY_NOTICES.md "$current_stage/$root/"
   mkdir -p "$current_stage/$root/completions"
   cp internal/command/completions/* "$current_stage/$root/completions/"

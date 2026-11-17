@@ -27,6 +27,7 @@ check-fmt:
 
 check-shell:
 	sh -n install.sh
+	sh -n scripts/install-completions.sh
 	sh -n scripts/build_release.sh
 	bash -n internal/command/completions/bash
 

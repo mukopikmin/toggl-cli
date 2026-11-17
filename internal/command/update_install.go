@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -31,11 +32,15 @@ type updateInstallRuntime struct {
 	goos          string
 	binaryVersion func(string) (string, error)
 	startHelper   func(string) error
+	completionOut io.Writer
+	completionErr io.Writer
 }
 
-func installUpdate(ctx context.Context, p updatePlan, client *http.Client) error {
+func installUpdate(ctx context.Context, p updatePlan, client *http.Client, out, errOut io.Writer) error {
 	return installUpdateWithRuntime(ctx, p, client, updateInstallRuntime{
-		goos: runtime.GOOS,
+		goos:          runtime.GOOS,
+		completionOut: out,
+		completionErr: errOut,
 		binaryVersion: func(path string) (string, error) {
 			out, err := exec.Command(path, "--version").Output()
 			return string(out), err
@@ -123,5 +128,11 @@ func installUpdateWithRuntime(ctx context.Context, p updatePlan, client *http.Cl
 		stageName = ""
 		return nil
 	}
-	return os.Rename(stageName, p.Executable)
+	if err := os.Rename(stageName, p.Executable); err != nil {
+		return err
+	}
+	if err := installUpdateCompletions(ctx, archive, p.Archive, platform.completionOut, platform.completionErr); err != nil && platform.completionErr != nil {
+		fmt.Fprintf(platform.completionErr, "Warning: completion installation failed; the Toggl binary was updated successfully: %v\n", err)
+	}
+	return nil
 }

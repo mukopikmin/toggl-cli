@@ -33,7 +33,6 @@ const Help = `Usage:
   toggl init
   toggl update [--channel stable|nightly]
   toggl completion <bash|zsh|fish>
-  toggl completion install <bash|zsh|fish>
 
 Commands:
   init        Create the configuration file
@@ -43,7 +42,7 @@ Commands:
   config      Show configuration values
   summary     Summarize time entries for a range of days
   update      Update the installed Toggl CLI binary
-  completion  Print or install a shell completion script
+  completion  Print a shell completion script
 
 Options:
   -s, --separator <text> Set the CSV delimiter (default: tab; CSV only)

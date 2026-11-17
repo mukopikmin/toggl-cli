@@ -168,7 +168,7 @@ func TestInstallUpdateVerifiesAndReplacesExecutable(t *testing.T) {
 		t.Fatal(err)
 	}
 	plan := updatePlan{Channel: "stable", CurrentVersion: "1.0.0", TargetVersion: "2.0.0", Target: "linux-x64", Executable: exe, Archive: root + ".tar.gz", DownloadURL: server.URL + "/archive"}
-	if err := installUpdate(context.Background(), plan, server.Client()); err != nil {
+	if err := installUpdate(context.Background(), plan, server.Client(), nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	got, err := os.ReadFile(exe)
