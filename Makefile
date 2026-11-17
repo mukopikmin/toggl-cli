@@ -27,6 +27,8 @@ check-fmt:
 
 check-shell:
 	sh -n install.sh
+	sh -n scripts/build_release.sh
+	bash -n internal/command/completions/bash
 
 check-notices:
 	sh scripts/check_third_party_notices.sh

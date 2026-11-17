@@ -46,6 +46,8 @@ for spec in darwin-arm64:darwin:arm64 linux-x64:linux:amd64 windows-x64:windows:
   binary=toggl; [ "$os" = windows ] && binary=toggl.exe
   GOOS=$os GOARCH=$arch CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$version" -o "$current_stage/$root/$binary" ./cmd/toggl
   cp README.md THIRD_PARTY_NOTICES.md "$current_stage/$root/"
+  mkdir -p "$current_stage/$root/completions"
+  cp internal/command/completions/* "$current_stage/$root/completions/"
   [ ! -f LICENSE ] || cp LICENSE "$current_stage/$root/LICENSE"
   if [ "$os" = "$host_os" ] && [ "$arch" = "$host_arch" ]; then test "$("$current_stage/$root/$binary" --version)" = "$version"; fi
   if [ "$os" = windows ]; then archive="$root.zip"; (cd "$current_stage" && zip -qr "$dist_dir/$archive" "$root"); else archive="$root.tar.gz"; tar -C "$current_stage" -czf "dist/$archive" "$root"; fi

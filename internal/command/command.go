@@ -32,6 +32,8 @@ const Help = `Usage:
   toggl config [options]
   toggl init
   toggl update [--channel stable|nightly]
+  toggl completion <bash|zsh|fish>
+  toggl completion install <bash|zsh|fish>
 
 Commands:
   init        Create the configuration file
@@ -41,6 +43,7 @@ Commands:
   config      Show configuration values
   summary     Summarize time entries for a range of days
   update      Update the installed Toggl CLI binary
+  completion  Print or install a shell completion script
 
 Options:
   -s, --separator <text> Set the CSV delimiter (default: tab; CSV only)
@@ -96,6 +99,10 @@ func (a App) Run(ctx context.Context, args []string) error {
 		return nil
 	}
 	switch args[0] {
+	case "completion":
+		return a.completion(args[1:])
+	case "__complete":
+		return a.complete(args[1:])
 	case "init":
 		return a.init(args[1:])
 	case "config":
