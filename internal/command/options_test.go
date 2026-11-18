@@ -16,9 +16,9 @@ func TestParseOptsCompatibleForms(t *testing.T) {
 		args []string
 		want opts
 	}{
-		{"attached format", []string{"-fjson"}, opts{format: "json", sep: "\t"}},
+		{"attached format", []string{"-fjson"}, opts{format: "json", formatSet: true, sep: "\t"}},
+		{"attached days", []string{"-d1", "-fjson"}, opts{format: "json", formatSet: true, sep: "\t", days: &one}},
 		{"daily total", []string{"--daily-total"}, opts{format: "csv", sep: "\t", dailyTotal: true}},
-		{"attached days", []string{"-d1", "-fjson"}, opts{format: "json", sep: "\t", days: &one}},
 		{"attached separator", []string{"-s,"}, opts{format: "csv", sep: ",", separatorSet: true}},
 		{"end of options", []string{"--", "--no-date", "-fjson"}, opts{format: "csv", sep: "\t", pos: []string{"--no-date", "-fjson"}}},
 		{"trailing end marker", []string{"--"}, opts{format: "csv", sep: "\t"}},
@@ -38,10 +38,9 @@ func TestParseOptsCompatibleForms(t *testing.T) {
 }
 
 func TestParseOptsRejectsInvalidValues(t *testing.T) {
-	allowed := map[string]bool{"format": true, "separator": true, "days": true, "no-project": true, "no-date": true, "clipboard": true, "daily-total": true}
+	allowed := map[string]bool{"format": true, "separator": true, "days": true, "no-project": true, "no-date": true, "clipboard": true}
 	tests := [][]string{
 		{"--no-date=false"}, {"--no-project=true"}, {"--clipboard=false"},
-		{"--daily-total=true"}, {"--daily-total=false"}, {"--daily-total="},
 		{"--days", "0"}, {"--days=00"}, {"-d0"},
 		{"--days", "+1"}, {"--days=-1"}, {"--days", "1.5"}, {"--days", ""},
 		{"--days", "9007199254740992"}, {"--days", "999999999999999999999999"},
@@ -56,5 +55,25 @@ func TestParseOptsRejectsInvalidValues(t *testing.T) {
 				t.Fatalf("expected usage error for %v, got %v", args, err)
 			}
 		})
+	}
+}
+
+func TestSummaryBooleanOverrides(t *testing.T) {
+	for _, tt := range []struct {
+		args []string
+		want bool
+	}{
+		{[]string{"--project", "--no-project", "--date", "--no-date", "--no-clipboard", "--clipboard"}, true},
+		{[]string{"--no-project", "--project", "--no-date", "--date", "--clipboard", "--no-clipboard"}, false},
+	} {
+		o, err := parseOpts(tt.args, summaryFlags())
+		if err != nil || o.noProject != tt.want || o.noDate != tt.want || o.clipboard != tt.want || !o.noProjectSet || !o.noDateSet || !o.clipboardSet {
+			t.Fatalf("parsed %v as %+v, %v", tt.args, o, err)
+		}
+	}
+	for _, arg := range []string{"--project=false", "--date=true", "--no-clipboard=false"} {
+		if _, err := parseOpts([]string{arg}, summaryFlags()); err == nil {
+			t.Fatalf("accepted boolean value: %s", arg)
+		}
 	}
 }

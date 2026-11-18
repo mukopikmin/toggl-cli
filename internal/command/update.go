@@ -271,7 +271,7 @@ func (a App) update(args []string) error {
 		fmt.Fprintln(a.Out, "Update cancelled.")
 		return nil
 	}
-	if err = installUpdate(context.Background(), plan, client); err != nil {
+	if err = installUpdate(context.Background(), plan, client, a.Out, a.Err); err != nil {
 		return err
 	}
 	fmt.Fprintf(a.Out, "Installed version %s.\n", plan.TargetVersion)

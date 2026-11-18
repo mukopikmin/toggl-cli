@@ -1,0 +1,14 @@
+#compdef toggl
+
+_toggl() {
+    local -a candidates
+    candidates=("${(@f)$("${words[1]}" __complete "${(@)words[2,CURRENT-1]}" "$PREFIX" 2>/dev/null)}")
+    (( ${#candidates} )) && compadd -- "${candidates[@]}"
+}
+
+# Allow both fpath autoloading and `source <(toggl completion zsh)`.
+if [[ $ZSH_EVAL_CONTEXT == *:file ]]; then
+    compdef _toggl toggl
+else
+    _toggl "$@"
+fi

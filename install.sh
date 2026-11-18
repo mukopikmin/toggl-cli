@@ -119,6 +119,13 @@ mv "$staged_binary" "$install_dir/toggl"
 staged_binary=""
 
 echo "Installed toggl $version to $install_dir/toggl"
+
+# Older releases remain installable without the completion installer.
+completion_installer="$temporary_dir/$archive_root/install-completions.sh"
+if [ -f "$completion_installer" ]; then
+  sh "$completion_installer" || echo "Completion installation failed; the Toggl binary was installed successfully." >&2
+fi
+
 case ":${PATH:-}:" in
   *":$install_dir:"*) ;;
   *) echo "Add $install_dir to your PATH to run toggl." ;;
