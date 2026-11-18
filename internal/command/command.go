@@ -176,7 +176,7 @@ func (a App) showConfig(args []string) error {
 		}
 	}
 	if o.format == "table" {
-		fmt.Fprintln(a.Out, table([]string{"Setting", "Value"}, rows))
+		fmt.Fprintln(a.Out, a.table([]string{"Setting", "Value"}, rows, []string{"Key", "Val"}))
 	} else {
 		for _, r := range rows {
 			fmt.Fprintf(a.Out, "%s=%s\n", r[0], r[1])
@@ -324,7 +324,7 @@ func (a App) project(ctx context.Context, args []string) error {
 			for _, p := range ps {
 				rows = append(rows, []string{p.DisplayName})
 			}
-			fmt.Fprintln(a.Out, table([]string{"Project"}, rows))
+			fmt.Fprintln(a.Out, a.table([]string{"Project"}, rows, []string{"Proj."}))
 		} else {
 			names := make([]string, len(ps))
 			for i, p := range ps {
@@ -450,7 +450,7 @@ func (a App) writeSummary(ctx context.Context, cfg config.Config, settings model
 		}
 		headers := append([]string{"Project"}, days...)
 		if settings.Format == "table" {
-			text = table(headers, rows)
+			text = a.table(headers, rows, summaryHeaderVariants(days, from, to)...)
 		} else {
 			separator := "\t"
 			if settings.Separator != nil {
@@ -478,6 +478,28 @@ func (a App) writeSummary(ctx context.Context, cfg config.Config, settings model
 		return clipboard(text)
 	}
 	return nil
+}
+
+func summaryHeaderVariants(days []string, from, to time.Time) [][]string {
+	compact := append([]string{"Proj."}, days...)
+	minimal := append([]string{"Proj."}, days...)
+	sameYear := from.Year() == to.Year()
+	sameMonth := sameYear && from.Month() == to.Month()
+	var previousMonth string
+	for i, day := range days {
+		if sameYear {
+			compact[i+1] = day[len(day)-len("01-02"):]
+		}
+		month := day[:len(day)-len("-02")]
+		// Keep the first date of each month identifiable in a multi-month table.
+		if sameMonth || month == previousMonth {
+			minimal[i+1] = strings.TrimPrefix(day[len(day)-len("02"):], "0")
+		} else {
+			minimal[i+1] = compact[i+1]
+		}
+		previousMonth = month
+	}
+	return [][]string{compact, minimal}
 }
 
 func (a App) timeEntry(ctx context.Context, args []string) error {
@@ -554,7 +576,8 @@ func (a App) timeEntry(ctx context.Context, args []string) error {
 		b, _ := json.MarshalIndent(objects, "", "  ")
 		fmt.Fprintln(a.Out, string(b))
 	} else if o.format == "table" {
-		fmt.Fprintln(a.Out, table(headers, rows))
+		compactHeaders := []string{"id", "desc", "proj_id", "start", "stop", "mins"}
+		fmt.Fprintln(a.Out, a.table(headers, rows, compactHeaders))
 	} else {
 		fmt.Fprintln(a.Out, csv(headers, rows, o.sep))
 	}
