@@ -1,0 +1,29 @@
+# bash completion for toggl (also loaded automatically by bash-completion).
+_toggl() {
+    local word candidate previous='' current raw
+    local -a args=()
+    local i
+    COMPREPLY=()
+    # Bash splits long-option assignments at '=' by default. Reassemble them
+    # for the CLI, then return only the portion Bash will replace.
+    for ((i=1; i<=COMP_CWORD; i++)); do
+        word=${COMP_WORDS[i]}
+        if [[ $word == '=' && ${#args[@]} -gt 0 ]]; then
+            args[${#args[@]}-1]+='='
+        elif [[ $previous == '=' && ${#args[@]} -gt 0 ]]; then
+            args[${#args[@]}-1]+=$word
+        else
+            args+=("$word")
+        fi
+        previous=$word
+    done
+    raw=${COMP_WORDS[COMP_CWORD]}
+    current=${args[${#args[@]}-1]}
+    while IFS= read -r candidate; do
+        if [[ $current == *=* && $raw != "$current" ]]; then
+            candidate=${candidate#*=}
+        fi
+        COMPREPLY+=("$candidate")
+    done < <("${COMP_WORDS[0]}" __complete "${args[@]}" 2>/dev/null)
+}
+complete -F _toggl toggl
