@@ -32,6 +32,70 @@ go install github.com/mukopikmin/toggl-cli/cmd/toggl@latest
 make build
 ```
 
+## Shell completion
+
+The installer places completion files automatically, without editing shell
+startup files or using `sudo`:
+
+| Shell | Installation location | Prerequisite |
+| --- | --- | --- |
+| bash | `${BASH_COMPLETION_USER_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/bash-completion}/completions/toggl` | bash-completion must already be loaded |
+| fish | `${XDG_CONFIG_HOME:-$HOME/.config}/fish/completions/toggl.fish` | fish loads this directory automatically |
+| zsh | The first existing writable `site-functions` directory in zsh's default `fpath` | `compinit` must already be enabled |
+
+Open a new shell after installation. Completion covers commands, subcommands,
+supported options, output formats (`csv`, `json`, `table`), update channels, and
+completion shell names. It does not require configuration or contact the Toggl
+API. Dates and arbitrary option values are left to the user.
+
+When no writable default zsh `site-functions` directory is available, the
+installer saves `_toggl` to
+`${XDG_DATA_HOME:-$HOME/.local/share}/zsh/site-functions/_toggl` and prints a
+notice. Move that file into an existing directory on your `fpath`, or add its
+directory to `fpath` before running `compinit`. A shell without its completion
+framework enabled still needs that framework configured; installing a CLI cannot
+enable it in the parent shell.
+
+A separate `install-completions.sh` is included in each release archive. The
+Linux/macOS installer and `toggl update` both run this script. After extracting
+a release manually, run it from the release directory:
+
+```sh
+sh ./install-completions.sh
+```
+
+From a source checkout, with `toggl` already on your PATH:
+
+```sh
+sh scripts/install-completions.sh internal/command/completions
+```
+
+The script installs all three shells, prints loading instructions, and can be
+rerun to replace completion files. It returns a nonzero status if installation
+fails. Initial installation and updates report completion failures while
+preserving a successful binary installation. Windows updates replace only the
+binary; users of POSIX shells on Windows can run the script manually.
+
+To print a script instead of installing it:
+
+```sh
+toggl completion bash
+toggl completion zsh
+toggl completion fish
+```
+
+For example, load completion in the current bash or zsh session with
+`source <(toggl completion bash)` or `source <(toggl completion zsh)` (after
+`compinit` in zsh). In fish, use `toggl completion fish | source`. For persistent
+completion, save the output in the corresponding directory above. Release
+archives also include all three scripts in `completions/`. Completion scripts
+ask the installed binary for candidates, so `toggl update` keeps the candidates
+current. On Linux/macOS, updates also refresh the scripts using the installer
+from the checksum-verified release archive. Releases without the installer remain
+installable and skip completion installation. Upgrading from a version that
+predates this update behavior requires running the script manually once, or
+rerunning the main installer.
+
 ## Configuration
 
 Run `toggl init`, or create `~/.config/toggl-cli/config.toml`:
@@ -84,6 +148,7 @@ and successful/error exit codes of the previous implementation:
 | `config` | `-f/--format` | Non-sensitive settings as `KEY=VALUE`, JSON, or table |
 | `init` | none | Creates a mode-`0600` configuration interactively |
 | `update` | `--channel stable\|nightly` | Checks, verifies, and installs a release update |
+| `completion` | `bash\|zsh\|fish` | Prints a shell completion script without loading configuration |
 | `--help`, `-h` | none | Help text |
 | `--version` | none | Build version |
 
