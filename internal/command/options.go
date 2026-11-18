@@ -12,6 +12,11 @@ type opts struct {
 	days                         *int
 	noProject, noDate, clipboard bool
 	channelSet                   bool
+	formatSet                    bool
+	noProjectSet, noDateSet      bool
+	clipboardSet                 bool
+	template                     string
+	templateSet, force           bool
 	pos                          []string
 }
 
@@ -51,7 +56,7 @@ func parseOpts(args []string, allowed map[string]bool) (opts, error) {
 			if e != nil {
 				return o, e
 			}
-			o.format = v
+			o.format, o.formatSet = v, true
 		case "-d", "--days":
 			if !allowed["days"] {
 				return o, usagef("unknown option: %s", key)
@@ -74,30 +79,32 @@ func parseOpts(args []string, allowed map[string]bool) (opts, error) {
 				return o, e
 			}
 			o.channel, o.channelSet = v, true
-		case "--no-project":
-			if !allowed["no-project"] {
+		case "--template":
+			if !allowed["template"] {
+				return o, usagef("unknown option: %s", key)
+			}
+			v, e := take()
+			if e != nil {
+				return o, e
+			}
+			o.template, o.templateSet = v, true
+		case "--no-project", "--project", "--no-date", "--date", "--clipboard", "--no-clipboard", "--force":
+			if !allowed[strings.TrimPrefix(key, "--")] {
 				return o, usagef("unknown option: %s", key)
 			}
 			if has {
 				return o, usagef("Option '%s' does not take an argument", key)
 			}
-			o.noProject = true
-		case "--no-date":
-			if !allowed["no-date"] {
-				return o, usagef("unknown option: %s", key)
+			switch key {
+			case "--no-project", "--project":
+				o.noProject, o.noProjectSet = key == "--no-project", true
+			case "--no-date", "--date":
+				o.noDate, o.noDateSet = key == "--no-date", true
+			case "--clipboard", "--no-clipboard":
+				o.clipboard, o.clipboardSet = key == "--clipboard", true
+			case "--force":
+				o.force = true
 			}
-			if has {
-				return o, usagef("Option '%s' does not take an argument", key)
-			}
-			o.noDate = true
-		case "--clipboard":
-			if !allowed["clipboard"] {
-				return o, usagef("unknown option: %s", key)
-			}
-			if has {
-				return o, usagef("Option '%s' does not take an argument", key)
-			}
-			o.clipboard = true
 		default:
 			if strings.HasPrefix(arg, "-") {
 				return o, usagef("unknown option: %s", arg)

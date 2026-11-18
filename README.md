@@ -1,7 +1,7 @@
 # toggl-cli
 
 A Go CLI that aggregates Toggl Track time entries by project and date. Results
-can be output as TSV (the default), CSV, JSON, or bordered terminal tables.
+can be output as delimiter-separated values, JSON, or bordered terminal tables.
 
 Configuration is parsed with `github.com/BurntSushi/toml`, which is distributed
 under the permissive MIT license. Third-party license texts are recorded in
@@ -10,7 +10,7 @@ under the permissive MIT license. Third-party license texts are recorded in
 ## Requirements
 
 - A Toggl Track API token and workspace ID
-- Go 1.27.3 or later, as required by `go.mod` (only when building from source)
+- Go 1.27.4 or later, as required by `go.mod` (only when building from source)
 
 ## Installation
 
@@ -31,6 +31,70 @@ go install github.com/mukopikmin/toggl-cli/cmd/toggl@latest
 # or from a checkout
 make build
 ```
+
+## Shell completion
+
+The installer places completion files automatically, without editing shell
+startup files or using `sudo`:
+
+| Shell | Installation location | Prerequisite |
+| --- | --- | --- |
+| bash | `${BASH_COMPLETION_USER_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/bash-completion}/completions/toggl` | bash-completion must already be loaded |
+| fish | `${XDG_CONFIG_HOME:-$HOME/.config}/fish/completions/toggl.fish` | fish loads this directory automatically |
+| zsh | The first existing writable `site-functions` directory in zsh's default `fpath` | `compinit` must already be enabled |
+
+Open a new shell after installation. Completion covers commands, subcommands,
+supported options, output formats (`tsv`, `csv`, `json`, `table`), update channels, and
+completion shell names. It does not require configuration or contact the Toggl
+API. Dates and arbitrary option values are left to the user.
+
+When no writable default zsh `site-functions` directory is available, the
+installer saves `_toggl` to
+`${XDG_DATA_HOME:-$HOME/.local/share}/zsh/site-functions/_toggl` and prints a
+notice. Move that file into an existing directory on your `fpath`, or add its
+directory to `fpath` before running `compinit`. A shell without its completion
+framework enabled still needs that framework configured; installing a CLI cannot
+enable it in the parent shell.
+
+A separate `install-completions.sh` is included in each release archive. The
+Linux/macOS installer and `toggl update` both run this script. After extracting
+a release manually, run it from the release directory:
+
+```sh
+sh ./install-completions.sh
+```
+
+From a source checkout, with `toggl` already on your PATH:
+
+```sh
+sh scripts/install-completions.sh internal/command/completions
+```
+
+The script installs all three shells, prints loading instructions, and can be
+rerun to replace completion files. It returns a nonzero status if installation
+fails. Initial installation and updates report completion failures while
+preserving a successful binary installation. Windows updates replace only the
+binary; users of POSIX shells on Windows can run the script manually.
+
+To print a script instead of installing it:
+
+```sh
+toggl completion bash
+toggl completion zsh
+toggl completion fish
+```
+
+For example, load completion in the current bash or zsh session with
+`source <(toggl completion bash)` or `source <(toggl completion zsh)` (after
+`compinit` in zsh). In fish, use `toggl completion fish | source`. For persistent
+completion, save the output in the corresponding directory above. Release
+archives also include all three scripts in `completions/`. Completion scripts
+ask the installed binary for candidates, so `toggl update` keeps the candidates
+current. On Linux/macOS, updates also refresh the scripts using the installer
+from the checksum-verified release archive. Releases without the installer remain
+installable and skip completion installation. Upgrading from a version that
+predates this update behavior requires running the script manually once, or
+rerunning the main installer.
 
 ## Configuration
 
@@ -72,40 +136,30 @@ quotes, or line breaks are quoted, and embedded quotes are doubled.
 
 | Command | Options / arguments | Output |
 | --- | --- | --- |
-| `summary` | `<start-date> <end-date>` or `--days N`; `-f/--format`, `--no-project`, `--no-date`, `--clipboard` | TSV or CSV with a date header; JSON summary or bordered table |
-| `time-entry list` | `<start-day> <end-day>`; `-f/--format` | Entries as TSV or CSV with a header, JSON, or table |
-| `project list` | `-f/--format` | Visible ordered project names as single-column TSV or CSV without a header, JSON, or table |
-| `client list` | `-f/--format` | Client IDs and names as TSV/CSV or JSON; names as a table |
+| `summary` | `<start-date> <end-date>`, `--days N`, or `--template NAME`; `-f/--format`, `--no-project`/`--project`, `--no-date`/`--date`, `--clipboard`/`--no-clipboard` | TSV by default; CSV, JSON summary, or bordered table |
+| `template add` | `<name> [<start-date> <end-date> or --days N]`; summary output options, `--force` | Stores a summary template without running it |
+| `template list` | none | Template names in alphabetical order |
+| `template show` | `<name>` | Template settings as TOML |
+| `template delete` | `<name>` | Deletes the named template |
+| `time-entry list` | `<start-day> <end-day>`; `-f/--format` | Entries as TSV by default, CSV, JSON, or table |
+| `project list` | `-f/--format` | Visible ordered project names as TSV or CSV, JSON, or table |
+| `client list` | `-f/--format` | Client IDs and names as TSV by default, CSV or JSON; names as a table |
 | `project sync` | none | Adds missing active projects to the TOML file |
 | `project reorder` | none | Interactively changes and saves visible-project order |
 | `config` | `-f/--format` | Non-sensitive settings as two-column TSV or CSV with a `Setting`/`Value` header, JSON, or table |
 | `init` | none | Creates a mode-`0600` configuration interactively |
 | `update` | `--channel stable\|nightly` | Checks, verifies, and installs a release update |
+| `completion` | `bash\|zsh\|fish` | Prints a shell completion script without loading configuration |
 | `--help`, `-h` | none | Help text |
 | `--version` | none | Build version |
 
 Date ranges are inclusive. Invalid usage, configuration, API, clipboard, and
 I/O errors exit with status 1; successful commands exit with status 0.
 
-```sh
-toggl summary --days 7              # TSV (default)
-toggl summary --days 7 --format csv # Comma-separated CSV
-toggl time-entry list 1 15 -ftsv    # Explicit TSV
-```
-
-Compared with earlier versions, `--format csv` now uses commas instead of tabs.
-Use `--format tsv` for tab-separated output. The `-s/--separator` option has been
-removed; replace `--separator ,` with `--format csv`. The default summary and
-time-entry output remains tab-separated. `config` now uses two columns with a
-header instead of `KEY=VALUE` lines. Project names and summary fields are now
-escaped when needed.
-
-`--no-project` and `--no-date` apply to summary CSV/TSV output, omitting the
-project column and date header respectively; neither can be used with `table`.
-
 Short options accept attached values, such as `-fjson`, `-ftsv`, and `-d7`.
 Use `--` to end option parsing. Boolean flags such as `--no-date` do not accept
-values.
+values. CSV now uses commas and TSV uses tabs. The `-s/--separator` option has
+been removed; replace `--separator ,` with `--format csv`.
 The `--days N` option includes exactly N calendar days ending today in the
 configured timezone (or the system timezone when omitted). For example,
 `--days 1` includes only today, and `--days 7` includes today and the previous
@@ -115,13 +169,14 @@ usage is reported before configuration is loaded. An empty
 `project list --format json` or `client list --format json` result is `[]`.
 
 `toggl client list` fetches clients from the configured workspace in API order.
-The default output is TSV with `id` and `name` headers. The `csv` format uses commas and `tsv` uses tabs. Fields containing
-the delimiter, quotes, or newlines are quoted. Empty CSV/TSV output contains only
-the header. This command does not change the configuration file.
+The default output is TSV with `id` and `name` headers. CSV uses commas and TSV
+uses tabs. Fields containing the delimiter, quotes, or newlines are quoted.
+Empty CSV/TSV output contains only the header. This command does not change the
+configuration file.
 
 ```sh
 toggl client list                   # TSV: id and name columns
-toggl client list --format csv     # CSV: id and name columns
+toggl client list --format csv      # CSV: id and name columns
 toggl client list --format json     # Objects with id and name
 toggl client list --format table    # Bordered table of names
 ```
@@ -137,12 +192,81 @@ embedded version, and only then replaces the current executable. Development
 builds such as `0.0.0-dev` must be updated by building or installing again.
 On Windows, the executable is replaced after the current process exits.
 
+## Summary templates
+
+Store frequently used summary settings, then run them by name:
+
+```sh
+# Store a rolling seven-day summary, including today; no API request is made.
+toggl template add weekly --days 7 --format table
+toggl template list
+toggl template show weekly
+toggl summary --template weekly
+
+# Override settings for this execution only.
+toggl summary --template weekly --days 14 --format csv
+toggl summary --template weekly 2026-10-01 2026-10-31
+
+# Store only output settings and supply a period when running the summary.
+toggl template add spreadsheet --no-project --no-date --clipboard
+toggl summary --template spreadsheet 2026-10-01 2026-10-31
+toggl summary --template spreadsheet --days 1 --project --date --no-clipboard
+
+# Replace all settings of an existing template, or delete it.
+toggl template add weekly --days 7 --format json --force
+toggl template delete weekly
+```
+
+Templates are stored in `~/.config/toggl-cli/templates.toml`, separately from
+credentials and project settings. Management commands do not require `toggl init`
+or API access. A missing templates file is treated as an empty collection.
+Names must start with an ASCII letter or digit and contain only ASCII letters,
+digits, underscores, or hyphens. Names are case-sensitive. Adding an existing
+name fails unless `--force` is given. Unknown names and invalid template files
+produce errors; an invalid file is never overwritten by a management command.
+
+The file uses named TOML tables, for example:
+
+```toml
+[templates.weekly]
+days = 7
+format = "table"
+no_project = false
+no_date = false
+clipboard = false
+
+[templates.spreadsheet]
+format = "csv"
+no_project = true
+no_date = true
+clipboard = true
+```
+
+Periods can use `days`, or both `start_date` and `end_date` in `YYYY-MM-DD`
+format, or be omitted. `days = 1` means today; `days = 7` means seven calendar days
+ending today (seven inclusive dates). Relative dates are calculated each time
+the summary runs, using the configured timezone or system timezone. Fixed dates
+remain fixed. A period must be available when executing a summary.
+
+Explicit command-line settings override the template, followed by the existing
+defaults (TSV, project column and date header, no clipboard).
+A command-line period replaces the saved period entirely. Supplying both a date
+range and `--days` on the command line is still an error. Use `--project`,
+`--date`, and `--no-clipboard` to reverse saved boolean settings; opposing flags
+use the last value specified. Boolean flags do not accept `=true` or `=false`.
+Merged settings are validated before API access, including the restriction on
+using `--no-project` or `--no-date` with table output. Previously saved
+`separator` template settings are ignored; the selected format determines the
+delimiter. Overrides do not modify the stored template. `template add --force`
+replaces all settings, rather than merging them with the previous template.
+
 ## Architecture
 
 - `cmd/toggl/main.go`: argument entry point and dependency assembly.
 - `internal/command/`: CLI interpretation and output formatting. `options.go`
   handles shared option parsing; `update_install.go` handles update installation.
 - `internal/model/`: API-independent models and pure aggregation.
+- `internal/template/`: validated TOML storage for named summary settings.
 - `internal/toggl/`: HTTP client, private DTOs, and domain conversion.
 - `internal/config/`: configuration loading and validation.
 
