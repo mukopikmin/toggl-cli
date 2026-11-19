@@ -331,7 +331,8 @@ func (a App) project(ctx context.Context, args []string) error {
 			for _, p := range ps {
 				rows = append(rows, []string{p.DisplayName})
 			}
-			return a.writeTable(ctx, tableOutputOptions{watch: listOptions.watch}, []string{"Project"}, rows, []string{"Proj."})
+			options := tableOutputOptions{watch: listOptions.watch, truncateProjects: true}
+			return a.writeTable(ctx, options, []string{"Project"}, rows, []string{"Proj."})
 		} else {
 			names := make([]string, len(ps))
 			for i, p := range ps {
@@ -461,7 +462,7 @@ func (a App) writeSummary(ctx context.Context, cfg config.Config, settings model
 		}
 		headers := append([]string{"Project"}, days...)
 		if settings.Format == "table" {
-			options := tableOutputOptions{watch: watch, clipboard: settings.Clipboard}
+			options := tableOutputOptions{watch: watch, clipboard: settings.Clipboard, truncateProjects: true}
 			return a.writeTable(ctx, options, headers, rows, summaryHeaderVariants(days, from, to)...)
 		}
 		separator := "\t"

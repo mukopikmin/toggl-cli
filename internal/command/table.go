@@ -6,7 +6,12 @@ import (
 	"unicode"
 )
 
-func table(headers []string, rows [][]string, maxWidth int, alternatives ...[]string) string {
+type tableLayout struct {
+	maxWidth            int
+	truncateFirstColumn bool
+}
+
+func table(headers []string, rows [][]string, layout tableLayout, alternatives ...[]string) string {
 	if len(headers) == 0 {
 		return ""
 	}
@@ -31,17 +36,22 @@ func table(headers []string, rows [][]string, maxWidth int, alternatives ...[]st
 	}
 	widths := slices.Clone(bodyWidths)
 	header := measure(headers, widths)
-	if maxWidth > 0 {
+	if layout.maxWidth > 0 {
 		width := tableWidth(widths)
 		for _, alternative := range alternatives {
-			if width <= maxWidth {
+			if width <= layout.maxWidth {
 				break
 			}
 			candidateWidths := slices.Clone(bodyWidths)
 			candidate := measure(alternative, candidateWidths)
-			if candidateWidth := tableWidth(candidateWidths); candidateWidth < width {
+			candidateWidth := tableWidth(candidateWidths)
+			// A shorter heading can help once the first column is narrowed.
+			if candidateWidth < width || (layout.truncateFirstColumn && candidateWidth == width) {
 				header, widths, width = candidate, candidateWidths, candidateWidth
 			}
+		}
+		if layout.truncateFirstColumn && width > layout.maxWidth {
+			widths[0] = max(1, widths[0]-(width-layout.maxWidth))
 		}
 	}
 	border := func(left, middle, right string) string {
@@ -66,7 +76,12 @@ func table(headers []string, rows [][]string, maxWidth int, alternatives ...[]st
 				if line < len(cell) {
 					value = cell[line]
 				}
-				parts[col] = " " + value + strings.Repeat(" ", widths[col]-displayWidth(value)) + " "
+				valueWidth := displayWidth(value)
+				if valueWidth > widths[col] {
+					value = clipDisplayWidth(value, widths[col]-1) + "…"
+					valueWidth = displayWidth(value)
+				}
+				parts[col] = " " + value + strings.Repeat(" ", widths[col]-valueWidth) + " "
 			}
 			lines[line] = "│" + strings.Join(parts, "│") + "│"
 		}
@@ -97,6 +112,16 @@ func displayWidth(value string) int {
 		width += runeDisplayWidth(r)
 	}
 	return width
+}
+
+func clipDisplayWidth(value string, width int) string {
+	for i, r := range value {
+		width -= runeDisplayWidth(r)
+		if width < 0 {
+			return value[:i]
+		}
+	}
+	return value
 }
 
 func runeDisplayWidth(r rune) int {

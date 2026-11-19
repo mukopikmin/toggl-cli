@@ -20,6 +20,7 @@ type tableTerminal interface {
 
 type tableOutputOptions struct {
 	watch, clipboard bool
+	truncateProjects bool
 }
 
 func (a App) validateTableWatch(watch bool, format string) error {
@@ -38,8 +39,7 @@ func (a App) validateTableWatch(watch bool, format string) error {
 
 func (a App) writeTable(ctx context.Context, options tableOutputOptions, headers []string, rows [][]string, alternatives ...[]string) (err error) {
 	out, terminal := a.Out.(tableTerminal)
-	render := func(width int) string { return table(headers, rows, width, alternatives...) }
-	var text string
+	var width int
 	if options.watch {
 		watchCtx, stop := signal.NotifyContext(ctx, os.Interrupt)
 		defer stop()
@@ -49,23 +49,26 @@ func (a App) writeTable(ctx context.Context, options tableOutputOptions, headers
 			return modeErr
 		}
 		defer func() { err = errors.Join(err, restore()) }()
-		text, err = watchTable(watchCtx, out, func() (int, int, error) {
+		width, err = watchTable(watchCtx, out, func() (int, int, error) {
 			return term.GetSize(int(fd))
-		}, render)
+		}, func(cols int) string {
+			return table(headers, rows, tableLayout{maxWidth: cols, truncateFirstColumn: options.truncateProjects}, alternatives...)
+		})
 		if err != nil {
 			return err
 		}
-	} else {
-		var width int
-		if terminal {
-			width, _, _ = term.GetSize(int(out.Fd()))
-		}
-		text = render(width)
+	} else if terminal {
+		width, _, _ = term.GetSize(int(out.Fd()))
 	}
+	layout := tableLayout{maxWidth: width, truncateFirstColumn: !options.watch && options.truncateProjects && width > 0}
+	text := table(headers, rows, layout, alternatives...)
 	if _, err := fmt.Fprintln(a.Out, text); err != nil {
 		return err
 	}
 	if options.clipboard {
+		if layout.truncateFirstColumn {
+			text = table(headers, rows, tableLayout{maxWidth: width}, alternatives...)
+		}
 		return clipboard(text)
 	}
 	return nil
@@ -77,13 +80,13 @@ const (
 	clearTableScreen = "\x1b[2J\x1b[H"
 )
 
-func watchTable(ctx context.Context, out io.Writer, getSize func() (int, int, error), render func(int) string) (text string, err error) {
+func watchTable(ctx context.Context, out io.Writer, getSize func() (int, int, error), render func(int) string) (width int, err error) {
 	width, height, err := getSize()
 	if err != nil {
-		return "", fmt.Errorf("read terminal size: %w", err)
+		return 0, fmt.Errorf("read terminal size: %w", err)
 	}
 	if width <= 0 || height <= 0 {
-		return "", errors.New("--watch requires a positive terminal width and height")
+		return 0, errors.New("--watch requires a positive terminal width and height")
 	}
 
 	// The alternate screen keeps resize redraws out of the terminal scrollback.
@@ -92,11 +95,11 @@ func watchTable(ctx context.Context, out io.Writer, getSize func() (int, int, er
 		err = errors.Join(err, restoreErr)
 	}()
 	if _, err := io.WriteString(out, enterTableScreen); err != nil {
-		return "", err
+		return 0, err
 	}
-	text = render(width)
+	text := render(width)
 	if err := writeTableFrame(out, text, width, height); err != nil {
-		return "", err
+		return 0, err
 	}
 
 	// Polling works on consoles that do not send a window resize signal.
@@ -105,11 +108,11 @@ func watchTable(ctx context.Context, out io.Writer, getSize func() (int, int, er
 	for {
 		select {
 		case <-ctx.Done():
-			return text, nil
+			return width, nil
 		case <-ticker.C:
 			cols, lines, err := getSize()
 			if err != nil {
-				return "", fmt.Errorf("read terminal size: %w", err)
+				return 0, fmt.Errorf("read terminal size: %w", err)
 			}
 			if cols <= 0 || lines <= 0 || (cols == width && lines == height) {
 				continue
@@ -119,7 +122,7 @@ func watchTable(ctx context.Context, out io.Writer, getSize func() (int, int, er
 			}
 			width, height = cols, lines
 			if err := writeTableFrame(out, text, width, height); err != nil {
-				return "", err
+				return 0, err
 			}
 		}
 	}
@@ -130,14 +133,7 @@ func writeTableFrame(out io.Writer, text string, width, height int) error {
 	lines := strings.SplitN(text, "\n", height+1)
 	lines = lines[:min(len(lines), height)]
 	for row, line := range lines {
-		remaining := width
-		for column, r := range line {
-			remaining -= runeDisplayWidth(r)
-			if remaining < 0 {
-				lines[row] = line[:column]
-				break
-			}
-		}
+		lines[row] = clipDisplayWidth(line, width)
 	}
 	_, err := io.WriteString(out, clearTableScreen+strings.Join(lines, "\r\n"))
 	return err

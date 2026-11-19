@@ -29,10 +29,10 @@ func TestWatchTableRedrawsAfterResize(t *testing.T) {
 		renders := 0
 		render := func(width int) string {
 			renders++
-			return table([]string{"2026-05-09"}, [][]string{{"1.25"}}, width, []string{"9"})
+			return table([]string{"2026-05-09"}, [][]string{{"1.25"}}, tableLayout{maxWidth: width}, []string{"9"})
 		}
 
-		text, err := watchTable(ctx, &out, getSize, render)
+		width, err := watchTable(ctx, &out, getSize, render)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -43,8 +43,8 @@ func TestWatchTableRedrawsAfterResize(t *testing.T) {
 		if !strings.Contains(frames[1], "2026-05-09") || !strings.Contains(frames[2], "│ 9    │") || strings.Contains(frames[2], "1.25") || !strings.Contains(frames[3], "1.25") {
 			t.Fatalf("unexpected frames: %q", frames)
 		}
-		if !strings.HasSuffix(frames[4], leaveTableScreen) || !strings.Contains(text, "2026-05-09") {
-			t.Fatalf("final frame = %q, output = %q", frames[4], text)
+		if !strings.HasSuffix(frames[4], leaveTableScreen) || !strings.Contains(frames[4], "2026-05-09") || width != 14 {
+			t.Fatalf("final frame = %q, width = %d", frames[4], width)
 		}
 	})
 }

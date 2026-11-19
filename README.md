@@ -172,14 +172,17 @@ In a `summary` covering a single year, shorter date headings use `MM-DD`.
 When space is tighter, the headings can show just the day of the month, such as
 `9` or `10`. For a range spanning multiple months, the first displayed date of
 each month includes the month and, if the range spans multiple years, the year.
-Data cells keep their full text, so a table can still exceed the terminal width.
-Piped and redirected output uses the full headings.
+If shorter headings still leave the table too wide, `summary` and
+`project list` shorten project names with `…`. Other data cells keep their full
+contents, so the table can still exceed the terminal width. Piped and
+redirected output uses the full headings and project names.
 
 Use `--watch` with table format in a terminal to redraw the table after a
 resize. It reads the data once and displays the portion that fits on screen.
-Press Ctrl+C to leave the live view and print the entire table. For `summary`,
-`--clipboard` copies that final output. Pass `--watch` when running a summary,
-including when the table format comes from a saved template.
+Press Ctrl+C to leave the live view and print the entire table with full project
+names. For `summary`, `--clipboard` also preserves full project names.
+Pass `--watch` when running a summary, including when the table format comes
+from a saved template.
 
 ```sh
 toggl summary --days 7 --format table --watch
