@@ -135,7 +135,7 @@ and successful/error exit codes of the previous implementation:
 
 | Command | Options / arguments | Output |
 | --- | --- | --- |
-| `summary` | `<start-date> <end-date>`, `--days N`, or `--template NAME`; `-f/--format csv\|json\|table`, `-s/--separator`, `--no-project`/`--project`, `--no-date`/`--date`, `--clipboard`/`--no-clipboard` | Tab-separated CSV by default; JSON summary or bordered table |
+| `summary` | `<start-date> <end-date>`, `--days N`, or `--template NAME`; `-f/--format csv\|json\|table`, `-s/--separator`, `--no-project`/`--project`, `--no-date`/`--date`, `--daily-total`, `--clipboard`/`--no-clipboard` | Tab-separated CSV by default; JSON summary or bordered table |
 | `template add` | `<name> [<start-date> <end-date> or --days N]`; summary output options, `--force` | Stores a summary template without running it |
 | `template list` | none | Template names in alphabetical order |
 | `template show` | `<name>` | Template settings as TOML |
@@ -188,6 +188,21 @@ toggl client list --separator ,     # CSV: id and name columns
 toggl client list --format json     # Objects with id and name
 toggl client list --format table    # Bordered table of names
 ```
+
+Add `--daily-total` to `summary` to append a `Total` row to CSV or table output:
+
+```sh
+toggl summary 2026-06-01 2026-06-15 --daily-total
+toggl summary --days 7 --daily-total --format table
+```
+
+Totals are in minutes and include only the projects shown in the output. Hidden
+projects, projects absent from the visible project list, and entries without a
+project are excluded. Dates follow the configured timezone and the entry's start
+date, as in the project rows. Days without time entries total `0`. Totals are
+computed before rounding and displayed to at most two decimal places. The flag
+works with `--no-project`, `--no-date`, `--separator`, and `--clipboard` where
+those options are supported; JSON does not support `--daily-total`.
 
 `project reorder` requires an interactive terminal. Use `j`/`k` or the arrow
 keys to select, Space to pick or drop, uppercase `J`/`K` to move, Enter to save,
