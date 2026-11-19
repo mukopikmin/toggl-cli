@@ -16,7 +16,7 @@ func (a App) client(ctx context.Context, args []string) error {
 	if args[0] != "list" {
 		return usagef("unknown client subcommand: %s", args[0])
 	}
-	o, err := parseOpts(args[1:], map[string]bool{"format": true, "separator": true})
+	o, err := parseOpts(args[1:], map[string]bool{"format": true, "separator": true, "watch": true})
 	if err != nil {
 		return err
 	}
@@ -28,6 +28,9 @@ func (a App) client(ctx context.Context, args []string) error {
 	}
 	if o.format == "table" && o.separatorSet {
 		return usage("--separator cannot be used with table format")
+	}
+	if err := a.validateTableWatch(o.watch, o.format); err != nil {
+		return err
 	}
 	d, err := loadCfg()
 	if err != nil {
@@ -53,8 +56,7 @@ func (a App) client(ctx context.Context, args []string) error {
 		for i, c := range clients {
 			rows[i] = []string{c.Name}
 		}
-		_, err = fmt.Fprintln(a.Out, a.table([]string{"Client"}, rows, []string{"Clnt"}))
-		return err
+		return a.writeTable(ctx, tableOutputOptions{watch: o.watch}, []string{"Client"}, rows, []string{"Clnt"})
 	default:
 		rows := make([][]string, len(clients))
 		for i, c := range clients {

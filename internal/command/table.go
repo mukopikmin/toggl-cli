@@ -4,17 +4,7 @@ import (
 	"slices"
 	"strings"
 	"unicode"
-
-	"golang.org/x/term"
 )
-
-func (a App) table(headers []string, rows [][]string, alternatives ...[]string) string {
-	var width int
-	if out, ok := a.Out.(interface{ Fd() uintptr }); ok {
-		width, _, _ = term.GetSize(int(out.Fd()))
-	}
-	return table(headers, rows, width, alternatives...)
-}
 
 func table(headers []string, rows [][]string, maxWidth int, alternatives ...[]string) string {
 	if len(headers) == 0 {
@@ -104,17 +94,21 @@ func tableWidth(widths []int) int {
 func displayWidth(value string) int {
 	width := 0
 	for _, r := range value {
-		if unicode.Is(unicode.M, r) {
-			continue
-		}
-		if isWide(r) {
-			width += 2
-		} else {
-			width++
-		}
+		width += runeDisplayWidth(r)
 	}
 	return width
 }
+
+func runeDisplayWidth(r rune) int {
+	if unicode.Is(unicode.M, r) {
+		return 0
+	}
+	if isWide(r) {
+		return 2
+	}
+	return 1
+}
+
 func isWide(r rune) bool {
 	return r >= 0x1100 && (r <= 0x115f || r == 0x2329 || r == 0x232a || r >= 0x2e80 && r <= 0xa4cf || r >= 0xac00 && r <= 0xd7a3 || r >= 0xf900 && r <= 0xfaff || r >= 0xfe10 && r <= 0xfe6f || r >= 0xff00 && r <= 0xff60 || r >= 0x1f300 && r <= 0x1faff || r >= 0x20000 && r <= 0x3fffd)
 }
