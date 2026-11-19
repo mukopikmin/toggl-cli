@@ -166,6 +166,15 @@ invalid. `time-entry list` days must exist in the current month. Invalid command
 usage is reported before configuration is loaded. An empty
 `project list --format json` or `client list --format json` result is `[]`.
 
+Table output uses the terminal width at the time of rendering. If the full
+headings are too wide, it uses shorter headings when they reduce the table width.
+In a `summary` covering a single year, shorter date headings use `MM-DD`.
+When space is tighter, the headings can show just the day of the month, such as
+`9` or `10`. For a range spanning multiple months, the first displayed date of
+each month includes the month and, if the range spans multiple years, the year.
+Data cells keep their full text, so a table can still exceed the terminal width.
+Piped and redirected output uses the full headings.
+
 `toggl client list` fetches clients from the configured workspace in API order.
 The default output is TSV with `id` and `name` headers. The `csv` format uses
 `--separator` to select the delimiter, with tab as the default. Fields containing
