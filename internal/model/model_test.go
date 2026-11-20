@@ -1,9 +1,38 @@
 package model
 
 import (
+	"reflect"
 	"testing"
 	"time"
 )
+
+func TestDailyTotals(t *testing.T) {
+	summary := Summary{
+		"2026-01-31": {1: 1.5, 2: 2.25, 3: 100},
+		"2026-02-01": {1: 0.004, 2: 0.004},
+		"2026-02-03": {1: 50},
+	}
+	projects := []Project{{ID: 1}, {ID: 2}}
+	days := []string{"2026-01-31", "2026-02-01", "2026-02-02"}
+	got := DailyTotals(summary, projects, days)
+	want := map[string]float64{"2026-01-31": 3.75, "2026-02-01": 0.008, "2026-02-02": 0}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	for _, input := range []struct {
+		summary  Summary
+		projects []Project
+	}{{nil, projects}, {summary, nil}} {
+		got := DailyTotals(input.summary, input.projects, days)
+		want := map[string]float64{"2026-01-31": 0, "2026-02-01": 0, "2026-02-02": 0}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("got %v, want %v", got, want)
+		}
+	}
+	if got := DailyTotals(summary, projects, nil); len(got) != 0 {
+		t.Fatalf("expected no totals without dates, got %v", got)
+	}
+}
 
 func TestSummarizeTimeZonesAndMonthBoundaries(t *testing.T) {
 	pid := int64(1)

@@ -62,6 +62,7 @@ Options:
   -h, --help             Show this help
       --no-project       Omit the project column (summary CSV only)
       --no-date          Omit the date header row from CSV output
+      --daily-total      Append daily totals in minutes (summary CSV/table only)
       --project          Include the project column (summary/template add)
       --date             Include the date header (summary/template add)
       --version          Show the version`
@@ -382,6 +383,7 @@ func (a App) summary(ctx context.Context, args []string) error {
 	allowed := summaryFlags()
 	allowed["template"] = true
 	allowed["watch"] = true
+	allowed["daily-total"] = true
 	o, e := parseOpts(args, allowed)
 	if e != nil {
 		return e
@@ -404,6 +406,9 @@ func (a App) summary(ctx context.Context, args []string) error {
 	settings, e := summaryOptions(base, o)
 	if e != nil {
 		return e
+	}
+	if o.dailyTotal && settings.Format == "json" {
+		return usage("--daily-total cannot be used with json format")
 	}
 	if e = settings.Validate(true); e != nil {
 		return usage(e.Error())
@@ -432,10 +437,10 @@ func (a App) summary(ctx context.Context, args []string) error {
 	if e != nil {
 		return e
 	}
-	return a.writeSummary(ctx, d.Config, settings, from, to, sum, o.watch)
+	return a.writeSummary(ctx, d.Config, settings, from, to, sum, o.watch, o.dailyTotal)
 }
 
-func (a App) writeSummary(ctx context.Context, cfg config.Config, settings model.SummaryOptions, from, to time.Time, sum model.Summary, watch bool) error {
+func (a App) writeSummary(ctx context.Context, cfg config.Config, settings model.SummaryOptions, from, to time.Time, sum model.Summary, watch, dailyTotal bool) error {
 	var text string
 	if settings.Format == "json" {
 		b, _ := json.MarshalIndent(sum, "", "  ")
@@ -457,6 +462,15 @@ func (a App) writeSummary(ctx context.Context, cfg config.Config, settings model
 				} else {
 					r = append(r, strconv.FormatFloat(float64(int(v*100+0.5))/100, 'f', -1, 64))
 				}
+			}
+			rows = append(rows, r)
+		}
+		if dailyTotal {
+			totals := model.DailyTotals(sum, ps, days)
+			r := []string{"Total"}
+			for _, day := range days {
+				v := totals[day]
+				r = append(r, strconv.FormatFloat(float64(int(v*100+0.5))/100, 'f', -1, 64))
 			}
 			rows = append(rows, r)
 		}
