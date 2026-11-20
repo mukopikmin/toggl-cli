@@ -12,6 +12,7 @@ type opts struct {
 	month                        string
 	days                         *int
 	noProject, noDate, clipboard bool
+	dailyTotal                   bool
 	separatorSet                 bool
 	channelSet                   bool
 	monthSet                     bool
@@ -110,6 +111,14 @@ func parseOpts(args []string, allowed map[string]bool) (opts, error) {
 				return o, e
 			}
 			o.template, o.templateSet = v, true
+		case "--daily-total":
+			if !allowed["daily-total"] {
+				return o, usagef("unknown option: %s", key)
+			}
+			if has {
+				return o, usagef("Option '%s' does not take an argument", key)
+			}
+			o.dailyTotal = true
 		case "--no-project", "--project", "--no-date", "--date", "--clipboard", "--no-clipboard", "--force":
 			if !allowed[strings.TrimPrefix(key, "--")] {
 				return o, usagef("unknown option: %s", key)

@@ -64,6 +64,7 @@ Options:
   -h, --help             Show this help
       --no-project       Omit the project column (summary CSV only)
       --no-date          Omit the date header row from CSV output
+      --daily-total      Append daily totals in minutes (summary CSV/table only)
       --project          Include the project column (summary/template add)
       --date             Include the date header (summary/template add)
       --version          Show the version`
@@ -179,7 +180,7 @@ func (a App) showConfig(args []string) error {
 		}
 	}
 	if o.format == "table" {
-		fmt.Fprintln(a.Out, table([]string{"Setting", "Value"}, rows))
+		fmt.Fprintln(a.Out, a.table([]string{"Setting", "Value"}, rows, []string{"Key", "Val"}))
 	} else {
 		for _, r := range rows {
 			fmt.Fprintf(a.Out, "%s=%s\n", r[0], r[1])
@@ -327,7 +328,7 @@ func (a App) project(ctx context.Context, args []string) error {
 			for _, p := range ps {
 				rows = append(rows, []string{p.DisplayName})
 			}
-			fmt.Fprintln(a.Out, table([]string{"Project"}, rows))
+			fmt.Fprintln(a.Out, a.table([]string{"Project"}, rows, []string{"Proj."}))
 		} else {
 			names := make([]string, len(ps))
 			for i, p := range ps {
@@ -391,6 +392,7 @@ func (a App) summary(ctx context.Context, args []string) error {
 	allowed := summaryFlags()
 	allowed["template"] = true
 	allowed["month"] = true
+	allowed["daily-total"] = true
 	o, e := parseOpts(args, allowed)
 	if e != nil {
 		return e
@@ -428,6 +430,9 @@ func (a App) summary(ctx context.Context, args []string) error {
 		settings.StartDate = monthStart.Format(time.DateOnly)
 		settings.EndDate = monthStart.AddDate(0, 1, -1).Format(time.DateOnly)
 	}
+	if o.dailyTotal && settings.Format == "json" {
+		return usage("--daily-total cannot be used with json format")
+	}
 	if e = settings.Validate(true); e != nil {
 		return usage(e.Error())
 	}
@@ -452,10 +457,10 @@ func (a App) summary(ctx context.Context, args []string) error {
 	if e != nil {
 		return e
 	}
-	return a.writeSummary(ctx, d.Config, settings, from, to, sum)
+	return a.writeSummary(ctx, d.Config, settings, from, to, sum, o.dailyTotal)
 }
 
-func (a App) writeSummary(ctx context.Context, cfg config.Config, settings model.SummaryOptions, from, to time.Time, sum model.Summary) error {
+func (a App) writeSummary(ctx context.Context, cfg config.Config, settings model.SummaryOptions, from, to time.Time, sum model.Summary, dailyTotal bool) error {
 	var text string
 	if settings.Format == "json" {
 		b, _ := json.MarshalIndent(sum, "", "  ")
@@ -480,9 +485,18 @@ func (a App) writeSummary(ctx context.Context, cfg config.Config, settings model
 			}
 			rows = append(rows, r)
 		}
+		if dailyTotal {
+			totals := model.DailyTotals(sum, ps, days)
+			r := []string{"Total"}
+			for _, day := range days {
+				v := totals[day]
+				r = append(r, strconv.FormatFloat(float64(int(v*100+0.5))/100, 'f', -1, 64))
+			}
+			rows = append(rows, r)
+		}
 		headers := append([]string{"Project"}, days...)
 		if settings.Format == "table" {
-			text = table(headers, rows)
+			text = a.table(headers, rows, summaryHeaderVariants(days, from, to)...)
 		} else {
 			separator := "\t"
 			if settings.Separator != nil {
@@ -510,6 +524,28 @@ func (a App) writeSummary(ctx context.Context, cfg config.Config, settings model
 		return clipboard(text)
 	}
 	return nil
+}
+
+func summaryHeaderVariants(days []string, from, to time.Time) [][]string {
+	compact := append([]string{"Proj."}, days...)
+	minimal := append([]string{"Proj."}, days...)
+	sameYear := from.Year() == to.Year()
+	sameMonth := sameYear && from.Month() == to.Month()
+	var previousMonth string
+	for i, day := range days {
+		if sameYear {
+			compact[i+1] = day[len(day)-len("01-02"):]
+		}
+		month := day[:len(day)-len("-02")]
+		// Keep the first date of each month identifiable in a multi-month table.
+		if sameMonth || month == previousMonth {
+			minimal[i+1] = strings.TrimPrefix(day[len(day)-len("02"):], "0")
+		} else {
+			minimal[i+1] = compact[i+1]
+		}
+		previousMonth = month
+	}
+	return [][]string{compact, minimal}
 }
 
 func (a App) timeEntry(ctx context.Context, args []string) error {
@@ -586,7 +622,8 @@ func (a App) timeEntry(ctx context.Context, args []string) error {
 		b, _ := json.MarshalIndent(objects, "", "  ")
 		fmt.Fprintln(a.Out, string(b))
 	} else if o.format == "table" {
-		fmt.Fprintln(a.Out, table(headers, rows))
+		compactHeaders := []string{"id", "desc", "proj_id", "start", "stop", "mins"}
+		fmt.Fprintln(a.Out, a.table(headers, rows, compactHeaders))
 	} else {
 		fmt.Fprintln(a.Out, csv(headers, rows, o.sep))
 	}
