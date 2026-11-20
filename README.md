@@ -135,7 +135,7 @@ and successful/error exit codes of the previous implementation:
 
 | Command | Options / arguments | Output |
 | --- | --- | --- |
-| `summary` | `<start-date> <end-date>`, `--days N`, or `--template NAME`; `-f/--format csv\|json\|table`, `-s/--separator`, `--no-project`/`--project`, `--no-date`/`--date`, `--clipboard`/`--no-clipboard` | Bordered table by default; CSV or JSON summary |
+| `summary` | `<start-date> <end-date>`, `--days N`, or `--template NAME`; `-f/--format csv\|json\|table`, `-s/--separator`, `--no-project`/`--project`, `--no-date`/`--date`, `--daily-total`, `--clipboard`/`--no-clipboard` | Bordered table by default; CSV or JSON summary |
 | `template add` | `<name> [<start-date> <end-date> or --days N]`; summary output options, `--force` | Stores a summary template without running it |
 | `template list` | none | Template names in alphabetical order |
 | `template show` | `<name>` | Template settings as TOML |
@@ -172,6 +172,15 @@ invalid. `time-entry list` days must exist in the current month. Invalid command
 usage is reported before configuration is loaded. An empty
 `project list --format json` or `client list --format json` result is `[]`.
 
+Table output uses the terminal width at the time of rendering. If the full
+headings are too wide, it uses shorter headings when they reduce the table width.
+In a `summary` covering a single year, shorter date headings use `MM-DD`.
+When space is tighter, the headings can show just the day of the month, such as
+`9` or `10`. For a range spanning multiple months, the first displayed date of
+each month includes the month and, if the range spans multiple years, the year.
+Data cells keep their full text, so a table can still exceed the terminal width.
+Piped and redirected output uses the full headings.
+
 `toggl client list` fetches clients from the configured workspace in API order.
 The default output is a bordered table of client names. Use `--format csv`
 for IDs and names with `id` and `name` headers. The `csv` format uses
@@ -186,6 +195,21 @@ toggl client list -fcsv -s,         # CSV: id and name columns
 toggl client list --format json     # Objects with id and name
 toggl client list --format table    # Bordered table of names
 ```
+
+Add `--daily-total` to `summary` to append a `Total` row to CSV or table output:
+
+```sh
+toggl summary 2026-06-01 2026-06-15 --daily-total
+toggl summary --days 7 --daily-total --format csv
+```
+
+Totals are in minutes and include only the projects shown in the output. Hidden
+projects, projects absent from the visible project list, and entries without a
+project are excluded. Dates follow the configured timezone and the entry's start
+date, as in the project rows. Days without time entries total `0`. Totals are
+computed before rounding and displayed to at most two decimal places. The flag
+works with `--no-project`, `--no-date`, `--separator`, and `--clipboard` where
+those options are supported; JSON does not support `--daily-total`.
 
 `project reorder` requires an interactive terminal. Use `j`/`k` or the arrow
 keys to select, Space to pick or drop, uppercase `J`/`K` to move, Enter to save,

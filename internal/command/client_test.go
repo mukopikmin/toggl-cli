@@ -62,8 +62,8 @@ func TestClientListDefaultAndEmptyOutput(t *testing.T) {
 		options []string
 		want    string
 	}{
-		{"default", []model.Client{{ID: 1, Name: "Client A"}}, nil, table([]string{"Client"}, [][]string{{"Client A"}}) + "\n"},
-		{"empty default", nil, nil, table([]string{"Client"}, nil) + "\n"},
+		{"default", []model.Client{{ID: 1, Name: "Client A"}}, nil, table([]string{"Client"}, [][]string{{"Client A"}}, 0) + "\n"},
+		{"empty default", nil, nil, table([]string{"Client"}, nil, 0) + "\n"},
 		{"CSV", []model.Client{{ID: 1, Name: "Client A"}}, []string{"-fcsv", "-s,"}, "id,name\n1,Client A\n"},
 		{"empty CSV", nil, []string{"--format", "csv", "--separator", ","}, "id,name\n"},
 		{"nil JSON", nil, []string{"-fjson"}, "[]\n"},

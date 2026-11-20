@@ -53,7 +53,7 @@ func (a App) client(ctx context.Context, args []string) error {
 		for i, c := range clients {
 			rows[i] = []string{c.Name}
 		}
-		_, err = fmt.Fprintln(a.Out, table([]string{"Client"}, rows))
+		_, err = fmt.Fprintln(a.Out, a.table([]string{"Client"}, rows, []string{"Clnt"}))
 		return err
 	default:
 		rows := make([][]string, len(clients))
