@@ -8,7 +8,7 @@ import (
 )
 
 func TestParseOptsCompatibleForms(t *testing.T) {
-	allowed := map[string]bool{"format": true, "days": true, "no-date": true}
+	allowed := map[string]bool{"format": true, "days": true, "no-date": true, "daily-total": true}
 	one := 1
 	maxSafe := 9007199254740991
 	tests := []struct {
@@ -18,6 +18,7 @@ func TestParseOptsCompatibleForms(t *testing.T) {
 	}{
 		{"default format", nil, opts{format: "tsv"}},
 		{"attached format", []string{"-fjson"}, opts{format: "json", formatSet: true}},
+		{"daily total", []string{"--daily-total"}, opts{format: "tsv", dailyTotal: true}},
 		{"attached tsv", []string{"-ftsv"}, opts{format: "tsv", formatSet: true}},
 		{"attached days", []string{"-d1", "-fjson"}, opts{format: "json", formatSet: true, days: &one}},
 		{"end of options", []string{"--", "--no-date", "-fjson"}, opts{format: "tsv", pos: []string{"--no-date", "-fjson"}}},
