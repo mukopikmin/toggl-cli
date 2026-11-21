@@ -2,6 +2,7 @@ package command
 
 import (
 	"slices"
+	"strconv"
 	"strings"
 	"unicode"
 )
@@ -23,7 +24,9 @@ func table(headers []string, rows [][]string, layout tableLayout, alternatives .
 		for j, value := range row {
 			normalized := strings.ReplaceAll(strings.ReplaceAll(value, "\r\n", "\n"), "\r", "\n")
 			cells[j] = strings.Split(normalized, "\n")
-			for _, line := range cells[j] {
+			for i, raw := range cells[j] {
+				line := terminalText(raw)
+				cells[j][i] = line
 				widths[j] = max(widths[j], displayWidth(line))
 			}
 		}
@@ -136,4 +139,17 @@ func runeDisplayWidth(r rune) int {
 
 func isWide(r rune) bool {
 	return r >= 0x1100 && (r <= 0x115f || r == 0x2329 || r == 0x232a || r >= 0x2e80 && r <= 0xa4cf || r >= 0xac00 && r <= 0xd7a3 || r >= 0xf900 && r <= 0xfaff || r >= 0xfe10 && r <= 0xfe6f || r >= 0xff00 && r <= 0xff60 || r >= 0x1f300 && r <= 0x1faff || r >= 0x20000 && r <= 0x3fffd)
+}
+
+func terminalText(value string) string {
+	var out strings.Builder
+	for _, r := range value {
+		if unicode.IsControl(r) || unicode.In(r, unicode.Bidi_Control) {
+			quoted := strconv.QuoteRuneToASCII(r)
+			out.WriteString(quoted[1 : len(quoted)-1])
+		} else {
+			out.WriteRune(r)
+		}
+	}
+	return out.String()
 }

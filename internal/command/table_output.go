@@ -138,3 +138,14 @@ func writeTableFrame(out io.Writer, text string, width, height int) error {
 	_, err := io.WriteString(out, clearTableScreen+strings.Join(lines, "\r\n"))
 	return err
 }
+
+func (a App) terminalDelimited(headers []string, rows [][]string, format string) string {
+	if out, ok := a.Out.(tableTerminal); ok && term.IsTerminal(int(out.Fd())) {
+		for _, row := range rows {
+			for i, value := range row {
+				row[i] = terminalText(value)
+			}
+		}
+	}
+	return delimited(headers, rows, format)
+}
