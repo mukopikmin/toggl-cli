@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -168,6 +169,18 @@ func TestInstallUpdateVerifiesAndReplacesExecutable(t *testing.T) {
 		t.Fatal(err)
 	}
 	plan := updatePlan{Channel: "stable", CurrentVersion: "1.0.0", TargetVersion: "2.0.0", Target: "linux-x64", Executable: exe, Archive: root + ".tar.gz", DownloadURL: server.URL + "/archive"}
+	mockDir := t.TempDir()
+	verifier := filepath.Join(mockDir, "gh")
+	t.Setenv("PATH", mockDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	if err := os.WriteFile(verifier, []byte("#!/bin/sh\nexit 1\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := installUpdate(context.Background(), plan, server.Client(), nil, nil); err == nil {
+		t.Fatal("accepted unverifiable archive")
+	}
+	if err := os.WriteFile(verifier, []byte("#!/bin/sh\ncase $1 in api) echo 0123456789012345678901234567890123456789;; attestation) test $2 = verify;; *) exit 1;; esac\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
 	if err := installUpdate(context.Background(), plan, server.Client(), nil, nil); err != nil {
 		t.Fatal(err)
 	}

@@ -82,7 +82,7 @@ func TestUpdateRefreshesCompletions(t *testing.T) {
 			})}
 			var out, warnings bytes.Buffer
 			plan := updatePlan{Archive: "release.tar.gz", Target: "linux-x64", TargetVersion: "2.0.0", Executable: exe, DownloadURL: "https://update.test/release"}
-			err := installUpdateWithRuntime(context.Background(), plan, client, updateInstallRuntime{goos: "linux", binaryVersion: func(string) (string, error) { return tc.version, nil }, completionOut: &out, completionErr: &warnings})
+			err := installUpdateWithRuntime(context.Background(), plan, client, updateInstallRuntime{verifyOrigin: func(context.Context, updatePlan, []byte) error { return nil }, goos: "linux", binaryVersion: func(string) (string, error) { return tc.version, nil }, completionOut: &out, completionErr: &warnings})
 			success := !tc.badChecksum && tc.version == "2.0.0"
 			if (err == nil) != success {
 				t.Fatalf("err=%v success=%v", err, success)

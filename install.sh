@@ -43,7 +43,7 @@ fi
 
 [ -n "${HOME:-}" ] || fail "HOME is not set"
 
-for command in curl tar mktemp; do
+for command in curl tar mktemp gh; do
   command -v "$command" >/dev/null 2>&1 || fail "required command not found: $command"
 done
 
@@ -106,6 +106,19 @@ else
 fi
 
 [ "$actual_checksum" = "$expected_checksum" ] || fail "SHA-256 checksum mismatch"
+
+repo=mukopikmin/toggl-cli
+workflow=release
+source_ref="refs/tags/$tag"
+if [ "$tag" = nightly ]; then
+  workflow=nightly
+  source_ref=refs/heads/main
+fi
+commit="$(gh api "repos/$repo/commits/$tag" --jq .sha)" || fail "could not resolve release commit"
+[ "${#commit}" -eq 40 ] || fail "invalid release commit"
+gh attestation verify "$archive_path" --repo "$repo" \
+  --signer-workflow "$repo/.github/workflows/$workflow.yml" \
+  --source-ref "$source_ref" --source-digest "$commit" || fail "release provenance verification failed"
 
 tar -xzf "$archive_path" -C "$temporary_dir" || fail "could not extract $archive"
 binary_path="$temporary_dir/${archive_root}/toggl"

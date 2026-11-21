@@ -61,7 +61,7 @@ func TestWindowsUpdateHandoffPreservesStagedBinary(t *testing.T) {
 			plan := updatePlan{TargetVersion: "2.0.0", Target: "windows-x64", Executable: executable, Archive: root + ".zip", DownloadURL: "https://update.test/archive"}
 			var staged, helper string
 			platform := updateInstallRuntime{
-				goos: "windows",
+				goos: "windows", verifyOrigin: func(context.Context, updatePlan, []byte) error { return nil },
 				binaryVersion: func(path string) (string, error) {
 					staged = path
 					got, err := os.ReadFile(path)

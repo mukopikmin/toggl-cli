@@ -14,6 +14,8 @@ under the permissive MIT license. Third-party license texts are recorded in
 
 ## Installation
 
+Installation and self-update require an authenticated GitHub CLI supporting `gh attestation verify --source-digest`. Both verify the archive against the release commit and expected workflow before extraction. Releases without attestations require a source build.
+
 Install the latest Linux x64 or macOS arm64 release:
 
 ```sh

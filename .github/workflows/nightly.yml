@@ -11,6 +11,9 @@ on:
 
 permissions:
   contents: write
+  attestations: write
+  id-token: write
+  artifact-metadata: write
 
 concurrency:
   group: nightly-release
@@ -23,6 +26,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Check attestation source
+        env:
+          EVENT: ${{ github.event.workflow_run.event }}
+          HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
+          TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          test "$EVENT" = push
+          test "$HEAD_REPO" = "$GITHUB_REPOSITORY"
+          test "$TESTED_SHA" = "$GITHUB_SHA"
+
       - name: Checkout tested commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -35,6 +48,11 @@ jobs:
 
       - name: Build nightly archives
         run: make release VERSION=nightly
+
+      - name: Attest nightly archives
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-checksums: dist/checksums.txt
 
       - name: Create or update nightly release
         env:
