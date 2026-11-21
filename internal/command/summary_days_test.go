@@ -86,7 +86,7 @@ func TestSummaryTableDateHeadings(t *testing.T) {
 			}
 			days := model.DateRange(from, to)
 			headers := append([]string{"Project"}, days...)
-			output := table(headers, nil, tt.terminalWidth, summaryHeaderVariants(days, from, to)...)
+			output := table(headers, nil, tableLayout{maxWidth: tt.terminalWidth}, summaryHeaderVariants(days, from, to)...)
 			if heading := strings.SplitN(output, "\n", 3)[1]; heading != tt.want {
 				t.Fatalf("heading = %q, want %q", heading, tt.want)
 			}

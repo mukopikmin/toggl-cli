@@ -4,19 +4,14 @@ import (
 	"slices"
 	"strings"
 	"unicode"
-
-	"golang.org/x/term"
 )
 
-func (a App) table(headers []string, rows [][]string, alternatives ...[]string) string {
-	var width int
-	if out, ok := a.Out.(interface{ Fd() uintptr }); ok {
-		width, _, _ = term.GetSize(int(out.Fd()))
-	}
-	return table(headers, rows, width, alternatives...)
+type tableLayout struct {
+	maxWidth            int
+	truncateFirstColumn bool
 }
 
-func table(headers []string, rows [][]string, maxWidth int, alternatives ...[]string) string {
+func table(headers []string, rows [][]string, layout tableLayout, alternatives ...[]string) string {
 	if len(headers) == 0 {
 		return ""
 	}
@@ -41,17 +36,22 @@ func table(headers []string, rows [][]string, maxWidth int, alternatives ...[]st
 	}
 	widths := slices.Clone(bodyWidths)
 	header := measure(headers, widths)
-	if maxWidth > 0 {
+	if layout.maxWidth > 0 {
 		width := tableWidth(widths)
 		for _, alternative := range alternatives {
-			if width <= maxWidth {
+			if width <= layout.maxWidth {
 				break
 			}
 			candidateWidths := slices.Clone(bodyWidths)
 			candidate := measure(alternative, candidateWidths)
-			if candidateWidth := tableWidth(candidateWidths); candidateWidth < width {
+			candidateWidth := tableWidth(candidateWidths)
+			// A shorter heading can help once the first column is narrowed.
+			if candidateWidth < width || (layout.truncateFirstColumn && candidateWidth == width) {
 				header, widths, width = candidate, candidateWidths, candidateWidth
 			}
+		}
+		if layout.truncateFirstColumn && width > layout.maxWidth {
+			widths[0] = max(1, widths[0]-(width-layout.maxWidth))
 		}
 	}
 	border := func(left, middle, right string) string {
@@ -76,7 +76,12 @@ func table(headers []string, rows [][]string, maxWidth int, alternatives ...[]st
 				if line < len(cell) {
 					value = cell[line]
 				}
-				parts[col] = " " + value + strings.Repeat(" ", widths[col]-displayWidth(value)) + " "
+				valueWidth := displayWidth(value)
+				if valueWidth > widths[col] {
+					value = clipDisplayWidth(value, widths[col]-1) + "…"
+					valueWidth = displayWidth(value)
+				}
+				parts[col] = " " + value + strings.Repeat(" ", widths[col]-valueWidth) + " "
 			}
 			lines[line] = "│" + strings.Join(parts, "│") + "│"
 		}
@@ -104,17 +109,31 @@ func tableWidth(widths []int) int {
 func displayWidth(value string) int {
 	width := 0
 	for _, r := range value {
-		if unicode.Is(unicode.M, r) {
-			continue
-		}
-		if isWide(r) {
-			width += 2
-		} else {
-			width++
-		}
+		width += runeDisplayWidth(r)
 	}
 	return width
 }
+
+func clipDisplayWidth(value string, width int) string {
+	for i, r := range value {
+		width -= runeDisplayWidth(r)
+		if width < 0 {
+			return value[:i]
+		}
+	}
+	return value
+}
+
+func runeDisplayWidth(r rune) int {
+	if unicode.Is(unicode.M, r) {
+		return 0
+	}
+	if isWide(r) {
+		return 2
+	}
+	return 1
+}
+
 func isWide(r rune) bool {
 	return r >= 0x1100 && (r <= 0x115f || r == 0x2329 || r == 0x232a || r >= 0x2e80 && r <= 0xa4cf || r >= 0xac00 && r <= 0xd7a3 || r >= 0xf900 && r <= 0xfaff || r >= 0xfe10 && r <= 0xfe6f || r >= 0xff00 && r <= 0xff60 || r >= 0x1f300 && r <= 0x1faff || r >= 0x20000 && r <= 0x3fffd)
 }

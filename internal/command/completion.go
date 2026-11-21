@@ -82,7 +82,7 @@ func completionCandidates(words []string) []string {
 		return nil
 	}
 
-	options := "-f --format"
+	options := "-f --format --watch"
 	if command == "summary" || command == "client" || command == "time-entry" {
 		options += " -s --separator"
 	}
