@@ -82,3 +82,12 @@ func TestCommandsUseFixedDelimiters(t *testing.T) {
 		}
 	}
 }
+
+func TestDelimitedSpreadsheetText(t *testing.T) {
+	for _, format := range []string{"csv", "tsv"} {
+		got := delimited(nil, [][]string{{"-1", " =example"}}, format, 1)
+		if !strings.Contains(got, "' =example") || !strings.HasPrefix(got, "-1") {
+			t.Fatal(got)
+		}
+	}
+}
