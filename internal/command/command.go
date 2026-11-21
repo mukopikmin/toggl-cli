@@ -340,27 +340,13 @@ func (a App) project(ctx context.Context, args []string) error {
 		}
 		return nil
 	case "sync":
-		configured := d.Config.Projects
-		sort.Slice(ps, func(i, j int) bool { return ps[i].ID < ps[j].ID })
-		text := d.Text
-		count := 0
-		for _, p := range ps {
-			if _, ok := configured[p.ID]; ok {
-				continue
-			}
-			if !strings.HasSuffix(text, "\n") {
-				text += "\n"
-			}
-			name := strings.ReplaceAll(strings.ReplaceAll(p.Name, "\r\n", "\n"), "\r", "\n")
-			text += fmt.Sprintf("\n# %s\n[projects.\"%d\"]\nhidden = false\n", strings.ReplaceAll(name, "\n", "\n# "), p.ID)
-			count++
+		count, err := d.SyncProjects(ps)
+		if err != nil {
+			return err
 		}
 		if count == 0 {
 			fmt.Fprintln(a.Out, "All active projects are already configured")
 			return nil
-		}
-		if e = os.WriteFile(d.Path, []byte(text), 0600); e != nil {
-			return e
 		}
 		fmt.Fprintf(a.Out, "Added %d project(s) to the config file\n", count)
 		return nil

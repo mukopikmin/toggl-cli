@@ -120,7 +120,10 @@ projects first, and `hidden` excludes a project. The token is never shown by
 use `Asia/Tokyo`. If input ends before all three prompts are answered, no
 configuration file is created. The `projects` configuration must be a TOML
 table, such as `[projects.123456]` above; an empty table (`projects = {}`) is
-also accepted.
+also accepted. Project updates check whether the configuration changed while the
+command was running. Reordering preserves comments in standard project table
+headers. Some other TOML layouts, including inline tables and dotted keys, are
+rewritten in table form and may lose comments.
 
 To migrate an old `~/.toggl_config`, run this from a checkout:
 
@@ -305,7 +308,7 @@ replaces all settings, rather than merging them with the previous template.
 - `internal/model/`: API-independent models and pure aggregation.
 - `internal/template/`: validated TOML storage for named summary settings.
 - `internal/toggl/`: HTTP client, private DTOs, and domain conversion.
-- `internal/config/`: configuration loading and validation.
+- `internal/config/`: configuration loading, validation, and project edits.
 
 ## Development
 
