@@ -21,9 +21,13 @@ func TestTimeEntriesDateRange(t *testing.T) {
 			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { q = r.URL.Query(); w.Write([]byte("[]")) }))
 			defer s.Close()
 			c := HTTPClient{Endpoint: s.URL}
-			from, _ := time.Parse(time.DateOnly, tt.from)
-			to, _ := time.Parse(time.DateOnly, tt.to)
-			_, err := c.TimeEntries(context.Background(), config.Config{Timezone: tt.zone}, from, to)
+			loc, err := time.LoadLocation(tt.zone)
+			if err != nil {
+				t.Fatal(err)
+			}
+			from, _ := time.ParseInLocation(time.DateOnly, tt.from, loc)
+			to, _ := time.ParseInLocation(time.DateOnly, tt.to, loc)
+			_, err = c.TimeEntries(context.Background(), config.Config{}, from, to.AddDate(0, 0, 1))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -65,7 +69,7 @@ func TestTimeEntriesMapsFallbackPIDAndErrors(t *testing.T) {
 	defer s.Close()
 	client := HTTPClient{Endpoint: s.URL}
 	day, _ := time.Parse(time.DateOnly, "2026-01-01")
-	entries, err := client.TimeEntries(context.Background(), config.Config{Timezone: "UTC"}, day, day)
+	entries, err := client.TimeEntries(context.Background(), config.Config{}, day, day.AddDate(0, 0, 1))
 	if err != nil || len(entries) != 1 || entries[0].ProjectID == nil || *entries[0].ProjectID != 9 {
 		t.Fatalf("%+v %v", entries, err)
 	}

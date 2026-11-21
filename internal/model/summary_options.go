@@ -78,7 +78,7 @@ func (o SummaryOptions) DateRange(now time.Time, loc *time.Location) (time.Time,
 		to := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 		return to.AddDate(0, 0, 1-*o.Days), to, nil
 	}
-	from, _ := summaryDate(o.StartDate)
-	to, _ := summaryDate(o.EndDate)
+	from, _ := time.ParseInLocation(time.DateOnly, o.StartDate, loc)
+	to, _ := time.ParseInLocation(time.DateOnly, o.EndDate, loc)
 	return from, to, nil
 }

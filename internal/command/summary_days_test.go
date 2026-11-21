@@ -49,7 +49,8 @@ func TestSummaryDaysIncludesToday(t *testing.T) {
 			if err := app.Run(context.Background(), []string{"summary", "--days", strconv.Itoa(tt.days)}); err != nil {
 				t.Fatal(err)
 			}
-			if gotStart, gotEnd := client.from.Format(time.RFC3339), client.to.Format(time.RFC3339); gotStart != tt.wantStart || gotEnd != tt.wantEnd {
+			wantEnd, _ := time.ParseInLocation(time.DateOnly, tt.wantEnd[:10], client.from.Location())
+			if gotStart, gotEnd := client.from.Format(time.RFC3339), client.to.Format(time.RFC3339); gotStart != tt.wantStart || gotEnd != wantEnd.AddDate(0, 0, 1).Format(time.RFC3339) {
 				t.Fatalf("range = %s through %s, want %s through %s", gotStart, gotEnd, tt.wantStart, tt.wantEnd)
 			}
 			headers := strings.Split(strings.TrimSpace(out.String()), "\t")

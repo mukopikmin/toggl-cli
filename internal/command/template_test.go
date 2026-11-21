@@ -275,7 +275,7 @@ func TestSummaryTemplateResolvesDaysAtExecution(t *testing.T) {
 		if err := app.Run(context.Background(), []string{"summary", "--template", "rolling"}); err != nil {
 			t.Fatal(err)
 		}
-		if client.from.Format(time.DateOnly) != tt.from || client.to.Format(time.DateOnly) != tt.to {
+		if client.from.Format(time.DateOnly) != tt.from || client.to.AddDate(0, 0, -1).Format(time.DateOnly) != tt.to {
 			t.Fatalf("at %s: got %s to %s", tt.now, client.from, client.to)
 		}
 		_, offset := client.to.Zone()

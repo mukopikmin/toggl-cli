@@ -167,8 +167,9 @@ The `--days N` option includes exactly N calendar days ending today in the
 configured timezone (or the system timezone when omitted). For example,
 `--days 1` includes only today, and `--days 7` includes today and the previous
 six days. The value must be a positive integer written using digits; zero is
-invalid. `time-entry list` days must exist in the current month. Invalid command
-usage is reported before configuration is loaded. An empty
+invalid. `time-entry list` days must exist in the current month in the configured
+timezone (or the system timezone when omitted). The CLI checks arguments that
+do not depend on configuration before loading it. An empty
 `project list --format json` or `client list --format json` result is `[]`.
 
 Table output uses the terminal width at the time of rendering. If the full

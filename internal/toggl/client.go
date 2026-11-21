@@ -17,6 +17,7 @@ const Endpoint = "https://api.track.toggl.com/api/v9"
 type Client interface {
 	Clients(context.Context, config.Config) ([]model.Client, error)
 	Projects(context.Context, config.Config) ([]model.Project, error)
+	// TimeEntries requests a half-open interval of absolute times.
 	TimeEntries(context.Context, config.Config, time.Time, time.Time) ([]model.TimeEntry, error)
 }
 type HTTPClient struct {
@@ -99,18 +100,8 @@ func (c HTTPClient) Projects(ctx context.Context, cfg config.Config) ([]model.Pr
 	}
 	return out, nil
 }
-func (c HTTPClient) TimeEntries(ctx context.Context, cfg config.Config, from, to time.Time) ([]model.TimeEntry, error) {
-	loc := time.Local
-	if cfg.Timezone != "" {
-		var err error
-		loc, err = time.LoadLocation(cfg.Timezone)
-		if err != nil {
-			return nil, err
-		}
-	}
-	start := time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, loc).UTC()
-	end := time.Date(to.Year(), to.Month(), to.Day()+1, 0, 0, 0, 0, loc).UTC()
-	q := url.Values{"start_date": {start.Format(time.RFC3339Nano)}, "end_date": {end.Format(time.RFC3339Nano)}, "meta": {"true"}}
+func (c HTTPClient) TimeEntries(ctx context.Context, cfg config.Config, from, end time.Time) ([]model.TimeEntry, error) {
+	q := url.Values{"start_date": {from.UTC().Format(time.RFC3339Nano)}, "end_date": {end.UTC().Format(time.RFC3339Nano)}, "meta": {"true"}}
 	var dto []struct {
 		ID          int64   `json:"id"`
 		ProjectID   *int64  `json:"project_id"`
