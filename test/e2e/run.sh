@@ -1,6 +1,16 @@
 #!/bin/sh
 set -eu
 
+binary=${TOGGL_E2E_BINARY:-}
+case "$binary" in
+    ''|/*) ;;
+    *) binary="$PWD/$binary" ;;
+esac
+if [ -n "$binary" ] && { [ ! -f "$binary" ] || [ ! -r "$binary" ]; }; then
+    printf 'TOGGL_E2E_BINARY must point to a readable file: %s\n' "$binary" >&2
+    exit 1
+fi
+
 cd "$(dirname "$0")/../.."
 
 docker_arch=$(docker version --format '{{.Server.Arch}}')
@@ -20,7 +30,11 @@ trap 'exit 143' TERM
 
 mkdir "$work_dir/rootfs"
 export CGO_ENABLED=0 GOOS=linux GOARCH="$docker_arch"
-go build -o "$work_dir/rootfs/toggl" ./cmd/toggl
+if [ -n "$binary" ]; then
+    cp "$binary" "$work_dir/rootfs/toggl"
+else
+    go build -o "$work_dir/rootfs/toggl" ./cmd/toggl
+fi
 go test -c -tags=e2e -o "$work_dir/rootfs/cli.test" ./test/e2e
 chmod 755 "$work_dir/rootfs/toggl" "$work_dir/rootfs/cli.test"
 

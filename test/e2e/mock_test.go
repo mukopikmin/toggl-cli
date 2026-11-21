@@ -16,6 +16,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -25,10 +26,33 @@ const (
 	fixtureToken = "toggl-e2e-test-token"
 )
 
-func startMockAPI(t *testing.T) string {
+type mockTraffic struct {
+	clientHellos atomic.Uint64
+	requests     atomic.Uint64
+	unauthorized atomic.Uint64
+}
+
+type trafficSnapshot struct {
+	clientHellos uint64
+	requests     uint64
+	unauthorized uint64
+}
+
+func (traffic *mockTraffic) snapshot() trafficSnapshot {
+	return trafficSnapshot{
+		clientHellos: traffic.clientHellos.Load(),
+		requests:     traffic.requests.Load(),
+		unauthorized: traffic.unauthorized.Load(),
+	}
+}
+
+func startMockAPI(t *testing.T) (string, *mockTraffic) {
 	t.Helper()
 
+	const clientsPath = "/api/v9/workspaces/123/clients"
+	traffic := &mockTraffic{}
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		traffic.requests.Add(1)
 		if r.Method != http.MethodGet || r.Host != apiHost {
 			t.Errorf("unexpected method or host: %s %s", r.Method, r.Host)
 			http.Error(w, "unexpected method or host", http.StatusBadRequest)
@@ -36,19 +60,25 @@ func startMockAPI(t *testing.T) string {
 		}
 		token, password, ok := r.BasicAuth()
 		if !ok || token != fixtureToken || password != "api_token" {
+			if r.URL.Path == clientsPath {
+				traffic.unauthorized.Add(1)
+			}
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
-		case "/api/v9/workspaces/123/clients":
+		case clientsPath:
 			io.WriteString(w, `[{"id":2,"name":"Example Client"}]`)
 		case "/api/v9/workspaces/123/projects":
 			io.WriteString(w, `[{"id":7,"name":"Example Project","active":true}]`)
 		case "/api/v9/me/time_entries":
 			query := r.URL.Query()
-			if query.Get("start_date") != "2026-10-30T15:00:00Z" ||
-				query.Get("end_date") != "2026-11-01T15:00:00Z" || query.Get("meta") != "true" {
+			start, startErr := time.Parse(time.RFC3339, query.Get("start_date"))
+			end, endErr := time.Parse(time.RFC3339, query.Get("end_date"))
+			if startErr != nil || endErr != nil ||
+				!start.Equal(time.Date(2026, time.October, 30, 15, 0, 0, 0, time.UTC)) ||
+				!end.Equal(time.Date(2026, time.November, 1, 15, 0, 0, 0, time.UTC)) {
 				t.Errorf("unexpected time entries query: %s", r.URL.RawQuery)
 				http.Error(w, "unexpected time entries query", http.StatusBadRequest)
 				return
@@ -71,11 +101,17 @@ func startMockAPI(t *testing.T) string {
 	server := &httptest.Server{
 		Listener: listener,
 		Config:   &http.Server{Handler: handler, ReadHeaderTimeout: 5 * time.Second},
-		TLS:      &tls.Config{Certificates: []tls.Certificate{cert}},
+		TLS: &tls.Config{
+			Certificates: []tls.Certificate{cert},
+			GetConfigForClient: func(*tls.ClientHelloInfo) (*tls.Config, error) {
+				traffic.clientHellos.Add(1)
+				return nil, nil
+			},
+		},
 	}
 	server.StartTLS()
 	t.Cleanup(server.Close)
-	return caFile
+	return caFile, traffic
 }
 
 func makeMockCertificate(t *testing.T) (tls.Certificate, string) {

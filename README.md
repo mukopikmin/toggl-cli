@@ -325,14 +325,27 @@ make build               # Build ./out/toggl
 these same targets for formatting, installer shell syntax, third-party notices,
 static analysis, tests, package builds, and known vulnerabilities.
 
-`make test-e2e` requires Docker with Linux containers. It builds the CLI and
-test binaries with the local Go toolchain and runs them in a temporary
-container. The container uses Docker's `--network none` and maps
-`api.track.toggl.com` to an HTTPS mock on loopback. The suite uses a temporary
-configuration with dummy credentials and a test CA trusted by the CLI process.
-It checks client listing, time summaries across a month boundary in Japan
-Standard Time, HTTP 401 handling, and TLS rejection when the CA is untrusted.
-The `Test` workflow runs this target as a separate step.
+`make test-e2e` requires Docker with Linux containers. By default it builds a
+CLI binary from the checkout. Set `TOGGL_E2E_BINARY` to test a prebuilt static
+Linux executable that matches the Docker engine's architecture.
+
+```sh
+make test-e2e TOGGL_E2E_BINARY=/path/to/extracted/toggl
+```
+
+With a prebuilt binary, the local Go toolchain compiles only the test suite.
+The test runs the supplied executable as a subprocess and checks its output,
+exit status, and HTTPS behavior. The container uses Docker's `--network none`
+and maps `api.track.toggl.com` to an HTTPS mock on loopback. The suite uses a
+temporary configuration with dummy credentials and supplies the test CA via
+`SSL_CERT_FILE`.
+
+The suite compares client JSON values and summary CSV records across a month
+boundary in Japan Standard Time. It checks HTTP 401 handling against a response
+recorded by the mock. For an untrusted CA, it checks that the CLI reports an
+error and that the mock observes a TLS attempt with no HTTP request.
+The `Test` workflow runs this suite against the executable extracted from a
+Linux release archive built by `make release`.
 
 The `Test` workflow runs for pull requests, pushes to `main`, and manual dispatches.
 Feature-branch pushes use the pull request run to avoid duplicate checks. Successful

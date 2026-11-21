@@ -28,8 +28,12 @@ jobs:
         run: make vet
       - name: Test
         run: make test
+      - name: Build Linux release archive for E2E
+        run: make release VERSION=0.0.0-e2e TARGET=linux-x64
       - name: Test CLI end to end
-        run: make test-e2e
+        run: |
+          tar -xzf dist/toggl-cli-v0.0.0-e2e-linux-x64.tar.gz -C "$RUNNER_TEMP"
+          TOGGL_E2E_BINARY="$RUNNER_TEMP/toggl-cli-v0.0.0-e2e-linux-x64/toggl" make test-e2e
       - name: Build
         run: make check-build
       - name: Check vulnerabilities
