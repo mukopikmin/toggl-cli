@@ -125,3 +125,18 @@ func TestSummaryDailyTotalInvalidUsage(t *testing.T) {
 		})
 	}
 }
+
+type failingSummaryWriter struct {
+	err error
+}
+
+func (w failingSummaryWriter) Write([]byte) (int, error) { return 0, w.err }
+
+func TestSummaryReportsOutputFailure(t *testing.T) {
+	want := errors.New("output unavailable")
+	app, _ := configuredApp(t, &fakeClient{}, "")
+	app.Out = failingSummaryWriter{err: want}
+	if err := app.Run(context.Background(), []string{"summary", "--days", "1"}); !errors.Is(err, want) {
+		t.Fatalf("got %v, want %v", err, want)
+	}
+}

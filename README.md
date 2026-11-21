@@ -307,6 +307,7 @@ replaces all settings, rather than merging them with the previous template.
 - `cmd/toggl/main.go`: argument entry point and dependency assembly.
 - `internal/command/`: CLI interpretation and output formatting. `options.go`
   handles shared option parsing; `update_install.go` handles update installation.
+- `internal/command/summary_output.go`: formats fetched summary data.
 - `internal/model/`: API-independent models and pure aggregation.
 - `internal/template/`: validated TOML storage for named summary settings.
 - `internal/toggl/`: HTTP client, private DTOs, and domain conversion.
