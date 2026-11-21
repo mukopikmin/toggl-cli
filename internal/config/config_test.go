@@ -83,3 +83,10 @@ func TestProjectsMustBeTable(t *testing.T) {
 		})
 	}
 }
+
+func TestInvalidTokenDiagnostic(t *testing.T) {
+	_, err := Parse("workspace='1'\ntoken=exampleCredential\n")
+	if err == nil || err.Error() != "Invalid configuration at line 2" {
+		t.Fatalf("unexpected diagnostic: %v", err)
+	}
+}
