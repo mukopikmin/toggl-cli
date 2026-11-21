@@ -33,7 +33,7 @@ func TestSummaryDaysIncludesToday(t *testing.T) {
 			fake := &fakeClient{}
 			client := &dateRangeClient{fakeClient: fake}
 			app, out := configuredApp(t, fake, "")
-			app.Client = client
+			app.NewClient = useClient(client)
 			now, err := time.Parse(time.RFC3339, tt.now)
 			if err != nil {
 				t.Fatal(err)

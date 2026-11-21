@@ -26,7 +26,7 @@ func TestSummaryUsageBeforeConfiguration(t *testing.T) {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			t.Setenv("HOME", t.TempDir())
 			client := &fakeClient{}
-			app := App{Client: client, Out: &bytes.Buffer{}}
+			app := App{NewClient: useClient(client), Out: &bytes.Buffer{}}
 			err := app.Run(context.Background(), args)
 			var usageError UsageError
 			if !errors.As(err, &usageError) || client.entryCalls != 0 || client.projectCalls != 0 {
@@ -42,11 +42,14 @@ func TestEmptyProjectJSONIsArray(t *testing.T) {
 		projects []model.Project
 	}{
 		{"nil", nil}, {"empty", []model.Project{}},
-		{"all hidden", []model.Project{{ID: 1, Hidden: true}}},
+		{"all hidden", []model.Project{{ID: 1, Name: "Hidden"}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app, out := configuredApp(t, &fakeClient{projects: tt.projects}, "")
+			if tt.name == "all hidden" {
+				appendProjectConfig(t, "\n[projects.1]\nhidden = true\n")
+			}
 			if err := app.Run(context.Background(), []string{"project", "list", "--format", "json"}); err != nil {
 				t.Fatal(err)
 			}
@@ -62,9 +65,9 @@ type dateRangeClient struct {
 	from, to time.Time
 }
 
-func (c *dateRangeClient) TimeEntries(ctx context.Context, cfg config.Config, from, to time.Time) ([]model.TimeEntry, error) {
+func (c *dateRangeClient) TimeEntries(ctx context.Context, from, to time.Time) ([]model.TimeEntry, error) {
 	c.from, c.to = from, to
-	return c.fakeClient.TimeEntries(ctx, cfg, from, to)
+	return c.fakeClient.TimeEntries(ctx, from, to)
 }
 
 func TestTimeEntryCalendarDays(t *testing.T) {
@@ -97,7 +100,7 @@ func TestTimeEntryCalendarDays(t *testing.T) {
 			fake := &fakeClient{}
 			client := &dateRangeClient{fakeClient: fake}
 			app, _ := configuredApp(t, fake, "")
-			app.Client = client
+			app.NewClient = useClient(client)
 			loc, err := time.LoadLocation(tt.zone)
 			if err != nil {
 				t.Fatal(err)
