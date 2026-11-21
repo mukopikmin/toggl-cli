@@ -122,7 +122,7 @@ func TestEmptyProjectListWritesNewline(t *testing.T) {
 }
 func TestSummaryFormatsAndBoundaries(t *testing.T) {
 	pid := int64(1)
-	client := &fakeClient{projects: []model.Project{{ID: 1, Name: "P", DisplayName: "P", Active: true}}, entries: []model.TimeEntry{{ID: 1, ProjectID: &pid, Start: "2026-05-01T23:30:00Z", DurationSeconds: 90}}}
+	client := &fakeClient{projects: []model.Project{{ID: 1, Name: "P", DisplayName: "P", Active: true}}, entries: []model.TimeEntry{{ID: 1, ProjectID: &pid, Start: time.Date(2026, 5, 1, 23, 30, 0, 0, time.UTC), DurationSeconds: 90}}}
 	tests := []struct {
 		name string
 		args []string
@@ -157,8 +157,8 @@ func TestSummaryFormatsAndBoundaries(t *testing.T) {
 
 func TestTimeEntryFormats(t *testing.T) {
 	pid := int64(8)
-	stop := "2026-05-01T01:00:00Z"
-	client := &fakeClient{entries: []model.TimeEntry{{ID: 2, ProjectID: &pid, Description: "a,b", Start: "2026-05-01T00:00:00Z", Stop: &stop, DurationSeconds: 3600}}}
+	stop := time.Date(2026, 5, 1, 1, 0, 0, 0, time.UTC)
+	client := &fakeClient{entries: []model.TimeEntry{{ID: 2, ProjectID: &pid, Description: "a,b", Start: time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC), Stop: &stop, DurationSeconds: 3600}}}
 	for _, format := range []string{"csv", "tsv", "json", "table"} {
 		t.Run(format, func(t *testing.T) {
 			app, out := configuredApp(t, client, "")
@@ -269,5 +269,24 @@ func TestClipboardCommandParityAndFallback(t *testing.T) {
 	}
 	if strings.Join(attempts, ",") != "wl-copy:summary output,xclip:summary output" {
 		t.Fatalf("%v", attempts)
+	}
+}
+
+func TestTimeEntryListSortsByInstant(t *testing.T) {
+	tokyo := time.FixedZone("Tokyo", 9*60*60)
+	tokyoStart := time.Date(2026, 5, 2, 9, 0, 0, 0, tokyo)
+	utcStart := tokyoStart.UTC()
+	client := &fakeClient{entries: []model.TimeEntry{
+		{ID: 3, Start: utcStart.Add(time.Hour)},
+		{ID: 2, Start: utcStart},
+		{ID: 1, Start: tokyoStart},
+	}}
+	app, out := configuredApp(t, client, "")
+	if err := app.Run(context.Background(), []string{"time-entry", "list", "2", "2"}); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(out.String(), "\n")
+	if !strings.HasPrefix(lines[1], "1\t") || !strings.HasPrefix(lines[2], "2\t") || !strings.HasPrefix(lines[3], "3\t") {
+		t.Fatal(out.String())
 	}
 }

@@ -120,7 +120,22 @@ func (c HTTPClient) TimeEntries(ctx context.Context, cfg config.Config, from, en
 		if pid == nil {
 			pid = d.PID
 		}
-		out[i] = model.TimeEntry{ID: d.ID, ProjectID: pid, Start: d.Start, Stop: d.Stop, DurationSeconds: d.Duration, Description: d.Description}
+		start, err := time.Parse(time.RFC3339Nano, d.Start)
+		if err != nil {
+			return nil, fmt.Errorf("invalid start for time entry %d: %w", d.ID, err)
+		}
+		var stop *time.Time
+		if d.Stop != nil {
+			parsed, err := time.Parse(time.RFC3339Nano, *d.Stop)
+			if err != nil {
+				return nil, fmt.Errorf("invalid stop for time entry %d: %w", d.ID, err)
+			}
+			stop = &parsed
+		}
+		out[i] = model.TimeEntry{
+			ID: d.ID, ProjectID: pid, Start: start, Stop: stop, Description: d.Description,
+			DurationSeconds: max(0, d.Duration), Running: d.Duration < 0,
+		}
 	}
 	return out, nil
 }

@@ -61,10 +61,8 @@ func TestProjectsMapsDTOSettingsAndAuthorization(t *testing.T) {
 	}
 }
 func TestTimeEntriesMapsFallbackPIDAndErrors(t *testing.T) {
-	pid := int64(9)
-	_ = pid
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`[{"id":1,"pid":9,"start":"2026-01-01T00:00:00Z","stop":null,"duration":60,"description":"work"}]`))
+		w.Write([]byte(`[{"id":1,"pid":9,"start":"2026-01-01T00:00:00Z","stop":null,"duration":-1767225600,"description":"work"}]`))
 	}))
 	defer s.Close()
 	client := HTTPClient{Endpoint: s.URL}
@@ -72,6 +70,9 @@ func TestTimeEntriesMapsFallbackPIDAndErrors(t *testing.T) {
 	entries, err := client.TimeEntries(context.Background(), config.Config{}, day, day.AddDate(0, 0, 1))
 	if err != nil || len(entries) != 1 || entries[0].ProjectID == nil || *entries[0].ProjectID != 9 {
 		t.Fatalf("%+v %v", entries, err)
+	}
+	if entries[0].Stop != nil || !entries[0].Running || entries[0].ElapsedSeconds(day.Add(time.Minute)) != 60 {
+		t.Fatalf("unexpected running entry: %+v", entries[0])
 	}
 	bad := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.Error(w, "no", http.StatusUnauthorized) }))
 	defer bad.Close()
