@@ -135,27 +135,33 @@ and successful/error exit codes of the previous implementation:
 
 | Command | Options / arguments | Output |
 | --- | --- | --- |
-| `summary` | `<start-date> <end-date>`, `--days N`, or `--template NAME`; `-f/--format csv\|json\|table`, `--watch`, `-s/--separator`, `--no-project`/`--project`, `--no-date`/`--date`, `--daily-total`, `--clipboard`/`--no-clipboard` | Tab-separated CSV by default; JSON summary or bordered table |
+| `summary` | `<start-date> <end-date>`, `--days N`, or `--template NAME`; `-f/--format csv\|json\|table`, `--watch`, `-s/--separator`, `--no-project`/`--project`, `--no-date`/`--date`, `--daily-total`, `--clipboard`/`--no-clipboard` | Bordered table by default; CSV or JSON summary |
 | `template add` | `<name> [<start-date> <end-date> or --days N]`; summary output options, `--force` | Stores a summary template without running it |
 | `template list` | none | Template names in alphabetical order |
 | `template show` | `<name>` | Template settings as TOML |
 | `template delete` | `<name>` | Deletes the named template |
-| `time-entry list` | `<start-day> <end-day>`; `-f/--format`, `--watch`, `-s/--separator` | Entries as CSV, JSON, or table |
-| `project list` | `-f/--format`, `--watch` | Visible ordered project names, JSON, or table |
-| `client list` | `-f/--format`, `--watch`, `-s/--separator` | Client IDs and names as CSV/TSV or JSON; names as a table |
+| `time-entry list` | `<start-day> <end-day>`; `-f/--format`, `--watch`, `-s/--separator` | Entries as a bordered table by default; CSV or JSON |
+| `project list` | `-f/--format`, `--watch` | Visible ordered projects as a table by default; names or JSON |
+| `client list` | `-f/--format`, `--watch`, `-s/--separator` | Client names as a table by default; IDs and names as CSV/TSV or JSON |
 | `project sync` | none | Adds missing active projects to the TOML file |
 | `project reorder` | none | Interactively changes and saves visible-project order |
-| `config` | `-f/--format`, `--watch` | Non-sensitive settings as `KEY=VALUE`, JSON, or table |
+| `config` | `-f/--format`, `--watch` | Non-sensitive settings as a table by default; `KEY=VALUE` or JSON |
 | `init` | none | Creates a mode-`0600` configuration interactively |
 | `update` | `--channel stable\|nightly` | Checks, verifies, and installs a release update |
 | `completion` | `bash\|zsh\|fish` | Prints a shell completion script without loading configuration |
 | `--help`, `-h` | none | Help text |
 | `--version` | none | Build version |
 
+The default output format is `table` for `summary`, `time-entry list`,
+`project list`, and `config`. Use `--format csv` for the previous plain-text
+output or `--format json` for JSON. CSV output uses a tab separator by default.
+Specify `--format csv` when using `--separator`, `--no-project`, or `--no-date`;
+these options cannot be used with table output.
+
 Date ranges are inclusive. Invalid usage, configuration, API, clipboard, and
 I/O errors exit with status 1; successful commands exit with status 0.
 
-Short options accept attached values, such as `-fjson`, `-d7`, and `-s,`.
+Short options accept attached values, such as `-fjson`, `-d7`, and `-fcsv -s,`.
 Use `--` to end option parsing. Boolean flags such as `--no-date` do not accept
 values. For a separator starting with a dash, use `--separator=<text>`.
 The `--days N` option includes exactly N calendar days ending today in the
@@ -189,15 +195,16 @@ toggl summary --days 7 --format table --watch
 ```
 
 `toggl client list` fetches clients from the configured workspace in API order.
-The default output is TSV with `id` and `name` headers. The `csv` format uses
+The default output is a bordered table of client names. Use `--format csv`
+for IDs and names with `id` and `name` headers. The `csv` format uses
 `--separator` to select the delimiter, with tab as the default. Fields containing
 the delimiter, quotes, or newlines are quoted. Empty CSV/TSV output contains only
 the header. The separator must not be empty and cannot be used with table format.
 This command does not change the configuration file.
 
 ```sh
-toggl client list                   # TSV: id and name columns
-toggl client list --separator ,     # CSV: id and name columns
+toggl client list                   # Bordered table of names
+toggl client list -fcsv -s,         # CSV: id and name columns
 toggl client list --format json     # Objects with id and name
 toggl client list --format table    # Bordered table of names
 ```
@@ -206,7 +213,7 @@ Add `--daily-total` to `summary` to append a `Total` row to CSV or table output:
 
 ```sh
 toggl summary 2026-06-01 2026-06-15 --daily-total
-toggl summary --days 7 --daily-total --format table
+toggl summary --days 7 --daily-total --format csv
 ```
 
 Totals are in minutes and include only the projects shown in the output. Hidden
@@ -244,7 +251,7 @@ toggl summary --template weekly --days 14 --format csv
 toggl summary --template weekly 2026-10-01 2026-10-31
 
 # Store only output settings and supply a period when running the summary.
-toggl template add spreadsheet --no-project --no-date --clipboard
+toggl template add spreadsheet --format csv --no-project --no-date --clipboard
 toggl summary --template spreadsheet 2026-10-01 2026-10-31
 toggl summary --template spreadsheet --days 1 --project --date --no-clipboard
 
@@ -286,7 +293,7 @@ the summary runs, using the configured timezone or system timezone. Fixed dates
 remain fixed. A period must be available when executing a summary.
 
 Explicit command-line settings override the template, followed by the existing
-defaults (CSV, tab separator, project column and date header, no clipboard).
+defaults (table, project column and date header, no clipboard).
 A command-line period replaces the saved period entirely. Supplying both a date
 range and `--days` on the command line is still an error. Use `--project`,
 `--date`, and `--no-clipboard` to reverse saved boolean settings; opposing flags

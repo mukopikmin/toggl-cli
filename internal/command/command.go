@@ -52,7 +52,7 @@ Commands:
 
 Options:
   -s, --separator <text> Set the CSV delimiter (default: tab; CSV only)
-  -f, --format <format>  Set the output format: csv, json, or table (default: csv)
+  -f, --format <format>  Set the output format: csv, json, or table (default: table)
       --watch            Redraw table output on terminal resize until Ctrl+C
   -d, --days <days>      Aggregate this many calendar days, including today (>= 1)
       --clipboard        Copy the output to the clipboard as well as stdout
