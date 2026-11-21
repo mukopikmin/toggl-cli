@@ -1,4 +1,4 @@
-package command
+package selfupdate
 
 import (
 	"context"
@@ -36,13 +36,13 @@ type updateInstallRuntime struct {
 	completionErr io.Writer
 }
 
-func installUpdate(ctx context.Context, p updatePlan, client *http.Client, out, errOut io.Writer) error {
-	return installUpdateWithRuntime(ctx, p, client, updateInstallRuntime{
+func (s Service) Install(ctx context.Context, p Plan, out, errOut io.Writer) error {
+	return installUpdateWithRuntime(ctx, p, s.httpClient(), updateInstallRuntime{
 		goos:          runtime.GOOS,
 		completionOut: out,
 		completionErr: errOut,
 		binaryVersion: func(path string) (string, error) {
-			out, err := exec.Command(path, "--version").Output()
+			out, err := exec.CommandContext(ctx, path, "--version").Output()
 			return string(out), err
 		},
 		startHelper: func(path string) error {
@@ -56,7 +56,7 @@ func installUpdate(ctx context.Context, p updatePlan, client *http.Client, out, 
 	})
 }
 
-func installUpdateWithRuntime(ctx context.Context, p updatePlan, client *http.Client, platform updateInstallRuntime) error {
+func installUpdateWithRuntime(ctx context.Context, p Plan, client *http.Client, platform updateInstallRuntime) error {
 	type result struct {
 		data []byte
 		err  error
@@ -65,6 +65,9 @@ func installUpdateWithRuntime(ctx context.Context, p updatePlan, client *http.Cl
 	go func() { b, e := download(ctx, client, p.DownloadURL); archiveResult <- result{b, e} }()
 	go func() { b, e := download(ctx, client, p.DownloadURL+".sha256"); checksumResult <- result{b, e} }()
 	a, c := <-archiveResult, <-checksumResult
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if a.err != nil || c.err != nil {
 		return errors.New("Failed to download the update archive or checksum.")
 	}
@@ -103,6 +106,9 @@ func installUpdateWithRuntime(ctx context.Context, p updatePlan, client *http.Cl
 		return err
 	}
 	out, err := platform.binaryVersion(stageName)
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if err != nil || strings.TrimSpace(out) != p.TargetVersion {
 		return fmt.Errorf("Downloaded binary version mismatch (expected %s); the existing binary was not changed.", p.TargetVersion)
 	}
