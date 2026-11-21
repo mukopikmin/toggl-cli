@@ -55,6 +55,7 @@ Commands:
 Options:
   -s, --separator <text> Set the CSV delimiter (default: tab; CSV only)
   -f, --format <format>  Set the output format: csv, json, or table (default: csv)
+      --watch            Redraw table output on terminal resize until Ctrl+C
   -d, --days <days>      Aggregate this many calendar days, including today (>= 1)
       --month <month>    Aggregate an entire month (YYYY-MM, YYYYMM, or YYYY/MM)
       --clipboard        Copy the output to the clipboard as well as stdout
@@ -120,7 +121,7 @@ func (a App) Run(ctx context.Context, args []string) error {
 	case "init":
 		return a.init(args[1:])
 	case "config":
-		return a.showConfig(args[1:])
+		return a.showConfig(ctx, args[1:])
 	case "project":
 		return a.project(ctx, args[1:])
 	case "client":
@@ -148,13 +149,16 @@ type outputTimeEntry struct {
 }
 
 func loadCfg() (config.Document, error) { return config.Load() }
-func (a App) showConfig(args []string) error {
-	o, e := parseOpts(args, map[string]bool{"format": true})
+func (a App) showConfig(ctx context.Context, args []string) error {
+	o, e := parseOpts(args, map[string]bool{"format": true, "watch": true})
 	if e != nil {
 		return e
 	}
 	if len(o.pos) > 0 {
 		return usage("config does not accept positional arguments")
+	}
+	if err := a.validateTableWatch(o.watch, o.format); err != nil {
+		return err
 	}
 	d, e := loadCfg()
 	if e != nil {
@@ -180,7 +184,7 @@ func (a App) showConfig(args []string) error {
 		}
 	}
 	if o.format == "table" {
-		fmt.Fprintln(a.Out, a.table([]string{"Setting", "Value"}, rows, []string{"Key", "Val"}))
+		return a.writeTable(ctx, tableOutputOptions{watch: o.watch}, []string{"Setting", "Value"}, rows, []string{"Key", "Val"})
 	} else {
 		for _, r := range rows {
 			fmt.Fprintf(a.Out, "%s=%s\n", r[0], r[1])
@@ -291,12 +295,15 @@ func (a App) project(ctx context.Context, args []string) error {
 	switch args[0] {
 	case "list":
 		var err error
-		listOptions, err = parseOpts(args[1:], map[string]bool{"format": true})
+		listOptions, err = parseOpts(args[1:], map[string]bool{"format": true, "watch": true})
 		if err != nil {
 			return err
 		}
 		if len(listOptions.pos) > 0 {
 			return usage("project list does not accept positional arguments")
+		}
+		if err := a.validateTableWatch(listOptions.watch, listOptions.format); err != nil {
+			return err
 		}
 	case "sync":
 		if len(args) > 1 {
@@ -328,7 +335,8 @@ func (a App) project(ctx context.Context, args []string) error {
 			for _, p := range ps {
 				rows = append(rows, []string{p.DisplayName})
 			}
-			fmt.Fprintln(a.Out, a.table([]string{"Project"}, rows, []string{"Proj."}))
+			options := tableOutputOptions{watch: listOptions.watch, truncateProjects: true}
+			return a.writeTable(ctx, options, []string{"Project"}, rows, []string{"Proj."})
 		} else {
 			names := make([]string, len(ps))
 			for i, p := range ps {
@@ -392,6 +400,7 @@ func (a App) summary(ctx context.Context, args []string) error {
 	allowed := summaryFlags()
 	allowed["template"] = true
 	allowed["month"] = true
+	allowed["watch"] = true
 	allowed["daily-total"] = true
 	o, e := parseOpts(args, allowed)
 	if e != nil {
@@ -436,6 +445,9 @@ func (a App) summary(ctx context.Context, args []string) error {
 	if e = settings.Validate(true); e != nil {
 		return usage(e.Error())
 	}
+	if err := a.validateTableWatch(o.watch, settings.Format); err != nil {
+		return err
+	}
 	d, e := loadCfg()
 	if e != nil {
 		return e
@@ -457,10 +469,10 @@ func (a App) summary(ctx context.Context, args []string) error {
 	if e != nil {
 		return e
 	}
-	return a.writeSummary(ctx, d.Config, settings, from, to, sum, o.dailyTotal)
+	return a.writeSummary(ctx, d.Config, settings, from, to, sum, o.watch, o.dailyTotal)
 }
 
-func (a App) writeSummary(ctx context.Context, cfg config.Config, settings model.SummaryOptions, from, to time.Time, sum model.Summary, dailyTotal bool) error {
+func (a App) writeSummary(ctx context.Context, cfg config.Config, settings model.SummaryOptions, from, to time.Time, sum model.Summary, watch, dailyTotal bool) error {
 	var text string
 	if settings.Format == "json" {
 		b, _ := json.MarshalIndent(sum, "", "  ")
@@ -496,28 +508,28 @@ func (a App) writeSummary(ctx context.Context, cfg config.Config, settings model
 		}
 		headers := append([]string{"Project"}, days...)
 		if settings.Format == "table" {
-			text = a.table(headers, rows, summaryHeaderVariants(days, from, to)...)
-		} else {
-			separator := "\t"
-			if settings.Separator != nil {
-				separator = *settings.Separator
-			}
-			var lines []string
-			if !settings.NoDate {
-				h := headers
-				if settings.NoProject {
-					h = days
-				}
-				lines = append(lines, strings.Join(h, separator))
-			}
-			for _, r := range rows {
-				if settings.NoProject {
-					r = r[1:]
-				}
-				lines = append(lines, strings.Join(r, separator))
-			}
-			text = strings.Join(lines, "\n")
+			options := tableOutputOptions{watch: watch, clipboard: settings.Clipboard, truncateProjects: true}
+			return a.writeTable(ctx, options, headers, rows, summaryHeaderVariants(days, from, to)...)
 		}
+		separator := "\t"
+		if settings.Separator != nil {
+			separator = *settings.Separator
+		}
+		var lines []string
+		if !settings.NoDate {
+			h := headers
+			if settings.NoProject {
+				h = days
+			}
+			lines = append(lines, strings.Join(h, separator))
+		}
+		for _, r := range rows {
+			if settings.NoProject {
+				r = r[1:]
+			}
+			lines = append(lines, strings.Join(r, separator))
+		}
+		text = strings.Join(lines, "\n")
 	}
 	fmt.Fprintln(a.Out, text)
 	if settings.Clipboard {
@@ -555,7 +567,7 @@ func (a App) timeEntry(ctx context.Context, args []string) error {
 	if args[0] != "list" {
 		return usagef("unknown time-entry subcommand: %s", args[0])
 	}
-	o, e := parseOpts(args[1:], map[string]bool{"format": true, "separator": true})
+	o, e := parseOpts(args[1:], map[string]bool{"format": true, "separator": true, "watch": true})
 	if e != nil {
 		return e
 	}
@@ -567,6 +579,9 @@ func (a App) timeEntry(ctx context.Context, args []string) error {
 	}
 	if o.format == "table" && o.separatorSet {
 		return usage("--separator cannot be used with table format")
+	}
+	if err := a.validateTableWatch(o.watch, o.format); err != nil {
+		return err
 	}
 	now := a.Now()
 	y, m, _ := now.Date()
@@ -623,7 +638,7 @@ func (a App) timeEntry(ctx context.Context, args []string) error {
 		fmt.Fprintln(a.Out, string(b))
 	} else if o.format == "table" {
 		compactHeaders := []string{"id", "desc", "proj_id", "start", "stop", "mins"}
-		fmt.Fprintln(a.Out, a.table(headers, rows, compactHeaders))
+		return a.writeTable(ctx, tableOutputOptions{watch: o.watch}, headers, rows, compactHeaders)
 	} else {
 		fmt.Fprintln(a.Out, csv(headers, rows, o.sep))
 	}
