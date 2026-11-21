@@ -5,15 +5,16 @@ TARGET ?=
 ARGS ?=
 VULNDB ?= https://vuln.go.dev
 
-.PHONY: help fmt check-fmt check-shell check-notices check-vuln vet test check-build check build run release
+.PHONY: help fmt check-fmt check-shell check-notices check-vuln vet test test-e2e check-build check build run release
 
 help:
 	@printf '%s\n' \
-	  'make check          Run all CI checks' \
+	  'make check          Run the standard checks' \
 	  'make fmt            Format Go source files' \
 	  'make build          Build out/toggl' \
 	  'make run ARGS="..."  Run the CLI from source' \
-	  'make test           Run all tests' \
+	  'make test           Run Go tests' \
+	  'make test-e2e       Run the CLI E2E tests in Docker' \
 	  'make vet            Run static analysis' \
 	  'make check-vuln     Scan for known Go vulnerabilities' \
 	  'make release VERSION=0.1.0 [TARGET=linux-x64]' \
@@ -39,6 +40,9 @@ vet:
 
 test:
 	go test ./...
+
+test-e2e:
+	sh test/e2e/run.sh
 
 check-build:
 	go build ./...

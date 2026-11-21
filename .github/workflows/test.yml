@@ -28,6 +28,8 @@ jobs:
         run: make vet
       - name: Test
         run: make test
+      - name: Test CLI end to end
+        run: make test-e2e
       - name: Build
         run: make check-build
       - name: Check vulnerabilities
