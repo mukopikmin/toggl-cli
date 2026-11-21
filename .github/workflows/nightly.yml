@@ -27,6 +27,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
 
       - name: Setup Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -36,7 +37,26 @@ jobs:
       - name: Build nightly archives
         run: make release VERSION=nightly
 
+      - name: Check whether the tested commit advances nightly
+        id: advance
+        env:
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          ref=$(git ls-remote --refs origin refs/tags/nightly)
+          read -r published _ <<< "$ref"
+          if [[ -n "$published" ]]; then
+            counts=$(git rev-list --left-right --count "$published...$HEAD_SHA")
+            read -r behind ahead <<< "$counts"
+            if (( behind > 0 || ahead == 0 )); then
+              echo "Skipping nightly: tested commit is $behind behind and $ahead ahead of the published tag."
+              exit 0
+            fi
+          fi
+          echo "previous=$published" >> "$GITHUB_OUTPUT"
+          echo "publish=true" >> "$GITHUB_OUTPUT"
+
       - name: Create or update nightly release
+        if: steps.advance.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
@@ -70,13 +90,15 @@ jobs:
       # used by the updater. Release creation creates the tag itself, so the
       # initial publication is the only case where this cannot be ordered.
       - name: Move nightly tag
+        if: steps.advance.outputs.publish == 'true'
         env:
+          PREVIOUS_TAG: ${{ steps.advance.outputs.previous }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
-          git tag --force nightly "$HEAD_SHA"
-          git push origin refs/tags/nightly --force
+          git push --force-with-lease="refs/tags/nightly:$PREVIOUS_TAG" origin "$HEAD_SHA:refs/tags/nightly"
 
       - name: Remove obsolete nightly releases and tags
+        if: steps.advance.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

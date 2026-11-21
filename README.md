@@ -390,4 +390,5 @@ for notes. These commands require Git, an authenticated GitHub CLI, and a checko
 with the annotated release tag (including its `Previous-Stable-Tag` trailer) and
 comparison tag available. Notes generation uses GitHub's
 generate-notes API. Nightly publication continues independently after successful
-tests on `main`.
+tests on `main`. After the first nightly release, a run updates its assets and
+tag only if the tested commit is a strict descendant of the published nightly.
