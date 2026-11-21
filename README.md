@@ -315,7 +315,8 @@ Install Make and the Go version required by `go.mod`. From a checkout:
 make                     # Show available commands
 make run ARGS="summary 2026-06-01 2026-06-15"
 make fmt                 # Format Go source files
-make check               # Run all CI checks
+make check               # Run the standard checks
+make test-e2e            # Run CLI end-to-end tests in Docker
 make build               # Build ./out/toggl
 ```
 
@@ -323,6 +324,15 @@ make build               # Build ./out/toggl
 `check-build`, and `check-vuln`. Each target can also be run separately. CI calls
 these same targets for formatting, installer shell syntax, third-party notices,
 static analysis, tests, package builds, and known vulnerabilities.
+
+`make test-e2e` requires Docker with Linux containers. It builds the CLI and
+test binaries with the local Go toolchain and runs them in a temporary
+container. The container uses Docker's `--network none` and maps
+`api.track.toggl.com` to an HTTPS mock on loopback. The suite uses a temporary
+configuration with dummy credentials and a test CA trusted by the CLI process.
+It checks client listing, time summaries across a month boundary in Japan
+Standard Time, HTTP 401 handling, and TLS rejection when the CA is untrusted.
+The `Test` workflow runs this target as a separate step.
 
 The `Test` workflow runs for pull requests, pushes to `main`, and manual dispatches.
 Feature-branch pushes use the pull request run to avoid duplicate checks. Successful
