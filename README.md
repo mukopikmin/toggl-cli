@@ -135,7 +135,7 @@ and successful/error exit codes of the previous implementation:
 
 | Command | Options / arguments | Output |
 | --- | --- | --- |
-| `summary` | `<start-date> <end-date>`, `--days N`, or `--template NAME`; `-f/--format csv\|json\|table`, `--watch`, `-s/--separator`, `--no-project`/`--project`, `--no-date`/`--date`, `--daily-total`, `--clipboard`/`--no-clipboard` | Tab-separated CSV by default; JSON summary or bordered table |
+| `summary` | `<start-date> <end-date>`, `--days N`, `--month MONTH`, or `--template NAME`; `-f/--format csv\|json\|table`, `--watch`, `-s/--separator`, `--no-project`/`--project`, `--no-date`/`--date`, `--daily-total`, `--clipboard`/`--no-clipboard` | Tab-separated CSV by default; JSON summary or bordered table |
 | `template add` | `<name> [<start-date> <end-date> or --days N]`; summary output options, `--force` | Stores a summary template without running it |
 | `template list` | none | Template names in alphabetical order |
 | `template show` | `<name>` | Template settings as TOML |
@@ -154,6 +154,12 @@ and successful/error exit codes of the previous implementation:
 
 Date ranges are inclusive. Invalid usage, configuration, API, clipboard, and
 I/O errors exit with status 1; successful commands exit with status 0.
+
+Use `toggl summary --month 2026-10` to summarize October 1 through October 31,
+2026. Months accept `YYYY-MM`, `YYYYMM`, and `YYYY/MM`. The full month is used
+in the configured timezone (or the system timezone when unset), including for
+the current month. `--month`, `--days`, and explicit start/end dates are
+mutually exclusive; `--month` is available only for `summary`.
 
 Short options accept attached values, such as `-fjson`, `-d7`, and `-s,`.
 Use `--` to end option parsing. Boolean flags such as `--no-date` do not accept
