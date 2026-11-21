@@ -54,9 +54,9 @@ func (a App) client(ctx context.Context, args []string) error {
 	default:
 		rows := make([][]string, len(clients))
 		for i, c := range clients {
-			rows[i] = []string{strconv.FormatInt(c.ID, 10), c.Name}
+			rows[i] = []string{strconv.FormatInt(c.ID, 10), spreadsheetText(o.format, c.Name)}
 		}
-		_, err = fmt.Fprintln(a.Out, delimited([]string{"id", "name"}, rows, o.format, 1))
+		_, err = fmt.Fprintln(a.Out, delimited([]string{"id", "name"}, rows, o.format))
 		return err
 	}
 }

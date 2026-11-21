@@ -4,9 +4,10 @@ import (
 	"encoding/csv"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
-func delimited(headers []string, rows [][]string, format string, textColumns ...int) string {
+func delimited(headers []string, rows [][]string, format string) string {
 	var text strings.Builder
 	w := csv.NewWriter(&text)
 	if format == "tsv" {
@@ -16,20 +17,16 @@ func delimited(headers []string, rows [][]string, format string, textColumns ...
 	if headers != nil {
 		_ = w.Write(headers)
 	}
-	for _, row := range rows {
-		record := append([]string(nil), row...)
-		for _, column := range textColumns {
-			record[column] = spreadsheetText(record[column])
-		}
-		_ = w.Write(record)
-	}
-	w.Flush()
+	_ = w.WriteAll(rows)
 	return strings.TrimSuffix(text.String(), "\n")
 }
 
-func spreadsheetText(value string) string {
-	trimmed := strings.TrimLeftFunc(value, unicode.IsSpace)
-	if trimmed != "" && strings.ContainsRune("=+-@＝＋－＠", []rune(trimmed)[0]) {
+func spreadsheetText(format, value string) string {
+	if format != "csv" && format != "tsv" {
+		return value
+	}
+	first, _ := utf8.DecodeRuneInString(strings.TrimLeftFunc(value, unicode.IsSpace))
+	if strings.ContainsRune("=+-@＝＋－＠", first) {
 		return "'" + value
 	}
 	return value
