@@ -310,7 +310,8 @@ replaces all settings, rather than merging them with the previous template.
 - `internal/command/summary_output.go`: formats fetched summary data.
 - `internal/model/`: API-independent models and pure aggregation.
 - `internal/template/`: validated TOML storage for named summary settings.
-- `internal/toggl/`: HTTP client, private DTOs, and domain conversion.
+- `internal/toggl/`: authenticated HTTP client, private DTOs, and domain
+  conversion. The CLI applies local project display preferences.
 - `internal/config/`: configuration loading, validation, and project edits.
 
 ## Development

@@ -17,7 +17,6 @@ import (
 	"github.com/mukopikmin/toggl-cli/internal/config"
 	"github.com/mukopikmin/toggl-cli/internal/model"
 	"github.com/mukopikmin/toggl-cli/internal/template"
-	"github.com/mukopikmin/toggl-cli/internal/toggl"
 	"golang.org/x/term"
 )
 
@@ -67,11 +66,11 @@ Options:
       --version          Show the version`
 
 type App struct {
-	Client   toggl.Client
-	Out, Err io.Writer
-	In       io.Reader
-	Now      func() time.Time
-	Version  string
+	NewClient func(workspace, token string) TogglClient
+	Out, Err  io.Writer
+	In        io.Reader
+	Now       func() time.Time
+	Version   string
 }
 
 type UsageError struct{ Message string }
@@ -314,7 +313,7 @@ func (a App) project(ctx context.Context, args []string) error {
 	if e != nil {
 		return e
 	}
-	ps, e := a.Client.Projects(ctx, d.Config)
+	ps, e := a.projects(ctx, d.Config)
 	if e != nil {
 		return e
 	}
@@ -412,14 +411,14 @@ func (a App) summary(ctx context.Context, args []string) error {
 	if e != nil {
 		return usage(e.Error())
 	}
-	entries, e := a.Client.TimeEntries(ctx, d.Config, from, to.AddDate(0, 0, 1))
+	entries, e := a.NewClient(d.Config.Workspace, d.Config.Token).TimeEntries(ctx, from, to.AddDate(0, 0, 1))
 	if e != nil {
 		return e
 	}
 	sum := model.Summarize(entries, loc, now)
 	var projects []model.Project
 	if settings.Format != "json" {
-		projects, e = a.Client.Projects(ctx, d.Config)
+		projects, e = a.projects(ctx, d.Config)
 		if e != nil {
 			return e
 		}
@@ -474,7 +473,7 @@ func (a App) timeEntry(ctx context.Context, args []string) error {
 	}
 	from := time.Date(y, m, sd, 0, 0, 0, 0, loc)
 	end := time.Date(y, m, ed+1, 0, 0, 0, 0, loc)
-	entries, e := a.Client.TimeEntries(ctx, d.Config, from, end)
+	entries, e := a.NewClient(d.Config.Workspace, d.Config.Token).TimeEntries(ctx, from, end)
 	if e != nil {
 		return e
 	}

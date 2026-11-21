@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mukopikmin/toggl-cli/internal/config"
 	"github.com/mukopikmin/toggl-cli/internal/model"
 )
 
@@ -24,7 +23,7 @@ func TestClientsMapsDTOAndRequest(t *testing.T) {
 		w.Write([]byte(`[{"id":2,"name":"取引先","wid":7,"archived":false},{"id":1,"name":"Other","wid":7,"archived":true}]`))
 	}))
 	defer s.Close()
-	got, err := (HTTPClient{Endpoint: s.URL}).Clients(context.Background(), config.Config{Workspace: "a/b", Token: "test-token"})
+	got, err := (HTTPClient{Endpoint: s.URL, Workspace: "a/b", Token: "test-token"}).Clients(context.Background())
 	want := []model.Client{{ID: 2, Name: "取引先"}, {ID: 1, Name: "Other"}}
 	if err != nil || !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v, %v; want %+v", got, err, want)
@@ -50,7 +49,7 @@ func TestClientsEmptyAndErrors(t *testing.T) {
 				w.Write([]byte(tt.body))
 			}))
 			defer s.Close()
-			got, err := (HTTPClient{Endpoint: s.URL}).Clients(context.Background(), config.Config{Workspace: "1"})
+			got, err := (HTTPClient{Endpoint: s.URL, Workspace: "1"}).Clients(context.Background())
 			if tt.wantError != "" {
 				if err == nil || !strings.Contains(err.Error(), tt.wantError) {
 					t.Fatalf("expected %q, got %v", tt.wantError, err)

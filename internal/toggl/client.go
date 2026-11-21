@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/mukopikmin/toggl-cli/internal/config"
 	"github.com/mukopikmin/toggl-cli/internal/model"
 	"net/http"
 	"net/url"
@@ -14,25 +13,20 @@ import (
 
 const Endpoint = "https://api.track.toggl.com/api/v9"
 
-type Client interface {
-	Clients(context.Context, config.Config) ([]model.Client, error)
-	Projects(context.Context, config.Config) ([]model.Project, error)
-	// TimeEntries requests a half-open interval of absolute times.
-	TimeEntries(context.Context, config.Config, time.Time, time.Time) ([]model.TimeEntry, error)
-}
 type HTTPClient struct {
-	Client   *http.Client
-	Endpoint string
+	Client           *http.Client
+	Endpoint         string
+	Workspace, Token string
 }
 
-func (c HTTPClient) do(ctx context.Context, cfg config.Config, operation, path string, out any) error {
+func (c HTTPClient) do(ctx context.Context, operation, path string, out any) error {
 	ep := c.Endpoint
 	if ep == "" {
 		ep = Endpoint
 	}
 	req, _ := http.NewRequestWithContext(ctx, "GET", ep+path, nil)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(cfg.Token+":api_token")))
+	req.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(c.Token+":api_token")))
 	res, err := c.http().Do(req)
 	if err != nil {
 		return err
@@ -49,12 +43,12 @@ func (c HTTPClient) http() *http.Client {
 	}
 	return http.DefaultClient
 }
-func (c HTTPClient) Clients(ctx context.Context, cfg config.Config) ([]model.Client, error) {
+func (c HTTPClient) Clients(ctx context.Context) ([]model.Client, error) {
 	var dto []struct {
 		ID   int64  `json:"id"`
 		Name string `json:"name"`
 	}
-	if err := c.do(ctx, cfg, "fetch clients", "/workspaces/"+url.PathEscape(cfg.Workspace)+"/clients", &dto); err != nil {
+	if err := c.do(ctx, "fetch clients", "/workspaces/"+url.PathEscape(c.Workspace)+"/clients", &dto); err != nil {
 		return nil, err
 	}
 	out := make([]model.Client, len(dto))
@@ -64,7 +58,7 @@ func (c HTTPClient) Clients(ctx context.Context, cfg config.Config) ([]model.Cli
 	return out, nil
 }
 
-func (c HTTPClient) Projects(ctx context.Context, cfg config.Config) ([]model.Project, error) {
+func (c HTTPClient) Projects(ctx context.Context) ([]model.Project, error) {
 	var dto []struct {
 		ID            int64  `json:"id"`
 		Name          string `json:"name"`
@@ -72,7 +66,7 @@ func (c HTTPClient) Projects(ctx context.Context, cfg config.Config) ([]model.Pr
 		Active        *bool  `json:"active"`
 		ProjectActive *bool  `json:"project_active"`
 	}
-	if err := c.do(ctx, cfg, "fetch projects", "/workspaces/"+url.PathEscape(cfg.Workspace)+"/projects", &dto); err != nil {
+	if err := c.do(ctx, "fetch projects", "/workspaces/"+url.PathEscape(c.Workspace)+"/projects", &dto); err != nil {
 		return nil, err
 	}
 	var out []model.Project
@@ -88,19 +82,11 @@ func (c HTTPClient) Projects(ctx context.Context, cfg config.Config) ([]model.Pr
 		if name == "" {
 			name = d.ProjectName
 		}
-		p := model.Project{ID: d.ID, Name: name, DisplayName: name, Active: true}
-		if s, ok := cfg.Projects[d.ID]; ok {
-			if s.DisplayName != "" {
-				p.DisplayName = s.DisplayName
-			}
-			p.Hidden = s.Hidden
-			p.DisplayOrder = s.DisplayOrder
-		}
-		out = append(out, p)
+		out = append(out, model.Project{ID: d.ID, Name: name, Active: true})
 	}
 	return out, nil
 }
-func (c HTTPClient) TimeEntries(ctx context.Context, cfg config.Config, from, end time.Time) ([]model.TimeEntry, error) {
+func (c HTTPClient) TimeEntries(ctx context.Context, from, end time.Time) ([]model.TimeEntry, error) {
 	q := url.Values{"start_date": {from.UTC().Format(time.RFC3339Nano)}, "end_date": {end.UTC().Format(time.RFC3339Nano)}, "meta": {"true"}}
 	var dto []struct {
 		ID          int64   `json:"id"`
@@ -111,7 +97,7 @@ func (c HTTPClient) TimeEntries(ctx context.Context, cfg config.Config, from, en
 		Duration    int64   `json:"duration"`
 		Description string  `json:"description"`
 	}
-	if err := c.do(ctx, cfg, "fetch time entries", "/me/time_entries?"+q.Encode(), &dto); err != nil {
+	if err := c.do(ctx, "fetch time entries", "/me/time_entries?"+q.Encode(), &dto); err != nil {
 		return nil, err
 	}
 	out := make([]model.TimeEntry, len(dto))

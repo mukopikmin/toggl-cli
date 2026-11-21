@@ -20,7 +20,7 @@ func TestTemplateLifecycleWithoutConfigurationOrAPI(t *testing.T) {
 	t.Setenv("HOME", home)
 	client := &fakeClient{err: errors.New("must not call API")}
 	var out bytes.Buffer
-	app := App{Client: client, Out: &out}
+	app := App{NewClient: useClient(client), Out: &out}
 	run := func(args ...string) string {
 		t.Helper()
 		out.Reset()
@@ -145,12 +145,12 @@ func TestSummaryTemplateMatchesDirectExecution(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			projectID := int64(1)
 			fake := &fakeClient{
-				projects: []model.Project{{ID: projectID, DisplayName: "Client A", Active: true}},
+				projects: []model.Project{{ID: projectID, Name: "Client A", Active: true}},
 				entries:  []model.TimeEntry{{ID: 1, ProjectID: &projectID, Start: time.Date(2026, 5, 2, 1, 0, 0, 0, time.UTC), DurationSeconds: 5400}},
 			}
 			app, out := configuredApp(t, fake, "")
 			client := &dateRangeClient{fakeClient: fake}
-			app.Client = client
+			app.NewClient = useClient(client)
 			configBefore, _ := os.ReadFile(config.Path(os.Getenv("HOME")))
 			if err := app.Run(context.Background(), append([]string{"template", "add", "test"}, tt.settings...)); err != nil {
 				t.Fatal(err)
@@ -181,7 +181,7 @@ func TestSummaryTemplateMatchesDirectExecution(t *testing.T) {
 func TestLegacyTemplateSeparatorDoesNotOverrideFormat(t *testing.T) {
 	projectID := int64(1)
 	fake := &fakeClient{
-		projects: []model.Project{{ID: projectID, DisplayName: "Project A"}},
+		projects: []model.Project{{ID: projectID, Name: "Project A"}},
 		entries:  []model.TimeEntry{{ProjectID: &projectID, Start: time.Date(2026, 5, 2, 1, 0, 0, 0, time.UTC), DurationSeconds: 90}},
 	}
 	app, out := configuredApp(t, fake, "")
@@ -256,7 +256,7 @@ func TestSummaryTemplateResolvesDaysAtExecution(t *testing.T) {
 	fake := &fakeClient{}
 	app, out := configuredApp(t, fake, "")
 	client := &dateRangeClient{fakeClient: fake}
-	app.Client = client
+	app.NewClient = useClient(client)
 	p := config.Path(os.Getenv("HOME"))
 	if err := os.WriteFile(p, []byte("workspace='1'\ntoken='test'\ntimezone='Asia/Tokyo'\n"), 0600); err != nil {
 		t.Fatal(err)
