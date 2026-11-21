@@ -67,6 +67,7 @@ Options:
 
 type App struct {
 	NewClient func(workspace, token string) TogglClient
+	Updater   Updater
 	Out, Err  io.Writer
 	In        io.Reader
 	Now       func() time.Time
@@ -128,7 +129,7 @@ func (a App) Run(ctx context.Context, args []string) error {
 	case "time-entry":
 		return a.timeEntry(ctx, args[1:])
 	case "update":
-		return a.update(args[1:])
+		return a.update(ctx, args[1:])
 	default:
 		return usagef("unknown command: %s", args[0])
 	}

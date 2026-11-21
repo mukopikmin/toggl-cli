@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/mukopikmin/toggl-cli/internal/command"
 	"github.com/mukopikmin/toggl-cli/internal/config"
+	"github.com/mukopikmin/toggl-cli/internal/selfupdate"
 	"github.com/mukopikmin/toggl-cli/internal/toggl"
 	"io"
 	"os"
@@ -19,6 +20,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		NewClient: func(workspace, token string) command.TogglClient {
 			return toggl.HTTPClient{Workspace: workspace, Token: token}
 		},
+		Updater: selfupdate.Service{},
 		Version: version, Out: stdout, Err: stderr,
 	}
 	if err := app.Run(context.Background(), args); err != nil {
