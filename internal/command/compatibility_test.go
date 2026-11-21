@@ -76,18 +76,21 @@ func TestTimeEntryCalendarDays(t *testing.T) {
 		start, end         string
 		wantStart, wantEnd string
 		fail               bool
+		zone               string
 	}{
-		{"month start", time.Date(2026, 5, 1, 0, 0, 0, 0, tokyo), "1", "1", "2026-05-01", "2026-05-01", false},
-		{"month end", time.Date(2026, 5, 31, 23, 0, 0, 0, west), "1", "31", "2026-05-01", "2026-05-31", false},
-		{"leap month end", time.Date(2024, 2, 1, 0, 0, 0, 0, tokyo), "28", "29", "2024-02-28", "2024-02-29", false},
-		{"nonleap month end", time.Date(2026, 2, 28, 23, 0, 0, 0, west), "1", "28", "2026-02-01", "2026-02-28", false},
-		{"nonleap overflow", time.Date(2026, 2, 1, 0, 0, 0, 0, tokyo), "29", "29", "", "", true},
-		{"zero", time.Date(2026, 5, 1, 0, 0, 0, 0, tokyo), "0", "1", "", "", true},
-		{"next month", time.Date(2026, 5, 1, 0, 0, 0, 0, tokyo), "31", "32", "", "", true},
-		{"same month next year", time.Date(2026, 5, 1, 0, 0, 0, 0, tokyo), "366", "366", "", "", true},
-		{"signed day", time.Date(2026, 5, 1, 0, 0, 0, 0, tokyo), "+1", "2", "", "", true},
-		{"huge day", time.Date(2026, 5, 1, 0, 0, 0, 0, tokyo), "99999999999999999999", "2", "", "", true},
-		{"reversed", time.Date(2026, 5, 1, 0, 0, 0, 0, tokyo), "2", "1", "", "", true},
+		{"month start", time.Date(2026, 5, 1, 12, 0, 0, 0, tokyo), "1", "1", "2026-05-01", "2026-05-01", false, "UTC"},
+		{"month end", time.Date(2026, 5, 31, 12, 0, 0, 0, west), "1", "31", "2026-05-01", "2026-05-31", false, "UTC"},
+		{"leap month end", time.Date(2024, 2, 1, 12, 0, 0, 0, tokyo), "28", "29", "2024-02-28", "2024-02-29", false, "UTC"},
+		{"nonleap month end", time.Date(2026, 2, 28, 12, 0, 0, 0, west), "1", "28", "2026-02-01", "2026-02-28", false, "UTC"},
+		{"nonleap overflow", time.Date(2026, 2, 1, 12, 0, 0, 0, tokyo), "29", "29", "", "", true, "UTC"},
+		{"zero", time.Date(2026, 5, 1, 12, 0, 0, 0, tokyo), "0", "1", "", "", true, "UTC"},
+		{"next month", time.Date(2026, 5, 1, 12, 0, 0, 0, tokyo), "31", "32", "", "", true, "UTC"},
+		{"same month next year", time.Date(2026, 5, 1, 12, 0, 0, 0, tokyo), "366", "366", "", "", true, "UTC"},
+		{"signed day", time.Date(2026, 5, 1, 12, 0, 0, 0, tokyo), "+1", "2", "", "", true, "UTC"},
+		{"huge day", time.Date(2026, 5, 1, 12, 0, 0, 0, tokyo), "99999999999999999999", "2", "", "", true, "UTC"},
+		{"reversed", time.Date(2026, 5, 1, 12, 0, 0, 0, tokyo), "2", "1", "", "", true, "UTC"},
+		{"Tokyo already in May", time.Date(2026, 4, 30, 16, 0, 0, 0, time.UTC), "1", "1", "2026-05-01", "2026-05-01", false, "Asia/Tokyo"},
+		{"New York still in March", time.Date(2026, 4, 1, 2, 0, 0, 0, time.UTC), "8", "8", "2026-03-08", "2026-03-08", false, "America/New_York"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -95,8 +98,19 @@ func TestTimeEntryCalendarDays(t *testing.T) {
 			client := &dateRangeClient{fakeClient: fake}
 			app, _ := configuredApp(t, fake, "")
 			app.Client = client
+			loc, err := time.LoadLocation(tt.zone)
+			if err != nil {
+				t.Fatal(err)
+			}
+			text, err := config.EncodeInitial("1", "test-token", tt.zone)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(config.Path(os.Getenv("HOME")), []byte(text), 0600); err != nil {
+				t.Fatal(err)
+			}
 			app.Now = func() time.Time { return tt.now }
-			err := app.Run(context.Background(), []string{"time-entry", "list", tt.start, tt.end})
+			err = app.Run(context.Background(), []string{"time-entry", "list", tt.start, tt.end})
 			if tt.fail {
 				var usageError UsageError
 				if !errors.As(err, &usageError) || fake.entryCalls != 0 {
@@ -104,7 +118,9 @@ func TestTimeEntryCalendarDays(t *testing.T) {
 				}
 				return
 			}
-			if err != nil || client.from.Format(time.DateOnly) != tt.wantStart || client.to.Format(time.DateOnly) != tt.wantEnd {
+			wantStart, _ := time.ParseInLocation(time.DateOnly, tt.wantStart, loc)
+			wantEnd, _ := time.ParseInLocation(time.DateOnly, tt.wantEnd, loc)
+			if err != nil || !client.from.Equal(wantStart) || !client.to.Equal(wantEnd.AddDate(0, 0, 1)) {
 				t.Fatalf("from=%s to=%s error=%v", client.from, client.to, err)
 			}
 		})
