@@ -136,17 +136,17 @@ quotes, or line breaks are quoted, and embedded quotes are doubled.
 
 | Command | Options / arguments | Output |
 | --- | --- | --- |
-| `summary` | `<start-date> <end-date>`, `--days N`, or `--template NAME`; `-f/--format`, `--no-project`/`--project`, `--no-date`/`--date`, `--daily-total`, `--clipboard`/`--no-clipboard` | TSV by default; CSV, JSON summary, or bordered table |
+| `summary` | `<start-date> <end-date>`, `--days N`, or `--template NAME`; `-f/--format`, `--watch`, `--no-project`/`--project`, `--no-date`/`--date`, `--daily-total`, `--clipboard`/`--no-clipboard` | TSV by default; CSV, JSON summary, or bordered table |
 | `template add` | `<name> [<start-date> <end-date> or --days N]`; summary output options, `--force` | Stores a summary template without running it |
 | `template list` | none | Template names in alphabetical order |
 | `template show` | `<name>` | Template settings as TOML |
 | `template delete` | `<name>` | Deletes the named template |
-| `time-entry list` | `<start-day> <end-day>`; `-f/--format` | Entries as TSV by default, CSV, JSON, or table |
-| `project list` | `-f/--format` | Visible ordered project names as TSV or CSV, JSON, or table |
-| `client list` | `-f/--format` | Client IDs and names as TSV by default, CSV or JSON; names as a table |
+| `time-entry list` | `<start-day> <end-day>`; `-f/--format`, `--watch` | Entries as TSV by default, CSV, JSON, or table |
+| `project list` | `-f/--format`, `--watch` | Visible ordered project names as TSV or CSV, JSON, or table |
+| `client list` | `-f/--format`, `--watch` | Client IDs and names as TSV by default, CSV or JSON; names as a table |
 | `project sync` | none | Adds missing active projects to the TOML file |
 | `project reorder` | none | Interactively changes and saves visible-project order |
-| `config` | `-f/--format` | Non-sensitive settings as two-column TSV or CSV with a `Setting`/`Value` header, JSON, or table |
+| `config` | `-f/--format`, `--watch` | Non-sensitive settings as two-column TSV or CSV with a `Setting`/`Value` header, JSON, or table |
 | `init` | none | Creates a mode-`0600` configuration interactively |
 | `update` | `--channel stable\|nightly` | Checks, verifies, and installs a release update |
 | `completion` | `bash\|zsh\|fish` | Prints a shell completion script without loading configuration |
@@ -174,8 +174,21 @@ In a `summary` covering a single year, shorter date headings use `MM-DD`.
 When space is tighter, the headings can show just the day of the month, such as
 `9` or `10`. For a range spanning multiple months, the first displayed date of
 each month includes the month and, if the range spans multiple years, the year.
-Data cells keep their full text, so a table can still exceed the terminal width.
-Piped and redirected output uses the full headings.
+If shorter headings still leave the table too wide, `summary` and
+`project list` shorten project names with `…`. Other data cells keep their full
+contents, so the table can still exceed the terminal width. Piped and
+redirected output uses the full headings and project names.
+
+Use `--watch` with table format in a terminal to redraw the table after a
+resize. It reads the data once and displays the portion that fits on screen.
+Press Ctrl+C to leave the live view and print the entire table with full project
+names. For `summary`, `--clipboard` also preserves full project names.
+Pass `--watch` when running a summary, including when the table format comes
+from a saved template.
+
+```sh
+toggl summary --days 7 --format table --watch
+```
 
 `toggl client list` fetches clients from the configured workspace in API order.
 The default output is TSV with `id` and `name` headers. CSV uses commas and TSV

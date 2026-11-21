@@ -82,7 +82,7 @@ func completionCandidates(words []string) []string {
 		return nil
 	}
 
-	options := "-f --format"
+	options := "-f --format --watch"
 	if command == "summary" {
 		options += " -d --days --no-project --no-date --clipboard"
 	}

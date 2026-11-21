@@ -18,6 +18,7 @@ type opts struct {
 	clipboardSet                 bool
 	template                     string
 	templateSet, force           bool
+	watch                        bool
 	pos                          []string
 }
 
@@ -97,7 +98,7 @@ func parseOpts(args []string, allowed map[string]bool) (opts, error) {
 				return o, usagef("Option '%s' does not take an argument", key)
 			}
 			o.dailyTotal = true
-		case "--no-project", "--project", "--no-date", "--date", "--clipboard", "--no-clipboard", "--force":
+		case "--no-project", "--project", "--no-date", "--date", "--clipboard", "--no-clipboard", "--force", "--watch":
 			if !allowed[strings.TrimPrefix(key, "--")] {
 				return o, usagef("unknown option: %s", key)
 			}
@@ -113,6 +114,8 @@ func parseOpts(args []string, allowed map[string]bool) (opts, error) {
 				o.clipboard, o.clipboardSet = key == "--clipboard", true
 			case "--force":
 				o.force = true
+			case "--watch":
+				o.watch = true
 			}
 		default:
 			if strings.HasPrefix(arg, "-") {
