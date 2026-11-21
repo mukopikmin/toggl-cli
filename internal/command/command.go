@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -430,6 +431,9 @@ func (a App) summary(ctx context.Context, args []string) error {
 	if e != nil {
 		return e
 	}
+	entries = slices.DeleteFunc(entries, func(entry model.TimeEntry) bool {
+		return entry.ProjectID != nil && d.Config.Projects[*entry.ProjectID].Hidden
+	})
 	sum, e := model.Summarize(entries, loc, now)
 	if e != nil {
 		return e

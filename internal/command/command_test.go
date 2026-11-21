@@ -271,3 +271,18 @@ func TestClipboardCommandParityAndFallback(t *testing.T) {
 		t.Fatalf("%v", attempts)
 	}
 }
+
+func TestJSONSummaryOmitsHiddenProjects(t *testing.T) {
+	hidden, visible := int64(42), int64(17)
+	client := &fakeClient{entries: []model.TimeEntry{{ProjectID: &hidden, Start: "2026-05-01T00:00:00Z", DurationSeconds: 60}, {ProjectID: &visible, Start: "2026-05-01T00:00:00Z", DurationSeconds: 60}}}
+	app, out := configuredApp(t, client, "")
+	if err := os.WriteFile(config.Path(os.Getenv("HOME")), []byte("workspace='1'\ntoken='secret'\n[projects.42]\nhidden=true\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.Run(context.Background(), []string{"summary", "--days", "2", "-fjson"}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), "42") || !strings.Contains(out.String(), "17") {
+		t.Fatal(out.String())
+	}
+}
