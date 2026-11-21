@@ -417,86 +417,14 @@ func (a App) summary(ctx context.Context, args []string) error {
 		return e
 	}
 	sum := model.Summarize(entries, loc, now)
-	return a.writeSummary(ctx, d.Config, settings, from, to, sum, o.watch, o.dailyTotal)
-}
-
-func (a App) writeSummary(ctx context.Context, cfg config.Config, settings model.SummaryOptions, from, to time.Time, sum model.Summary, watch, dailyTotal bool) error {
-	var text string
-	if settings.Format == "json" {
-		b, _ := json.MarshalIndent(sum, "", "  ")
-		text = string(b)
-	} else {
-		ps, e := a.Client.Projects(ctx, cfg)
+	var projects []model.Project
+	if settings.Format != "json" {
+		projects, e = a.Client.Projects(ctx, d.Config)
 		if e != nil {
 			return e
 		}
-		ps = model.VisibleSorted(ps)
-		days := model.DateRange(from, to)
-		rows := [][]string{}
-		for _, p := range ps {
-			r := []string{p.DisplayName}
-			for _, day := range days {
-				v := sum[day][p.ID]
-				if v == 0 {
-					r = append(r, "")
-				} else {
-					r = append(r, strconv.FormatFloat(float64(int(v*100+0.5))/100, 'f', -1, 64))
-				}
-			}
-			rows = append(rows, r)
-		}
-		if dailyTotal {
-			totals := model.DailyTotals(sum, ps, days)
-			r := []string{"Total"}
-			for _, day := range days {
-				v := totals[day]
-				r = append(r, strconv.FormatFloat(float64(int(v*100+0.5))/100, 'f', -1, 64))
-			}
-			rows = append(rows, r)
-		}
-		headers := append([]string{"Project"}, days...)
-		if settings.Format == "table" {
-			options := tableOutputOptions{watch: watch, clipboard: settings.Clipboard, truncateProjects: true}
-			return a.writeTable(ctx, options, headers, rows, summaryHeaderVariants(days, from, to)...)
-		}
-		if settings.NoProject {
-			headers = days
-			for i := range rows {
-				rows[i] = rows[i][1:]
-			}
-		}
-		if settings.NoDate {
-			headers = nil
-		}
-		text = delimited(headers, rows, settings.Format)
 	}
-	fmt.Fprintln(a.Out, text)
-	if settings.Clipboard {
-		return clipboard(text)
-	}
-	return nil
-}
-
-func summaryHeaderVariants(days []string, from, to time.Time) [][]string {
-	compact := append([]string{"Proj."}, days...)
-	minimal := append([]string{"Proj."}, days...)
-	sameYear := from.Year() == to.Year()
-	sameMonth := sameYear && from.Month() == to.Month()
-	var previousMonth string
-	for i, day := range days {
-		if sameYear {
-			compact[i+1] = day[len(day)-len("01-02"):]
-		}
-		month := day[:len(day)-len("-02")]
-		// Keep the first date of each month identifiable in a multi-month table.
-		if sameMonth || month == previousMonth {
-			minimal[i+1] = strings.TrimPrefix(day[len(day)-len("02"):], "0")
-		} else {
-			minimal[i+1] = compact[i+1]
-		}
-		previousMonth = month
-	}
-	return [][]string{compact, minimal}
+	return a.writeSummary(ctx, settings, from, to, sum, projects, o.watch, o.dailyTotal)
 }
 
 func (a App) timeEntry(ctx context.Context, args []string) error {
