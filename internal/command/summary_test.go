@@ -18,12 +18,12 @@ func TestSummaryDailyTotalFormats(t *testing.T) {
 	client := &fakeClient{
 		projects: []model.Project{{ID: one, DisplayName: "A"}, {ID: hidden, DisplayName: "Hidden", Hidden: true}, {ID: two, DisplayName: "B"}},
 		entries: []model.TimeEntry{
-			{ProjectID: &one, Start: "2026-05-01T00:00:00Z", DurationSeconds: 1},
-			{ProjectID: &two, Start: "2026-05-01T01:00:00Z", DurationSeconds: 1},
-			{ProjectID: &hidden, Start: "2026-05-01T02:00:00Z", DurationSeconds: 3600},
-			{ProjectID: &absent, Start: "2026-05-01T03:00:00Z", DurationSeconds: 3600},
-			{Start: "2026-05-01T04:00:00Z", DurationSeconds: 3600},
-			{ProjectID: &one, Start: "2026-05-02T11:59:30Z", DurationSeconds: -time.Date(2026, 5, 2, 11, 59, 30, 0, time.UTC).Unix()},
+			{ProjectID: &one, Start: time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC), DurationSeconds: 1},
+			{ProjectID: &two, Start: time.Date(2026, 5, 1, 1, 0, 0, 0, time.UTC), DurationSeconds: 1},
+			{ProjectID: &hidden, Start: time.Date(2026, 5, 1, 2, 0, 0, 0, time.UTC), DurationSeconds: 3600},
+			{ProjectID: &absent, Start: time.Date(2026, 5, 1, 3, 0, 0, 0, time.UTC), DurationSeconds: 3600},
+			{Start: time.Date(2026, 5, 1, 4, 0, 0, 0, time.UTC), DurationSeconds: 3600},
+			{ProjectID: &one, Start: time.Date(2026, 5, 2, 11, 59, 30, 0, time.UTC), Running: true},
 		},
 	}
 	tests := []struct {
@@ -82,9 +82,11 @@ func TestSummaryDailyTotalMonthBoundaries(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.zone, func(t *testing.T) {
+			start, _ := time.Parse(time.RFC3339, tt.start)
+			end, _ := time.Parse(time.RFC3339, tt.end)
 			client := &fakeClient{projects: []model.Project{{ID: pid, DisplayName: "A"}}, entries: []model.TimeEntry{
-				{ProjectID: &pid, Start: tt.start, DurationSeconds: 60},
-				{ProjectID: &pid, Start: tt.end, DurationSeconds: 120},
+				{ProjectID: &pid, Start: start, DurationSeconds: 60},
+				{ProjectID: &pid, Start: end, DurationSeconds: 120},
 			}}
 			app, out := configuredApp(t, client, "")
 			text := "workspace=\"1\"\ntoken=\"secret\"\ntimezone=\"" + tt.zone + "\"\n"

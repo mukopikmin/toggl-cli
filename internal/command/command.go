@@ -416,10 +416,7 @@ func (a App) summary(ctx context.Context, args []string) error {
 	if e != nil {
 		return e
 	}
-	sum, e := model.Summarize(entries, loc, now)
-	if e != nil {
-		return e
-	}
+	sum := model.Summarize(entries, loc, now)
 	return a.writeSummary(ctx, d.Config, settings, from, to, sum, o.watch, o.dailyTotal)
 }
 
@@ -554,26 +551,28 @@ func (a App) timeEntry(ctx context.Context, args []string) error {
 		return e
 	}
 	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].Start < entries[j].Start || entries[i].Start == entries[j].Start && entries[i].ID < entries[j].ID
+		if order := entries[i].Start.Compare(entries[j].Start); order != 0 {
+			return order < 0
+		}
+		return entries[i].ID < entries[j].ID
 	})
 	rows := [][]string{}
 	objects := []outputTimeEntry{}
 	for _, x := range entries {
-		seconds := x.DurationSeconds
-		if seconds < 0 {
-			seconds = a.Now().Unix() + seconds
-		}
-		minutes := float64(int(float64(seconds)/60*100+0.5)) / 100
+		minutes := float64(int(float64(x.ElapsedSeconds(now))/60*100+0.5)) / 100
+		start := x.Start.Format(time.RFC3339Nano)
 		pid := ""
 		if x.ProjectID != nil {
 			pid = strconv.FormatInt(*x.ProjectID, 10)
 		}
 		stop := ""
+		var stopJSON *string
 		if x.Stop != nil {
-			stop = *x.Stop
+			stop = x.Stop.Format(time.RFC3339Nano)
+			stopJSON = &stop
 		}
-		rows = append(rows, []string{strconv.FormatInt(x.ID, 10), x.Description, pid, x.Start, stop, strconv.FormatFloat(minutes, 'f', -1, 64)})
-		objects = append(objects, outputTimeEntry{ID: x.ID, Description: x.Description, ProjectID: x.ProjectID, Start: x.Start, Stop: x.Stop, DurationMinutes: minutes})
+		rows = append(rows, []string{strconv.FormatInt(x.ID, 10), x.Description, pid, start, stop, strconv.FormatFloat(minutes, 'f', -1, 64)})
+		objects = append(objects, outputTimeEntry{ID: x.ID, Description: x.Description, ProjectID: x.ProjectID, Start: start, Stop: stopJSON, DurationMinutes: minutes})
 	}
 	headers := []string{"id", "description", "project_id", "start", "stop", "duration_minutes"}
 	if o.format == "json" {

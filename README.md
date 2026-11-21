@@ -156,6 +156,7 @@ quotes, or line breaks are quoted, and embedded quotes are doubled.
 | `--help`, `-h` | none | Help text |
 | `--version` | none | Build version |
 
+Time entry timestamps are rendered as RFC 3339 and sorted by start instant.
 Date ranges are inclusive. Invalid usage, configuration, API, clipboard, and
 I/O errors exit with status 1; successful commands exit with status 0.
 

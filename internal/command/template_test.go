@@ -146,7 +146,7 @@ func TestSummaryTemplateMatchesDirectExecution(t *testing.T) {
 			projectID := int64(1)
 			fake := &fakeClient{
 				projects: []model.Project{{ID: projectID, DisplayName: "Client A", Active: true}},
-				entries:  []model.TimeEntry{{ID: 1, ProjectID: &projectID, Start: "2026-05-02T01:00:00Z", DurationSeconds: 5400}},
+				entries:  []model.TimeEntry{{ID: 1, ProjectID: &projectID, Start: time.Date(2026, 5, 2, 1, 0, 0, 0, time.UTC), DurationSeconds: 5400}},
 			}
 			app, out := configuredApp(t, fake, "")
 			client := &dateRangeClient{fakeClient: fake}
@@ -182,7 +182,7 @@ func TestLegacyTemplateSeparatorDoesNotOverrideFormat(t *testing.T) {
 	projectID := int64(1)
 	fake := &fakeClient{
 		projects: []model.Project{{ID: projectID, DisplayName: "Project A"}},
-		entries:  []model.TimeEntry{{ProjectID: &projectID, Start: "2026-05-02T01:00:00Z", DurationSeconds: 90}},
+		entries:  []model.TimeEntry{{ProjectID: &projectID, Start: time.Date(2026, 5, 2, 1, 0, 0, 0, time.UTC), DurationSeconds: 90}},
 	}
 	app, out := configuredApp(t, fake, "")
 	path := filepath.Join(os.Getenv("HOME"), ".config", "toggl-cli", "templates.toml")
