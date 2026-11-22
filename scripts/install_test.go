@@ -82,7 +82,7 @@ func TestInstallerCompletions(t *testing.T) {
 				checksum = strings.Repeat("0", 64)
 			}
 			write(archive+".sha256", checksum+"\n", 0600)
-			write(filepath.Join(mockBin, "gh"), "#!/bin/sh\ncase $1 in api) echo 0123456789012345678901234567890123456789;; attestation) test $2 = verify;; *) exit 1;; esac\n", 0700)
+			write(filepath.Join(mockBin, "cosign"), "#!/bin/sh\ntest \"$1\" = verify-blob-attestation\n", 0700)
 			write(filepath.Join(mockBin, "uname"), "#!/bin/sh\ncase $1 in -s) echo Linux;; -m) echo x86_64;; esac\n", 0700)
 			write(filepath.Join(mockBin, "zsh"), "#!/bin/sh\nprintf '%s\\n' \"$TEST_ZSH_FPATH\"\n", 0700)
 			write(filepath.Join(mockBin, "curl"), `#!/bin/sh
@@ -94,6 +94,7 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 case "$url" in
+  */commits/nightly) echo 0123456789012345678901234567890123456789;;
   *.sha256) cp "$TEST_ARCHIVE.sha256" "$output";;
   *) cp "$TEST_ARCHIVE" "$output";;
 esac

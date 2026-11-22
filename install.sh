@@ -43,16 +43,20 @@ fi
 
 [ -n "${HOME:-}" ] || fail "HOME is not set"
 
-for command in curl tar mktemp gh; do
+for command in curl tar mktemp; do
   command -v "$command" >/dev/null 2>&1 || fail "required command not found: $command"
 done
 
 case "$(uname -s):$(uname -m)" in
   Darwin:arm64 | Darwin:aarch64)
     target="darwin-arm64"
+    verifier_asset="cosign-darwin-arm64"
+    verifier_sha="5fadd012ae6381a6a29ff86a7d39aa873878852f1073fc90b15995961ecfb084"
     ;;
   Linux:x86_64 | Linux:amd64)
     target="linux-x64"
+    verifier_asset="cosign-linux-amd64"
+    verifier_sha="c956e5dfcac53d52bcf058360d579472f0c1d2d9b69f55209e256fe7783f4c74"
     ;;
   *)
     fail "unsupported platform: $(uname -s) $(uname -m)"
@@ -97,14 +101,14 @@ case "$expected_checksum" in
 esac
 [ "${#expected_checksum}" -eq 64 ] || fail "invalid SHA-256 checksum"
 
-if command -v sha256sum >/dev/null 2>&1; then
-  actual_checksum="$(sha256sum "$archive_path" | awk '{print $1}')"
-elif command -v shasum >/dev/null 2>&1; then
-  actual_checksum="$(shasum -a 256 "$archive_path" | awk '{print $1}')"
-else
-  fail "required command not found: sha256sum or shasum"
-fi
-
+sha256_file() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | awk '{print $1}'
+  else
+    shasum -a 256 "$1" | awk '{print $1}'
+  fi
+}
+actual_checksum="$(sha256_file "$archive_path")"
 [ "$actual_checksum" = "$expected_checksum" ] || fail "SHA-256 checksum mismatch"
 
 repo=mukopikmin/toggl-cli
@@ -114,11 +118,24 @@ if [ "$tag" = nightly ]; then
   workflow=nightly
   source_ref=refs/heads/main
 fi
-commit="$(gh api "repos/$repo/commits/$tag" --jq .sha)" || fail "could not resolve release commit"
+commit="$(curl -fsSL -H 'Accept: application/vnd.github.sha' "https://api.github.com/repos/$repo/commits/$tag")" || fail "could not resolve release commit"
+case "$commit" in *[!0-9a-f]*) fail "invalid release commit";; esac
 [ "${#commit}" -eq 40 ] || fail "invalid release commit"
-gh attestation verify "$archive_path" --repo "$repo" \
-  --signer-workflow "$repo/.github/workflows/$workflow.yml" \
-  --source-ref "$source_ref" --source-digest "$commit" || fail "release provenance verification failed"
+bundle="$temporary_dir/provenance.json"
+curl -fsSL -o "$bundle" "$download_url/provenance.json" || fail "could not download build provenance"
+
+if command -v cosign >/dev/null 2>&1; then
+  verifier=cosign
+else
+  verifier="$temporary_dir/cosign"
+  curl -fsSL -o "$verifier" "https://github.com/sigstore/cosign/releases/download/v3.0.6/$verifier_asset" || fail "could not download verifier"
+  [ "$(sha256_file "$verifier")" = "$verifier_sha" ] || fail "verifier checksum mismatch"
+  chmod 700 "$verifier"
+fi
+"$verifier" verify-blob-attestation --bundle "$bundle" --type slsaprovenance1 \
+  --certificate-identity "$repository/.github/workflows/$workflow.yml@$source_ref" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-github-workflow-sha "$commit" "$archive_path" || fail "release provenance verification failed"
 
 tar -xzf "$archive_path" -C "$temporary_dir" || fail "could not extract $archive"
 binary_path="$temporary_dir/${archive_root}/toggl"

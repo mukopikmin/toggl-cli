@@ -9,7 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
+
 	"runtime"
 	"strings"
 )
@@ -40,7 +40,10 @@ type updateInstallRuntime struct {
 
 func installUpdate(ctx context.Context, p updatePlan, client *http.Client, out, errOut io.Writer) error {
 	return installUpdateWithRuntime(ctx, p, client, updateInstallRuntime{
-		goos: runtime.GOOS, verifyOrigin: verifyReleaseOrigin,
+		goos: runtime.GOOS,
+		verifyOrigin: func(ctx context.Context, plan updatePlan, archive []byte) error {
+			return verifyReleaseOrigin(ctx, client, plan, archive)
+		},
 		completionOut: out,
 		completionErr: errOut,
 		binaryVersion: func(path string) (string, error) {
@@ -56,37 +59,6 @@ func installUpdate(ctx context.Context, p updatePlan, client *http.Client, out, 
 			return nil
 		},
 	})
-}
-
-func verifyReleaseOrigin(ctx context.Context, plan updatePlan, archive []byte) error {
-	const repo = "mukopikmin/toggl-cli"
-	tag, workflow := "v"+plan.TargetVersion, "release"
-	ref := "refs/tags/" + tag
-	if plan.Channel == "nightly" {
-		tag, workflow, ref = "nightly", "nightly", "refs/heads/main"
-	}
-	output, err := exec.CommandContext(ctx, "gh", "api", "repos/"+repo+"/commits/"+tag, "--jq", ".sha").Output()
-	if err != nil {
-		return fmt.Errorf("resolve release commit using gh: %w", err)
-	}
-	sha := strings.TrimSpace(string(output))
-	if !regexp.MustCompile(`^[0-9a-f]{40}$`).MatchString(sha) {
-		return errors.New("invalid release commit")
-	}
-	dir, err := os.MkdirTemp("", "toggl-provenance-*")
-	if err != nil {
-		return err
-	}
-	defer os.RemoveAll(dir)
-	path := filepath.Join(dir, plan.Archive)
-	if err = os.WriteFile(path, archive, 0600); err != nil {
-		return err
-	}
-	output, err = exec.CommandContext(ctx, "gh", "attestation", "verify", path, "--repo", repo, "--signer-workflow", repo+"/.github/workflows/"+workflow+".yml", "--source-ref", ref, "--source-digest", sha).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("release provenance verification failed: %w: %s", err, output)
-	}
-	return nil
 }
 
 func installUpdateWithRuntime(ctx context.Context, p updatePlan, client *http.Client, platform updateInstallRuntime) error {

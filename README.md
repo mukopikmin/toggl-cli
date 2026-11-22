@@ -14,7 +14,7 @@ under the permissive MIT license. Third-party license texts are recorded in
 
 ## Installation
 
-Installation and self-update require an authenticated GitHub CLI supporting `gh attestation verify --source-digest`. Both verify the archive against the release commit and expected workflow before extraction. Releases without attestations require a source build.
+Installation and self-update verify the public Sigstore provenance bundle for the release commit and workflow. No GitHub account or GitHub CLI is required. They use Cosign v3 on PATH when available, otherwise they temporarily download a SHA-256-pinned Cosign v3.0.6 binary (about 135 MB on Linux x64). This requires network access to GitHub and Sigstore. Releases without a verification bundle require a source build.
 
 Install the latest Linux x64 or macOS arm64 release:
 

@@ -157,6 +157,10 @@ func TestInstallUpdateVerifiesAndReplacesExecutable(t *testing.T) {
 	gz.Close()
 	sum := sha256.Sum256(archive.Bytes())
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/commits/") {
+			w.Write([]byte(`{"sha":"0123456789012345678901234567890123456789"}`))
+			return
+		}
 		if strings.HasSuffix(r.URL.Path, ".sha256") {
 			w.Write([]byte(hex.EncodeToString(sum[:])))
 			return
@@ -164,13 +168,16 @@ func TestInstallUpdateVerifiesAndReplacesExecutable(t *testing.T) {
 		w.Write(archive.Bytes())
 	}))
 	defer server.Close()
+	previousAPI := updateAPI
+	updateAPI = server.URL
+	t.Cleanup(func() { updateAPI = previousAPI })
 	exe := t.TempDir() + "/toggl"
 	if err := os.WriteFile(exe, []byte("old"), 0755); err != nil {
 		t.Fatal(err)
 	}
 	plan := updatePlan{Channel: "stable", CurrentVersion: "1.0.0", TargetVersion: "2.0.0", Target: "linux-x64", Executable: exe, Archive: root + ".tar.gz", DownloadURL: server.URL + "/archive"}
 	mockDir := t.TempDir()
-	verifier := filepath.Join(mockDir, "gh")
+	verifier := filepath.Join(mockDir, "cosign")
 	t.Setenv("PATH", mockDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	if err := os.WriteFile(verifier, []byte("#!/bin/sh\nexit 1\n"), 0700); err != nil {
 		t.Fatal(err)
@@ -178,7 +185,7 @@ func TestInstallUpdateVerifiesAndReplacesExecutable(t *testing.T) {
 	if err := installUpdate(context.Background(), plan, server.Client(), nil, nil); err == nil {
 		t.Fatal("accepted unverifiable archive")
 	}
-	if err := os.WriteFile(verifier, []byte("#!/bin/sh\ncase $1 in api) echo 0123456789012345678901234567890123456789;; attestation) test $2 = verify;; *) exit 1;; esac\n"), 0700); err != nil {
+	if err := os.WriteFile(verifier, []byte("#!/bin/sh\ntest $1 = verify-blob-attestation\n"), 0700); err != nil {
 		t.Fatal(err)
 	}
 	if err := installUpdate(context.Background(), plan, server.Client(), nil, nil); err != nil {
