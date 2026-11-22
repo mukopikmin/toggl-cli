@@ -94,6 +94,7 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 case "$url" in
+  */targets/trusted_root.json) cp ../internal/command/sigstore-root.json "$output";;
   */commits/nightly) echo 0123456789012345678901234567890123456789;;
   *.sha256) cp "$TEST_ARCHIVE.sha256" "$output";;
   *) cp "$TEST_ARCHIVE" "$output";;

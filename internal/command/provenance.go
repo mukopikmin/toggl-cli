@@ -3,6 +3,7 @@ package command
 import (
 	"context"
 	"crypto/sha256"
+	_ "embed"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -14,6 +15,11 @@ import (
 	"path/filepath"
 	"regexp"
 )
+
+// Public Sigstore trust root from sigstore/root-signing at 25b222a48cda4aa88e1af85605bdd193f5619a60.
+//
+//go:embed sigstore-root.json
+var sigstoreRoot []byte
 
 func verifyReleaseOrigin(ctx context.Context, client *http.Client, plan updatePlan, archive []byte) error {
 	tag, workflow := "v"+plan.TargetVersion, "release"
@@ -43,6 +49,9 @@ func verifyReleaseOrigin(ctx context.Context, client *http.Client, plan updatePl
 	if err != nil {
 		return err
 	}
+	if tag == "v0.5.2" {
+		bundleURL = "https://github.com/mukopikmin/toggl-cli/attestations/58847128/download"
+	}
 	bundle, err := download(ctx, client, bundleURL)
 	if err != nil {
 		return fmt.Errorf("download build provenance: %w", err)
@@ -58,8 +67,12 @@ func verifyReleaseOrigin(ctx context.Context, client *http.Client, plan updatePl
 	if err != nil {
 		return err
 	}
+	rootPath := filepath.Join(dir, "trusted_root.json")
+	if err = os.WriteFile(rootPath, sigstoreRoot, 0600); err != nil {
+		return err
+	}
 	identity := "https://github.com/mukopikmin/toggl-cli/.github/workflows/" + workflow + ".yml@" + ref
-	output, err := exec.CommandContext(ctx, verifier, "verify-blob-attestation", "--bundle", bundlePath, "--type", "slsaprovenance1", "--certificate-identity", identity, "--certificate-oidc-issuer", "https://token.actions.githubusercontent.com", "--certificate-github-workflow-sha", commit.SHA, archivePath).CombinedOutput()
+	output, err := exec.CommandContext(ctx, verifier, "verify-blob-attestation", "--trusted-root", rootPath, "--bundle", bundlePath, "--type", "slsaprovenance1", "--certificate-identity", identity, "--certificate-oidc-issuer", "https://token.actions.githubusercontent.com", "--certificate-github-workflow-sha", commit.SHA, archivePath).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("release provenance verification failed: %w: %s", err, output)
 	}

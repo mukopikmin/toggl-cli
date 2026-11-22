@@ -122,7 +122,16 @@ commit="$(curl -fsSL -H 'Accept: application/vnd.github.sha' "https://api.github
 case "$commit" in *[!0-9a-f]*) fail "invalid release commit";; esac
 [ "${#commit}" -eq 40 ] || fail "invalid release commit"
 bundle="$temporary_dir/provenance.json"
-curl -fsSL -o "$bundle" "$download_url/provenance.json" || fail "could not download build provenance"
+bundle_url="$download_url/provenance.json"
+# The last release before bundles became release assets already has a public attestation.
+if [ "$tag" = v0.5.2 ]; then
+  bundle_url="$repository/attestations/58847128/download"
+fi
+curl -fsSL -o "$bundle" "$bundle_url" || fail "could not download build provenance"
+
+trusted_root="$temporary_dir/trusted_root.json"
+curl -fsSL -o "$trusted_root" "https://raw.githubusercontent.com/sigstore/root-signing/25b222a48cda4aa88e1af85605bdd193f5619a60/targets/trusted_root.json" || fail "could not download Sigstore trust root"
+[ "$(sha256_file "$trusted_root")" = "6494e21ea73fa7ee769f85f57d5a3e6a08725eae1e38c755fc3517c9e6bc0b66" ] || fail "invalid Sigstore trust root"
 
 if command -v cosign >/dev/null 2>&1; then
   verifier=cosign
@@ -132,7 +141,7 @@ else
   [ "$(sha256_file "$verifier")" = "$verifier_sha" ] || fail "verifier checksum mismatch"
   chmod 700 "$verifier"
 fi
-"$verifier" verify-blob-attestation --bundle "$bundle" --type slsaprovenance1 \
+"$verifier" verify-blob-attestation --trusted-root "$trusted_root" --bundle "$bundle" --type slsaprovenance1 \
   --certificate-identity "$repository/.github/workflows/$workflow.yml@$source_ref" \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   --certificate-github-workflow-sha "$commit" "$archive_path" || fail "release provenance verification failed"
