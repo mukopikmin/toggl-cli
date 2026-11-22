@@ -220,6 +220,8 @@ CSV and TSV previously returned one headerless column of display names. Use
 `--fields displayName` to select that field and account for the header in
 existing scripts. Explicit field selection also keeps the output shape stable
 when public fields are added.
+CSV and TSV protect text fields for spreadsheet import. JSON preserves the
+original values.
 
 `toggl client list` fetches clients from the configured workspace in API order.
 All formats include `id` and `name` by default. Use `--fields` to select the
@@ -420,3 +422,5 @@ with the annotated release tag (including its `Previous-Stable-Tag` trailer) and
 comparison tag available. Notes generation uses GitHub's
 generate-notes API. Nightly publication continues independently after successful
 tests on `main`.
+
+CSV and TSV exports prefix formula-like text fields with an apostrophe for spreadsheet import. JSON preserves the original text.

@@ -178,13 +178,13 @@ func (a App) showConfig(ctx context.Context, args []string) error {
 	rows := [][]string{}
 	for _, k := range []string{"WORKSPACE", "TIMEZONE"} {
 		if x, ok := v[k]; ok {
-			rows = append(rows, []string{k, x})
+			rows = append(rows, []string{k, spreadsheetText(o.format, x)})
 		}
 	}
 	if o.format == "table" {
 		return a.writeTable(ctx, tableOutputOptions{watch: o.watch}, []string{"Setting", "Value"}, rows, []string{"Key", "Val"})
 	} else {
-		fmt.Fprintln(a.Out, delimited([]string{"Setting", "Value"}, rows, o.format))
+		fmt.Fprintln(a.Out, a.terminalDelimited([]string{"Setting", "Value"}, rows, o.format))
 	}
 	return nil
 }
@@ -429,7 +429,7 @@ func (a App) writeSummary(ctx context.Context, cfg config.Config, settings model
 		days := model.DateRange(from, to)
 		rows := [][]string{}
 		for _, p := range ps {
-			r := []string{p.DisplayName}
+			r := []string{spreadsheetText(settings.Format, p.DisplayName)}
 			for _, day := range days {
 				v := sum[day][p.ID]
 				if v == 0 {
@@ -463,7 +463,7 @@ func (a App) writeSummary(ctx context.Context, cfg config.Config, settings model
 		if settings.NoDate {
 			headers = nil
 		}
-		text = delimited(headers, rows, settings.Format)
+		text = a.terminalDelimited(headers, rows, settings.Format)
 	}
 	fmt.Fprintln(a.Out, text)
 	if settings.Clipboard {
@@ -557,7 +557,7 @@ func (a App) timeEntry(ctx context.Context, args []string) error {
 		if x.Stop != nil {
 			stop = *x.Stop
 		}
-		rows = append(rows, []string{strconv.FormatInt(x.ID, 10), x.Description, pid, x.Start, stop, strconv.FormatFloat(minutes, 'f', -1, 64)})
+		rows = append(rows, []string{strconv.FormatInt(x.ID, 10), spreadsheetText(o.format, x.Description), pid, spreadsheetText(o.format, x.Start), spreadsheetText(o.format, stop), strconv.FormatFloat(minutes, 'f', -1, 64)})
 		objects = append(objects, outputTimeEntry{ID: x.ID, Description: x.Description, ProjectID: x.ProjectID, Start: x.Start, Stop: x.Stop, DurationMinutes: minutes})
 	}
 	headers := []string{"id", "description", "project_id", "start", "stop", "duration_minutes"}
@@ -568,7 +568,7 @@ func (a App) timeEntry(ctx context.Context, args []string) error {
 		compactHeaders := []string{"id", "desc", "proj_id", "start", "stop", "mins"}
 		return a.writeTable(ctx, tableOutputOptions{watch: o.watch}, headers, rows, compactHeaders)
 	} else {
-		fmt.Fprintln(a.Out, delimited(headers, rows, o.format))
+		fmt.Fprintln(a.Out, a.terminalDelimited(headers, rows, o.format))
 	}
 	return nil
 }

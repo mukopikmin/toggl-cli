@@ -79,6 +79,8 @@ func writeList[T any](ctx context.Context, a App, records []T, fields listFields
 		for j, field := range fields {
 			switch value := field.value(record).(type) {
 			case nil:
+			case string:
+				row[j] = spreadsheetText(format, value)
 			case float64:
 				row[j] = strconv.FormatFloat(value, 'f', -1, 64)
 			default:
@@ -95,6 +97,7 @@ func writeList[T any](ctx context.Context, a App, records []T, fields listFields
 		}
 		return a.writeTable(ctx, options, headers, rows, shortHeaders)
 	}
+	a.escapeTerminalRows(rows)
 	_, err := fmt.Fprintln(a.Out, renderDelimited(fields.names(), rows, format, true))
 	return err
 }
