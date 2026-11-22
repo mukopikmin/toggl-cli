@@ -53,7 +53,7 @@ Commands:
   completion  Print a shell completion script
 
 Options:
-  -f, --format <format>  Set the output format: csv, tsv, json, or table (default: tsv)
+  -f, --format <format>  Set the output format: csv, tsv, json, or table (default: table)
       --watch            Redraw table output on terminal resize until Ctrl+C
   -d, --days <days>      Aggregate this many calendar days, including today (>= 1)
       --month <month>    Aggregate an entire month (YYYY-MM, YYYYMM, or YYYY/MM)

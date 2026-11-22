@@ -40,7 +40,7 @@ func TestSummaryMonth(t *testing.T) {
 				if err := os.WriteFile(config.Path(os.Getenv("HOME")), []byte("workspace=\"1\"\ntoken=\"secret\"\ntimezone=\""+tt.zone+"\"\n"), 0600); err != nil {
 					t.Fatal(err)
 				}
-				if err := app.Run(context.Background(), []string{"summary", "--month", month}); err != nil {
+				if err := app.Run(context.Background(), []string{"summary", "--month", month, "--format", "tsv"}); err != nil {
 					t.Fatal(err)
 				}
 				if fake.entryCalls != 1 || client.from.Format(time.DateOnly) != tt.start || client.to.Format(time.DateOnly) != tt.end {
