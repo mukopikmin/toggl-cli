@@ -184,7 +184,7 @@ func (a App) showConfig(ctx context.Context, args []string) error {
 	if o.format == "table" {
 		return a.writeTable(ctx, tableOutputOptions{watch: o.watch}, []string{"Setting", "Value"}, rows, []string{"Key", "Val"})
 	} else {
-		fmt.Fprintln(a.Out, delimited([]string{"Setting", "Value"}, rows, o.format))
+		fmt.Fprintln(a.Out, a.terminalDelimited([]string{"Setting", "Value"}, rows, o.format))
 	}
 	return nil
 }
@@ -463,7 +463,7 @@ func (a App) writeSummary(ctx context.Context, cfg config.Config, settings model
 		if settings.NoDate {
 			headers = nil
 		}
-		text = delimited(headers, rows, settings.Format)
+		text = a.terminalDelimited(headers, rows, settings.Format)
 	}
 	fmt.Fprintln(a.Out, text)
 	if settings.Clipboard {
@@ -568,7 +568,7 @@ func (a App) timeEntry(ctx context.Context, args []string) error {
 		compactHeaders := []string{"id", "desc", "proj_id", "start", "stop", "mins"}
 		return a.writeTable(ctx, tableOutputOptions{watch: o.watch}, headers, rows, compactHeaders)
 	} else {
-		fmt.Fprintln(a.Out, delimited(headers, rows, o.format))
+		fmt.Fprintln(a.Out, a.terminalDelimited(headers, rows, o.format))
 	}
 	return nil
 }

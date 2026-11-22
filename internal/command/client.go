@@ -56,7 +56,7 @@ func (a App) client(ctx context.Context, args []string) error {
 		for i, c := range clients {
 			rows[i] = []string{strconv.FormatInt(c.ID, 10), c.Name}
 		}
-		_, err = fmt.Fprintln(a.Out, delimited([]string{"id", "name"}, rows, o.format))
+		_, err = fmt.Fprintln(a.Out, a.terminalDelimited([]string{"id", "name"}, rows, o.format))
 		return err
 	}
 }
