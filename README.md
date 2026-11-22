@@ -220,6 +220,8 @@ CSV and TSV previously returned one headerless column of display names. Use
 `--fields displayName` to select that field and account for the header in
 existing scripts. Explicit field selection also keeps the output shape stable
 when public fields are added.
+CSV and TSV protect text fields for spreadsheet import. JSON preserves the
+original values.
 
 `toggl client list` fetches clients from the configured workspace in API order.
 The default output is a bordered table of names. CSV and TSV use `id` and `name` headers. CSV uses commas and TSV

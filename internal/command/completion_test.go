@@ -30,6 +30,8 @@ func TestCompletionCandidates(t *testing.T) {
 		{"project fields", []string{"project", "list", "--fields", ""}, "name id alias displayName hidden active displayOrder"},
 		{"project field after comma", []string{"project", "list", "--fields", "id,displayN"}, "id,displayName"},
 		{"project field assignment", []string{"project", "list", "--fields=id,h"}, "--fields=id,hidden"},
+		{"project fields exclude selected", []string{"project", "list", "--fields", "id,"}, "id,name id,alias id,displayName id,hidden id,active id,displayOrder"},
+		{"project assignment excludes selected", []string{"project", "list", "--fields=name, id,i"}, ""},
 		{"project option after fields", []string{"project", "list", "--fields", "id,hidden", "--i"}, "--include-hidden"},
 		{"entry options", []string{"time-entry", "list", "1", "2", "--"}, "--format --watch"},
 		{"config options", []string{"config", "--"}, "--format --watch"},

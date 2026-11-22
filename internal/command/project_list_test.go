@@ -14,6 +14,7 @@ import (
 
 func TestProjectListFields(t *testing.T) {
 	first, second := 1.0, 2.0
+	negative := -2.5
 	projects := []model.Project{
 		{ID: 20, Name: "Unordered", DisplayName: "Unordered", Active: true},
 		{ID: 30, Name: "Original, name", Alias: "Shown", DisplayName: "Shown", Active: true, DisplayOrder: &second},
@@ -46,6 +47,14 @@ func TestProjectListFields(t *testing.T) {
 			args:    []string{"--format", "csv", "--fields=name, id,hidden"},
 			project: projects,
 			want:    "name,id,hidden\n\"Original, name\",30,false\nUnordered,20,false\n",
+		},
+		{
+			name: "csv protects text and preserves numbers",
+			args: []string{"--format", "csv", "--fields", "name,alias,displayOrder"},
+			project: []model.Project{
+				{ID: 1, Name: "+ Example", Alias: "- Example", DisplayOrder: &negative},
+			},
+			want: "name,alias,displayOrder\n'+ Example,'- Example,-2.5\n",
 		},
 		{
 			name:    "tsv includes hidden",

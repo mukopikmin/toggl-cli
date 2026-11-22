@@ -3,6 +3,7 @@ package command
 import (
 	"embed"
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -111,7 +112,13 @@ func completionCandidates(words []string) []string {
 	completeValue := func(option, prefix string) []string {
 		if option == "--fields" {
 			if i := strings.LastIndexByte(current, ','); i >= 0 {
-				prefix = current[:i+1]
+				selected := strings.Split(strings.TrimPrefix(current[:i], prefix), ",")
+				names := slices.DeleteFunc(slices.Clone(fieldNames), func(name string) bool {
+					return slices.ContainsFunc(selected, func(field string) bool {
+						return strings.TrimSpace(field) == name
+					})
+				})
+				return filter(strings.Join(names, " "), current[:i+1])
 			}
 		}
 		return filter(values(option), prefix)
