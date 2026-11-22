@@ -25,7 +25,7 @@ func TestCompletionCandidates(t *testing.T) {
 		{"install removed", []string{"completion", "install", ""}, ""},
 		{"installed shell has no arguments", []string{"completion", "install", "bash", ""}, ""},
 		{"summary options", []string{"summary", "--"}, "--format --watch --days --no-project --no-date --clipboard"},
-		{"project options", []string{"project", "list", "--"}, "--format --watch --fields --include-hidden"},
+		{"project options", []string{"project", "list", "--"}, "--format --watch --include-hidden --fields"},
 		{"project fields", []string{"project", "list", "--fields", ""}, "name id alias displayName hidden active displayOrder"},
 		{"project field after comma", []string{"project", "list", "--fields", "id,displayN"}, "id,displayName"},
 		{"project field assignment", []string{"project", "list", "--fields=id,h"}, "--fields=id,hidden"},

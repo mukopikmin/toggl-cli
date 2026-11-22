@@ -86,8 +86,13 @@ func completionCandidates(words []string) []string {
 	if command == "summary" {
 		options += " -d --days --no-project --no-date --clipboard"
 	}
+	var fieldNames []string
 	if command == "project" {
-		options += " --fields --include-hidden"
+		fieldNames = projectFields.names()
+		options += " --include-hidden"
+	}
+	if len(fieldNames) > 0 {
+		options += " --fields"
 	}
 	if command == "update" {
 		options = "--channel"
@@ -99,7 +104,7 @@ func completionCandidates(words []string) []string {
 		case "--channel":
 			return "stable nightly"
 		case "--fields":
-			return strings.Join(projectFieldNames(projectFields), " ")
+			return strings.Join(fieldNames, " ")
 		}
 		return ""
 	}
