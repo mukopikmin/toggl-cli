@@ -47,7 +47,7 @@ jobs:
           if [[ -n "$published" ]]; then
             counts=$(git rev-list --left-right --count "$published...$HEAD_SHA")
             read -r behind ahead <<< "$counts"
-            if (( behind > 0 || ahead == 0 )); then
+            if (( behind > 0 )); then
               echo "Skipping nightly: tested commit is $behind behind and $ahead ahead of the published tag."
               exit 0
             fi
@@ -55,50 +55,59 @@ jobs:
           echo "previous=$published" >> "$GITHUB_OUTPUT"
           echo "publish=true" >> "$GITHUB_OUTPUT"
 
-      - name: Create or update nightly release
+      - name: Confirm and reserve the nightly tag
+        id: claim
         if: steps.advance.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIOUS_TAG: ${{ steps.advance.outputs.previous }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          notes="Latest tested build from main ($HEAD_SHA)."
+          if [[ "$PREVIOUS_TAG" == "$HEAD_SHA" ]] &&
+             body=$(gh release view nightly --json body --jq .body) &&
+             [[ "$body" == "$notes" ]]; then
+            echo "Skipping nightly: release already published for $HEAD_SHA."
+            exit 0
+          fi
+          # Claim the tag before changing any release assets. A stale lease
+          # fails here; a failed upload can be retried for this same commit.
+          git push --force-with-lease="refs/tags/nightly:$PREVIOUS_TAG" origin "$HEAD_SHA:refs/tags/nightly"
+          echo "publish=true" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update nightly release
+        if: steps.claim.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           if gh release view nightly >/dev/null 2>&1; then
-            gh release edit nightly \
-              --title "Nightly" \
-              --notes "Latest tested build from main ($HEAD_SHA)." \
-              --prerelease \
-              --latest=false
             gh release upload nightly \
               dist/*.tar.gz \
               dist/*.zip \
               dist/*.sha256 \
               dist/checksums.txt \
               --clobber
+            gh release edit nightly \
+              --title "Nightly" \
+              --notes "Latest tested build from main ($HEAD_SHA)." \
+              --prerelease \
+              --latest=false
           else
             gh release create nightly \
               dist/*.tar.gz \
               dist/*.zip \
               dist/*.sha256 \
               dist/checksums.txt \
-              --target "$HEAD_SHA" \
+              --verify-tag \
               --title "Nightly" \
               --notes "Latest tested build from main ($HEAD_SHA)." \
               --prerelease \
               --latest=false
           fi
 
-      # For an existing release, publish all assets before changing the pointer
-      # used by the updater. Release creation creates the tag itself, so the
-      # initial publication is the only case where this cannot be ordered.
-      - name: Move nightly tag
-        if: steps.advance.outputs.publish == 'true'
-        env:
-          PREVIOUS_TAG: ${{ steps.advance.outputs.previous }}
-          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
-        run: |
-          git push --force-with-lease="refs/tags/nightly:$PREVIOUS_TAG" origin "$HEAD_SHA:refs/tags/nightly"
-
       - name: Remove obsolete nightly releases and tags
-        if: steps.advance.outputs.publish == 'true'
+        if: steps.claim.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
