@@ -19,7 +19,7 @@ type opts struct {
 	template                     string
 	templateSet, force           bool
 	watch                        bool
-	columns                      []string
+	fields                       []string
 	includeHidden                bool
 	pos                          []string
 }
@@ -61,15 +61,15 @@ func parseOpts(args []string, allowed map[string]bool) (opts, error) {
 				return o, e
 			}
 			o.format, o.formatSet = v, true
-		case "--columns":
-			if !allowed["columns"] {
+		case "--fields":
+			if !allowed["fields"] {
 				return o, usagef("unknown option: %s", key)
 			}
 			v, e := take()
 			if e != nil {
 				return o, e
 			}
-			o.columns = strings.Split(v, ",")
+			o.fields = strings.Split(v, ",")
 		case "-d", "--days":
 			if !allowed["days"] {
 				return o, usagef("unknown option: %s", key)

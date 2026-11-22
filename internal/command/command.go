@@ -53,7 +53,7 @@ Commands:
 Options:
   -f, --format <format>  Set the output format: csv, tsv, json, or table (default: table)
       --watch            Redraw table output on terminal resize until Ctrl+C
-      --columns <list>   Select id, displayName, name, and/or hidden (project list table/CSV/TSV)
+      --fields <list>    Select comma-separated project fields in any format (default: all)
       --include-hidden   Include projects hidden in the configuration (project list)
   -d, --days <days>      Aggregate this many calendar days, including today (>= 1)
       --clipboard        Copy the output to the clipboard as well as stdout
@@ -287,7 +287,7 @@ func (a App) project(ctx context.Context, args []string) error {
 	if len(args) == 0 {
 		return usage("project requires a subcommand: list, reorder, or sync")
 	}
-	var listOptions opts
+	var listOptions projectListOptions
 	switch args[0] {
 	case "list":
 		var err error

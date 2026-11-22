@@ -46,7 +46,7 @@ func TestProjectsMapsDTOSettingsAndAuthorization(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(projects) != 1 || projects[0].DisplayName != "Custom" || !projects[0].Hidden || *projects[0].DisplayOrder != 4 {
+	if len(projects) != 1 || projects[0].Name != "Old" || projects[0].Alias != "Custom" || projects[0].DisplayName != "Custom" || !projects[0].Hidden || *projects[0].DisplayOrder != 4 {
 		t.Fatalf("%+v", projects)
 	}
 	if auth != "Basic "+base64.StdEncoding.EncodeToString([]byte("secret:api_token")) {

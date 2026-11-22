@@ -13,6 +13,7 @@ type Client struct {
 type Project struct {
 	ID           int64    `json:"id"`
 	Name         string   `json:"name"`
+	Alias        string   `json:"alias,omitempty"`
 	DisplayName  string   `json:"displayName"`
 	Active       bool     `json:"active"`
 	Hidden       bool     `json:"hidden"`

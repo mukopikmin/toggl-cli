@@ -142,7 +142,7 @@ quotes, or line breaks are quoted, and embedded quotes are doubled.
 | `template show` | `<name>` | Template settings as TOML |
 | `template delete` | `<name>` | Deletes the named template |
 | `time-entry list` | `<start-day> <end-day>`; `-f/--format`, `--watch` | Entries as a bordered table by default, TSV, CSV, or JSON |
-| `project list` | `-f/--format`, `--watch`, `--columns`, `--include-hidden` | Ordered projects as a table by default, TSV, CSV, or JSON |
+| `project list` | `-f/--format`, `--watch`, `--fields`, `--include-hidden` | Ordered projects as a table by default, TSV, CSV, or JSON |
 | `client list` | `-f/--format`, `--watch` | Client names as a table by default. Use TSV, CSV, or JSON for IDs and names |
 | `project sync` | none | Adds missing active projects to the TOML file |
 | `project reorder` | none | Interactively changes and saves visible-project order |
@@ -190,25 +190,36 @@ from a saved template.
 toggl summary --days 7 --format table --watch
 ```
 
-`toggl project list` shows visible active project display names by default.
-Use `--columns` to select a comma-separated list of columns for table, CSV,
-or TSV output. The output follows the order of the selected columns. CSV and
-TSV include a header when `--columns` is set. JSON includes all project fields.
+`toggl project list` shows all public fields for visible active projects by
+default in table, CSV, TSV, and JSON. Use `--fields` with a comma-separated list
+to output only those fields in any format. Table, CSV, and TSV follow the field
+order and include headers. For JSON, each project is an object with the selected
+keys. Unset aliases and display orders appear as empty cells in table, CSV,
+and TSV and as `null` in JSON.
 
-| Column | Value |
+| Field | Value |
 | --- | --- |
-| `id` | Toggl project ID |
-| `displayName` | Configured display name, or the Toggl name when unset |
 | `name` | Project name in Toggl |
+| `id` | Toggl project ID |
+| `alias` | Project name set by `display_name` in the local configuration |
+| `displayName` | Configured display name, or the Toggl name when unset |
 | `hidden` | `true` when the project is hidden in the local configuration, `false` when visible |
+| `active` | Toggl activation status. The list contains active projects |
+| `displayOrder` | Project order set by `display_order` in the local configuration |
 
 Use `--include-hidden` with any format to include hidden active projects in the
 configured display order.
 
 ```sh
-toggl project list --columns id,displayName,name,hidden --include-hidden
-toggl project list --format tsv --columns id,displayName
+toggl project list --include-hidden
+toggl project list --format csv --fields id,name
+toggl project list --format json --fields id,alias,hidden
 ```
+
+CSV and TSV previously returned one headerless column of display names. Use
+`--fields displayName` to select that field and account for the header in
+existing scripts. Explicit field selection also keeps the output shape stable
+when public fields are added.
 
 `toggl client list` fetches clients from the configured workspace in API order.
 The default output is a bordered table of names. CSV and TSV use `id` and `name` headers. CSV uses commas and TSV

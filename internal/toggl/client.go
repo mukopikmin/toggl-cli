@@ -90,6 +90,7 @@ func (c HTTPClient) Projects(ctx context.Context, cfg config.Config) ([]model.Pr
 		p := model.Project{ID: d.ID, Name: name, DisplayName: name, Active: true}
 		if s, ok := cfg.Projects[d.ID]; ok {
 			if s.DisplayName != "" {
+				p.Alias = s.DisplayName
 				p.DisplayName = s.DisplayName
 			}
 			p.Hidden = s.Hidden

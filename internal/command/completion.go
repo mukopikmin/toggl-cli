@@ -87,7 +87,7 @@ func completionCandidates(words []string) []string {
 		options += " -d --days --no-project --no-date --clipboard"
 	}
 	if command == "project" {
-		options += " --columns --include-hidden"
+		options += " --fields --include-hidden"
 	}
 	if command == "update" {
 		options = "--channel"
@@ -98,13 +98,13 @@ func completionCandidates(words []string) []string {
 			return "csv tsv json table"
 		case "--channel":
 			return "stable nightly"
-		case "--columns":
-			return "id displayName name hidden"
+		case "--fields":
+			return strings.Join(projectFieldNames(projectFields), " ")
 		}
 		return ""
 	}
 	completeValue := func(option, prefix string) []string {
-		if option == "--columns" {
+		if option == "--fields" {
 			if i := strings.LastIndexByte(current, ','); i >= 0 {
 				prefix = current[:i+1]
 			}
