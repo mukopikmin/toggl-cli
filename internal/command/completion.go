@@ -83,9 +83,6 @@ func completionCandidates(words []string) []string {
 	}
 
 	options := "-f --format --watch"
-	if command == "summary" || command == "client" || command == "time-entry" {
-		options += " -s --separator"
-	}
 	if command == "summary" {
 		options += " -d --days --no-project --no-date --clipboard"
 	}
@@ -95,7 +92,7 @@ func completionCandidates(words []string) []string {
 	values := func(option string) string {
 		switch option {
 		case "-f", "--format":
-			return "csv json table"
+			return "csv tsv json table"
 		case "--channel":
 			return "stable nightly"
 		}
@@ -113,7 +110,16 @@ func completionCandidates(words []string) []string {
 		if arg == "--" {
 			return nil
 		}
-		if allowed(arg) && (values(arg) != "" || arg == "-s" || arg == "--separator" || arg == "-d" || arg == "--days") {
+		if strings.HasPrefix(arg, "-") && !allowed(arg) {
+			if key, _, assigned := strings.Cut(arg, "="); assigned && allowed(key) {
+				continue
+			}
+			if strings.HasPrefix(arg, "-f") && allowed("-f") || strings.HasPrefix(arg, "-d") && allowed("-d") {
+				continue
+			}
+			return nil
+		}
+		if allowed(arg) && (values(arg) != "" || arg == "-d" || arg == "--days") {
 			pending = arg
 		}
 	}

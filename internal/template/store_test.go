@@ -53,7 +53,6 @@ func TestParseRejectsInvalidTemplates(t *testing.T) {
 		"[", "templates = []", "templates = 1", "[templates.bad]\ndays = '1'",
 		"[templates.bad]\ndays = -1", "[templates.bad]\ndays = 0", "[templates.bad]\ndays = 9007199254740992",
 		"[templates.bad]\nformat = 'xml'", "[templates.bad]\nformat = 'table'\nno_date = true",
-		"[templates.bad]\nformat = 'table'\nseparator = ''",
 		"[templates.bad]\nstart_date = '2026-05-01'",
 		"[templates.bad]\nstart_date = '2026-02-30'\nend_date = '2026-03-01'",
 		"[templates.bad]\nstart_date = '2026-05-02'\nend_date = '2026-05-01'",

@@ -53,8 +53,7 @@ Commands:
   completion  Print a shell completion script
 
 Options:
-  -s, --separator <text> Set the CSV delimiter (default: tab; CSV only)
-  -f, --format <format>  Set the output format: csv, json, or table (default: csv)
+  -f, --format <format>  Set the output format: csv, tsv, json, or table (default: tsv)
       --watch            Redraw table output on terminal resize until Ctrl+C
   -d, --days <days>      Aggregate this many calendar days, including today (>= 1)
       --month <month>    Aggregate an entire month (YYYY-MM, YYYYMM, or YYYY/MM)
@@ -63,9 +62,9 @@ Options:
       --template <name>  Use a saved summary template
       --force            Replace an existing template (template add only)
   -h, --help             Show this help
-      --no-project       Omit the project column (summary CSV only)
-      --no-date          Omit the date header row from CSV output
-      --daily-total      Append daily totals in minutes (summary CSV/table only)
+      --no-project       Omit the project column (summary CSV/TSV only)
+      --no-date          Omit the date header row (summary CSV/TSV only)
+      --daily-total      Append daily totals in minutes (summary CSV/TSV/table only)
       --project          Include the project column (summary/template add)
       --date             Include the date header (summary/template add)
       --version          Show the version`
@@ -186,9 +185,7 @@ func (a App) showConfig(ctx context.Context, args []string) error {
 	if o.format == "table" {
 		return a.writeTable(ctx, tableOutputOptions{watch: o.watch}, []string{"Setting", "Value"}, rows, []string{"Key", "Val"})
 	} else {
-		for _, r := range rows {
-			fmt.Fprintf(a.Out, "%s=%s\n", r[0], r[1])
-		}
+		fmt.Fprintln(a.Out, delimited([]string{"Setting", "Value"}, rows, o.format))
 	}
 	return nil
 }
@@ -338,11 +335,11 @@ func (a App) project(ctx context.Context, args []string) error {
 			options := tableOutputOptions{watch: listOptions.watch, truncateProjects: true}
 			return a.writeTable(ctx, options, []string{"Project"}, rows, []string{"Proj."})
 		} else {
-			names := make([]string, len(ps))
+			rows := make([][]string, len(ps))
 			for i, p := range ps {
-				names[i] = p.DisplayName
+				rows[i] = []string{p.DisplayName}
 			}
-			fmt.Fprintln(a.Out, strings.Join(names, "\n"))
+			fmt.Fprintln(a.Out, delimited(nil, rows, listOptions.format))
 		}
 		return nil
 	case "sync":
@@ -511,25 +508,16 @@ func (a App) writeSummary(ctx context.Context, cfg config.Config, settings model
 			options := tableOutputOptions{watch: watch, clipboard: settings.Clipboard, truncateProjects: true}
 			return a.writeTable(ctx, options, headers, rows, summaryHeaderVariants(days, from, to)...)
 		}
-		separator := "\t"
-		if settings.Separator != nil {
-			separator = *settings.Separator
-		}
-		var lines []string
-		if !settings.NoDate {
-			h := headers
-			if settings.NoProject {
-				h = days
+		if settings.NoProject {
+			headers = days
+			for i := range rows {
+				rows[i] = rows[i][1:]
 			}
-			lines = append(lines, strings.Join(h, separator))
 		}
-		for _, r := range rows {
-			if settings.NoProject {
-				r = r[1:]
-			}
-			lines = append(lines, strings.Join(r, separator))
+		if settings.NoDate {
+			headers = nil
 		}
-		text = strings.Join(lines, "\n")
+		text = delimited(headers, rows, settings.Format)
 	}
 	fmt.Fprintln(a.Out, text)
 	if settings.Clipboard {
@@ -567,18 +555,12 @@ func (a App) timeEntry(ctx context.Context, args []string) error {
 	if args[0] != "list" {
 		return usagef("unknown time-entry subcommand: %s", args[0])
 	}
-	o, e := parseOpts(args[1:], map[string]bool{"format": true, "separator": true, "watch": true})
+	o, e := parseOpts(args[1:], map[string]bool{"format": true, "watch": true})
 	if e != nil {
 		return e
 	}
 	if len(o.pos) != 2 {
 		return usage("time-entry list requires start and end day")
-	}
-	if o.sep == "" {
-		return usage("separator must not be empty")
-	}
-	if o.format == "table" && o.separatorSet {
-		return usage("--separator cannot be used with table format")
 	}
 	if err := a.validateTableWatch(o.watch, o.format); err != nil {
 		return err
@@ -640,20 +622,7 @@ func (a App) timeEntry(ctx context.Context, args []string) error {
 		compactHeaders := []string{"id", "desc", "proj_id", "start", "stop", "mins"}
 		return a.writeTable(ctx, tableOutputOptions{watch: o.watch}, headers, rows, compactHeaders)
 	} else {
-		fmt.Fprintln(a.Out, csv(headers, rows, o.sep))
+		fmt.Fprintln(a.Out, delimited(headers, rows, o.format))
 	}
 	return nil
-}
-func csv(h []string, rows [][]string, sep string) string {
-	all := append([][]string{h}, rows...)
-	var lines []string
-	for _, r := range all {
-		for i, v := range r {
-			if strings.ContainsAny(v, "\r\n\"") || strings.Contains(v, sep) {
-				r[i] = "\"" + strings.ReplaceAll(v, "\"", "\"\"") + "\""
-			}
-		}
-		lines = append(lines, strings.Join(r, sep))
-	}
-	return strings.Join(lines, "\n")
 }

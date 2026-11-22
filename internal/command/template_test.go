@@ -56,7 +56,7 @@ func TestTemplateLifecycleWithoutConfigurationOrAPI(t *testing.T) {
 	}
 	run("template", "add", "weekly", "--days", "1", "--force")
 	doc, err = template.Load()
-	if err != nil || *doc.Templates["weekly"].Days != 1 || doc.Templates["weekly"].Format != "csv" {
+	if err != nil || *doc.Templates["weekly"].Days != 1 || doc.Templates["weekly"].Format != "tsv" {
 		t.Fatalf("force did not replace the template: %+v, %v", doc, err)
 	}
 	if !doc.Templates["spreadsheet"].NoDate {
@@ -85,7 +85,8 @@ func TestTemplateUsageErrorsDoNotWrite(t *testing.T) {
 		{"template", "add", "weekly", "--days=-1"},
 		{"template", "add", "weekly", "--days", "0"},
 		{"summary", "--days", "0"},
-		{"template", "add", "weekly", "--format", "table", "--separator", ","},
+		{"template", "add", "weekly", "--format", "table", "--no-date"},
+		{"template", "add", "weekly", "--separator", ","},
 		{"template", "add", "weekly", "--format", "table", "--no-date"},
 		{"template", "add", "weekly", "--template", "other"},
 		{"template", "list", "extra"}, {"template", "list", "--force"},
@@ -137,8 +138,7 @@ func TestSummaryTemplateMatchesDirectExecution(t *testing.T) {
 		{"relative replaces fixed", []string{"2026-04-01", "2026-04-30"}, []string{"--days", "1"}, []string{"--days", "1"}},
 		{"output only", []string{"--no-project", "--no-date"}, []string{"2026-05-01", "2026-05-02"}, []string{"2026-05-01", "2026-05-02", "--no-project", "--no-date"}},
 		{"clear booleans", []string{"--days", "1", "--no-project", "--no-date", "--clipboard"}, []string{"--project", "--date", "--no-clipboard"}, []string{"--days", "1"}},
-		{"empty separator", []string{"--days", "1", "--separator", ""}, nil, []string{"--days", "1", "--separator", ""}},
-		{"override separator", []string{"--days", "1", "--separator", ","}, []string{"--separator", "|"}, []string{"--days", "1", "--separator", "|"}},
+		{"csv format", []string{"--days", "1", "--format", "csv"}, nil, []string{"--days", "1", "--format", "csv"}},
 		{"json", []string{"--days", "1", "--format", "json"}, nil, []string{"--days", "1", "--format", "json"}},
 	}
 	for _, tt := range tests {
@@ -178,6 +178,28 @@ func TestSummaryTemplateMatchesDirectExecution(t *testing.T) {
 	}
 }
 
+func TestLegacyTemplateSeparatorDoesNotOverrideFormat(t *testing.T) {
+	projectID := int64(1)
+	fake := &fakeClient{
+		projects: []model.Project{{ID: projectID, DisplayName: "Project A"}},
+		entries:  []model.TimeEntry{{ProjectID: &projectID, Start: "2026-05-02T01:00:00Z", DurationSeconds: 90}},
+	}
+	app, out := configuredApp(t, fake, "")
+	path := filepath.Join(os.Getenv("HOME"), ".config", "toggl-cli", "templates.toml")
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("[templates.legacy]\ndays = 1\nformat = 'csv'\nseparator = '\\t'\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.Run(context.Background(), []string{"summary", "--template", "legacy"}); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := out.String(), "Project,2026-05-02\nProject A,1.5\n"; got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
 func TestCorruptTemplatesAreNotOverwritten(t *testing.T) {
 	for _, args := range [][]string{
 		{"template", "add", "weekly", "--days", "1", "--force"},
@@ -209,7 +231,7 @@ func TestCorruptTemplatesAreNotOverwritten(t *testing.T) {
 func TestSummaryValidatesMergedTemplateBeforeAPI(t *testing.T) {
 	tests := []struct{ settings, overrides []string }{
 		{[]string{"--days", "1", "--no-date"}, []string{"--format", "table"}},
-		{[]string{"--days", "1", "--separator", ""}, []string{"--format", "table"}},
+		{[]string{"--days", "1", "--no-project"}, []string{"--format", "table"}},
 		{[]string{"--format", "table"}, nil},
 		{[]string{"--days", "1"}, []string{"2026-05-01"}},
 		{[]string{"--days", "1"}, []string{"2026-05-01", "2026-05-02", "--days", "1"}},
