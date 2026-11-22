@@ -178,7 +178,7 @@ func (a App) showConfig(ctx context.Context, args []string) error {
 	rows := [][]string{}
 	for _, k := range []string{"WORKSPACE", "TIMEZONE"} {
 		if x, ok := v[k]; ok {
-			rows = append(rows, []string{k, x})
+			rows = append(rows, []string{k, spreadsheetText(o.format, x)})
 		}
 	}
 	if o.format == "table" {
@@ -429,7 +429,7 @@ func (a App) writeSummary(ctx context.Context, cfg config.Config, settings model
 		days := model.DateRange(from, to)
 		rows := [][]string{}
 		for _, p := range ps {
-			r := []string{p.DisplayName}
+			r := []string{spreadsheetText(settings.Format, p.DisplayName)}
 			for _, day := range days {
 				v := sum[day][p.ID]
 				if v == 0 {
@@ -557,7 +557,7 @@ func (a App) timeEntry(ctx context.Context, args []string) error {
 		if x.Stop != nil {
 			stop = *x.Stop
 		}
-		rows = append(rows, []string{strconv.FormatInt(x.ID, 10), x.Description, pid, x.Start, stop, strconv.FormatFloat(minutes, 'f', -1, 64)})
+		rows = append(rows, []string{strconv.FormatInt(x.ID, 10), spreadsheetText(o.format, x.Description), pid, spreadsheetText(o.format, x.Start), spreadsheetText(o.format, stop), strconv.FormatFloat(minutes, 'f', -1, 64)})
 		objects = append(objects, outputTimeEntry{ID: x.ID, Description: x.Description, ProjectID: x.ProjectID, Start: x.Start, Stop: x.Stop, DurationMinutes: minutes})
 	}
 	headers := []string{"id", "description", "project_id", "start", "stop", "duration_minutes"}

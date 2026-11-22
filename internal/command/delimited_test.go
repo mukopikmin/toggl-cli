@@ -79,3 +79,16 @@ func TestCommandsUseFixedDelimiters(t *testing.T) {
 		}
 	}
 }
+
+func TestSpreadsheetTextExport(t *testing.T) {
+	for _, format := range []string{"csv", "tsv", "json", "table"} {
+		app, out := configuredApp(t, &fakeClient{clients: []model.Client{{ID: 1, Name: " =example"}}}, "")
+		if err := app.Run(context.Background(), []string{"client", "list", "-f", format}); err != nil {
+			t.Fatal(err)
+		}
+		protected := strings.Contains(out.String(), "' =example")
+		if protected != (format == "csv" || format == "tsv") {
+			t.Fatalf("%s: %q", format, out.String())
+		}
+	}
+}

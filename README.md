@@ -422,3 +422,5 @@ with the annotated release tag (including its `Previous-Stable-Tag` trailer) and
 comparison tag available. Notes generation uses GitHub's
 generate-notes API. Nightly publication continues independently after successful
 tests on `main`.
+
+CSV and TSV exports prefix formula-like text fields with an apostrophe for spreadsheet import. JSON preserves the original text.

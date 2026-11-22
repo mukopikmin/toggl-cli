@@ -3,6 +3,8 @@ package command
 import (
 	"encoding/csv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 func delimited(headers []string, rows [][]string, format string) string {
@@ -30,4 +32,15 @@ func renderDelimited(headers []string, rows [][]string, format string, quoteEmpt
 	}
 	w.Flush()
 	return strings.TrimSuffix(text.String(), "\n")
+}
+
+func spreadsheetText(format, value string) string {
+	if format != "csv" && format != "tsv" {
+		return value
+	}
+	first, _ := utf8.DecodeRuneInString(strings.TrimLeftFunc(value, unicode.IsSpace))
+	if strings.ContainsRune("=+-@＝＋－＠", first) {
+		return "'" + value
+	}
+	return value
 }
