@@ -138,12 +138,21 @@ func (a App) Run(ctx context.Context, args []string) error {
 }
 
 type outputTimeEntry struct {
-	ID              int64   `json:"id"`
-	Description     string  `json:"description"`
-	ProjectID       *int64  `json:"project_id"`
-	Start           string  `json:"start"`
-	Stop            *string `json:"stop"`
-	DurationMinutes float64 `json:"duration_minutes"`
+	ID              int64
+	Description     string
+	ProjectID       *int64
+	Start           string
+	Stop            *string
+	DurationMinutes float64
+}
+
+var timeEntryFields = listFields[outputTimeEntry]{
+	{"id", "id", "id", func(e outputTimeEntry) any { return e.ID }},
+	{"description", "description", "desc", func(e outputTimeEntry) any { return e.Description }},
+	{"project_id", "project_id", "proj_id", func(e outputTimeEntry) any { return optionalListValue(e.ProjectID) }},
+	{"start", "start", "start", func(e outputTimeEntry) any { return e.Start }},
+	{"stop", "stop", "stop", func(e outputTimeEntry) any { return optionalListValue(e.Stop) }},
+	{"duration_minutes", "duration_minutes", "mins", func(e outputTimeEntry) any { return e.DurationMinutes }},
 }
 
 func loadCfg() (config.Document, error) { return config.Load() }
@@ -501,7 +510,7 @@ func (a App) timeEntry(ctx context.Context, args []string) error {
 	if args[0] != "list" {
 		return usagef("unknown time-entry subcommand: %s", args[0])
 	}
-	o, e := parseOpts(args[1:], map[string]bool{"format": true, "watch": true})
+	o, e := parseOpts(args[1:], map[string]bool{"format": true, "watch": true, "fields": true})
 	if e != nil {
 		return e
 	}
@@ -510,6 +519,10 @@ func (a App) timeEntry(ctx context.Context, args []string) error {
 	}
 	if err := a.validateTableWatch(o.watch, o.format); err != nil {
 		return err
+	}
+	fields, e := timeEntryFields.selectFields("time-entry", o.fields)
+	if e != nil {
+		return e
 	}
 	now := a.Now()
 	y, m, _ := now.Date()
@@ -541,34 +554,14 @@ func (a App) timeEntry(ctx context.Context, args []string) error {
 	sort.Slice(entries, func(i, j int) bool {
 		return entries[i].Start < entries[j].Start || entries[i].Start == entries[j].Start && entries[i].ID < entries[j].ID
 	})
-	rows := [][]string{}
-	objects := []outputTimeEntry{}
+	objects := make([]outputTimeEntry, 0, len(entries))
 	for _, x := range entries {
 		seconds := x.DurationSeconds
 		if seconds < 0 {
 			seconds = a.Now().Unix() + seconds
 		}
 		minutes := float64(int(float64(seconds)/60*100+0.5)) / 100
-		pid := ""
-		if x.ProjectID != nil {
-			pid = strconv.FormatInt(*x.ProjectID, 10)
-		}
-		stop := ""
-		if x.Stop != nil {
-			stop = *x.Stop
-		}
-		rows = append(rows, []string{strconv.FormatInt(x.ID, 10), x.Description, pid, x.Start, stop, strconv.FormatFloat(minutes, 'f', -1, 64)})
 		objects = append(objects, outputTimeEntry{ID: x.ID, Description: x.Description, ProjectID: x.ProjectID, Start: x.Start, Stop: x.Stop, DurationMinutes: minutes})
 	}
-	headers := []string{"id", "description", "project_id", "start", "stop", "duration_minutes"}
-	if o.format == "json" {
-		b, _ := json.MarshalIndent(objects, "", "  ")
-		fmt.Fprintln(a.Out, string(b))
-	} else if o.format == "table" {
-		compactHeaders := []string{"id", "desc", "proj_id", "start", "stop", "mins"}
-		return a.writeTable(ctx, tableOutputOptions{watch: o.watch}, headers, rows, compactHeaders)
-	} else {
-		fmt.Fprintln(a.Out, delimited(headers, rows, o.format))
-	}
-	return nil
+	return writeList(ctx, a, objects, fields, o.format, tableOutputOptions{watch: o.watch})
 }
