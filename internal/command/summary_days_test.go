@@ -94,3 +94,35 @@ func TestSummaryTableDateHeadings(t *testing.T) {
 		})
 	}
 }
+
+func TestCalendarBoundsAtMidnightDSTTransition(t *testing.T) {
+	for _, args := range [][]string{
+		{"summary", "2018-11-04", "2018-11-04", "--format", "tsv"},
+		{"summary", "--days", "1", "--format", "tsv"},
+		{"time-entry", "list", "4", "4"},
+	} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			fake := &fakeClient{}
+			client := &dateRangeClient{fakeClient: fake}
+			app, out := configuredApp(t, fake, "")
+			app.NewClient = useClient(client)
+			app.Now = func() time.Time { return time.Date(2018, 11, 4, 12, 0, 0, 0, time.UTC) }
+			text, err := config.EncodeInitial("1", "test-token", "America/Sao_Paulo")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(config.Path(os.Getenv("HOME")), []byte(text), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err := app.Run(context.Background(), args); err != nil {
+				t.Fatal(err)
+			}
+			if from, to := client.from.UTC().Format(time.RFC3339), client.to.UTC().Format(time.RFC3339); from != "2018-11-04T03:00:00Z" || to != "2018-11-05T02:00:00Z" {
+				t.Fatalf("request from %s to %s", from, to)
+			}
+			if args[0] == "summary" && strings.TrimSpace(out.String()) != "Project	2018-11-04" {
+				t.Fatalf("unexpected date columns: %q", out.String())
+			}
+		})
+	}
+}

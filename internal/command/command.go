@@ -411,7 +411,9 @@ func (a App) summary(ctx context.Context, args []string) error {
 	if e != nil {
 		return usage(e.Error())
 	}
-	entries, e := a.NewClient(d.Config.Workspace, d.Config.Token).TimeEntries(ctx, from, to.AddDate(0, 0, 1))
+	start := model.StartOfDate(from, loc)
+	end := model.StartOfDate(to.AddDate(0, 0, 1), loc)
+	entries, e := a.NewClient(d.Config.Workspace, d.Config.Token).TimeEntries(ctx, start, end)
 	if e != nil {
 		return e
 	}
@@ -471,8 +473,8 @@ func (a App) timeEntry(ctx context.Context, args []string) error {
 	if ed > lastDay {
 		return usage("start and end day must be valid dates")
 	}
-	from := time.Date(y, m, sd, 0, 0, 0, 0, loc)
-	end := time.Date(y, m, ed+1, 0, 0, 0, 0, loc)
+	from := model.StartOfDate(time.Date(y, m, sd, 0, 0, 0, 0, time.UTC), loc)
+	end := model.StartOfDate(time.Date(y, m, ed+1, 0, 0, 0, 0, time.UTC), loc)
 	entries, e := a.NewClient(d.Config.Workspace, d.Config.Token).TimeEntries(ctx, from, end)
 	if e != nil {
 		return e
