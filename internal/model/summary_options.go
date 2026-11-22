@@ -93,6 +93,11 @@ func StartOfDate(date time.Time, loc *time.Location) time.Time {
 	for {
 		_, offset := cursor.Zone()
 		_, next := cursor.ZoneBounds()
+		if !next.IsZero() && !next.After(cursor) {
+			// Go can report December 31 UTC as the end of a rule
+			// interval in a future leap year. Advance to January 1.
+			next = time.Date(cursor.UTC().Year()+1, time.January, 1, 0, 0, 0, 0, time.UTC)
+		}
 		start := date.Add(-time.Duration(offset) * time.Second).In(loc)
 		if start.Before(cursor) {
 			start = cursor
