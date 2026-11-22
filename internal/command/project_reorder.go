@@ -56,7 +56,7 @@ func renderReorder(s reorderState) string {
 				marker = "*"
 			}
 		}
-		lines = append(lines, fmt.Sprintf("%s %s", marker, p.DisplayName))
+		lines = append(lines, fmt.Sprintf("%s %s", marker, terminalText(p.DisplayName)))
 	}
 	// Raw mode disables the terminal's automatic carriage return on newline.
 	return strings.Join(lines, "\r\n")
