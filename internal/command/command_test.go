@@ -56,7 +56,7 @@ func TestHelpVersionAndUsageErrors(t *testing.T) {
 		args []string
 		want string
 		fail bool
-	}{{"help", nil, "Usage:", false}, {"version", []string{"--version"}, "1.2.3", false}, {"unknown", []string{"wat"}, "unknown command", true}, {"project needs verb", []string{"project"}, "requires a subcommand", true}, {"time entry needs verb", []string{"time-entry"}, "requires a subcommand", true}, {"invalid format", []string{"config", "--format", "xml"}, "format must", true}, {"foreign boolean", []string{"config", "--clipboard"}, "unknown option", true}}
+	}{{"help", nil, "Usage:", false}, {"help default format", nil, "(default: table)", false}, {"version", []string{"--version"}, "1.2.3", false}, {"unknown", []string{"wat"}, "unknown command", true}, {"project needs verb", []string{"project"}, "requires a subcommand", true}, {"time entry needs verb", []string{"time-entry"}, "requires a subcommand", true}, {"invalid format", []string{"config", "--format", "xml"}, "format must", true}, {"foreign boolean", []string{"config", "--clipboard"}, "unknown option", true}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var out bytes.Buffer
@@ -92,10 +92,69 @@ func TestConfigFormatsHideToken(t *testing.T) {
 		})
 	}
 }
+func TestDefaultOutputIsTable(t *testing.T) {
+	pid := int64(1)
+	client := &fakeClient{
+		projects: []model.Project{{ID: 1, Name: "Client", DisplayName: "Shown", Active: true}},
+		entries:  []model.TimeEntry{{ID: 2, ProjectID: &pid, Description: "Work", Start: "2026-05-01T00:00:00Z", DurationSeconds: 90}},
+	}
+	tests := []struct {
+		name string
+		args []string
+		want []string
+	}{
+		{"summary", []string{"summary", "2026-05-01", "2026-05-02"}, []string{"Project", "2026-05-01", "Shown", "1.5"}},
+		{"time entries", []string{"time-entry", "list", "1", "2"}, []string{"description", "duration_minutes", "Work", "1.5"}},
+		{"projects", []string{"project", "list"}, []string{"Project", "Shown"}},
+		{"config", []string{"config"}, []string{"Setting", "Value", "WORKSPACE", "UTC"}},
+		{"empty projects", []string{"project", "list"}, []string{"Project"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fixture := client
+			if tt.name == "empty projects" {
+				fixture = &fakeClient{}
+			}
+			app, out := configuredApp(t, fixture, "")
+			if err := app.Run(context.Background(), tt.args); err != nil {
+				t.Fatal(err)
+			}
+			got := out.String()
+			if !strings.HasPrefix(got, "┌") || !strings.HasSuffix(got, "┘\n") || strings.Contains(got, "secret") {
+				t.Fatalf("expected bordered table without token, got %q", got)
+			}
+			for _, want := range tt.want {
+				if !strings.Contains(got, want) {
+					t.Fatalf("missing %q in %q", want, got)
+				}
+			}
+		})
+	}
+}
+
+func TestDefaultTableRejectsCSVOptionsBeforeConfiguration(t *testing.T) {
+	tests := [][]string{
+		{"summary", "--days", "1", "--no-project"},
+		{"summary", "--days", "1", "--no-date"},
+	}
+	for _, args := range tests {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			t.Setenv("HOME", t.TempDir())
+			client := &fakeClient{}
+			app := App{Client: client, Out: &bytes.Buffer{}}
+			err := app.Run(context.Background(), args)
+			var usageError UsageError
+			if !errors.As(err, &usageError) || !strings.Contains(err.Error(), "cannot be used with table format") || client.entryCalls != 0 || client.projectCalls != 0 {
+				t.Fatalf("expected table option error before configuration/API access, got %v", err)
+			}
+		})
+	}
+}
+
 func TestProjectListAndSync(t *testing.T) {
 	client := &fakeClient{projects: []model.Project{{ID: 2, Name: "Hidden", DisplayName: "Hidden", Hidden: true}, {ID: 1, Name: "Client", DisplayName: "Shown", Active: true}}}
 	app, out := configuredApp(t, client, "")
-	if err := app.Run(context.Background(), []string{"project", "list"}); err != nil {
+	if err := app.Run(context.Background(), []string{"project", "list", "--format", "tsv"}); err != nil {
 		t.Fatal(err)
 	}
 	if out.String() != "Shown\n" {
@@ -113,7 +172,7 @@ func TestProjectListAndSync(t *testing.T) {
 
 func TestEmptyProjectListWritesNewline(t *testing.T) {
 	app, out := configuredApp(t, &fakeClient{}, "")
-	if err := app.Run(context.Background(), []string{"project", "list"}); err != nil {
+	if err := app.Run(context.Background(), []string{"project", "list", "--format", "tsv"}); err != nil {
 		t.Fatal(err)
 	}
 	if out.String() != "\n" {
@@ -128,12 +187,11 @@ func TestSummaryFormatsAndBoundaries(t *testing.T) {
 		args []string
 		want string
 	}{
-		{"default tsv", []string{"summary", "2026-05-01", "2026-05-02"}, "Project\t2026-05-01\t2026-05-02\nP\t1.5\t"},
 		{"tsv", []string{"summary", "2026-05-01", "2026-05-02", "--format", "tsv"}, "Project\t2026-05-01\t2026-05-02\nP\t1.5\t"},
 		{"csv", []string{"summary", "2026-05-01", "2026-05-02", "--format", "csv"}, "Project,2026-05-01,2026-05-02\nP,1.5,"},
 		{"json", []string{"summary", "--days", "2", "--format", "json"}, `"2026-05-01"`},
 		{"table", []string{"summary", "--days", "2", "--format", "table"}, "│ Project"},
-		{"no headers tsv", []string{"summary", "2026-05-01", "2026-05-02", "--no-project", "--no-date"}, "1.5\t"},
+		{"no headers tsv", []string{"summary", "2026-05-01", "2026-05-02", "-ftsv", "--no-project", "--no-date"}, "1.5\t"},
 		{"no headers csv", []string{"summary", "2026-05-01", "2026-05-02", "-fcsv", "--no-project", "--no-date"}, "1.5,"},
 	}
 	for _, tt := range tests {

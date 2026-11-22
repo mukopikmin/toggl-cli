@@ -130,23 +130,23 @@ go run ./cmd/migrate-config
 
 ## Commands
 
-Use `-f/--format tsv|csv|json|table` to select an output format. TSV uses tabs
+Use `-f/--format tsv|csv|json|table` to select an output format. Table is the default. TSV uses tabs
 and CSV uses commas; both delimiters are fixed. Fields containing the delimiter,
 quotes, or line breaks are quoted, and embedded quotes are doubled.
 
 | Command | Options / arguments | Output |
 | --- | --- | --- |
-| `summary` | `<start-date> <end-date>`, `--days N`, or `--template NAME`; `-f/--format`, `--watch`, `--no-project`/`--project`, `--no-date`/`--date`, `--daily-total`, `--clipboard`/`--no-clipboard` | TSV by default; CSV, JSON summary, or bordered table |
+| `summary` | `<start-date> <end-date>`, `--days N`, or `--template NAME`; `-f/--format`, `--watch`, `--no-project`/`--project`, `--no-date`/`--date`, `--daily-total`, `--clipboard`/`--no-clipboard` | Bordered table by default, TSV, CSV, or JSON summary |
 | `template add` | `<name> [<start-date> <end-date> or --days N]`; summary output options, `--force` | Stores a summary template without running it |
 | `template list` | none | Template names in alphabetical order |
 | `template show` | `<name>` | Template settings as TOML |
 | `template delete` | `<name>` | Deletes the named template |
-| `time-entry list` | `<start-day> <end-day>`; `-f/--format`, `--watch` | Entries as TSV by default, CSV, JSON, or table |
-| `project list` | `-f/--format`, `--watch` | Visible ordered project names as TSV or CSV, JSON, or table |
-| `client list` | `-f/--format`, `--watch` | Client IDs and names as TSV by default, CSV or JSON; names as a table |
+| `time-entry list` | `<start-day> <end-day>`; `-f/--format`, `--watch` | Entries as a bordered table by default, TSV, CSV, or JSON |
+| `project list` | `-f/--format`, `--watch` | Visible ordered projects as a table by default, TSV, CSV, or JSON |
+| `client list` | `-f/--format`, `--watch` | Client names as a table by default. Use TSV, CSV, or JSON for IDs and names |
 | `project sync` | none | Adds missing active projects to the TOML file |
 | `project reorder` | none | Interactively changes and saves visible-project order |
-| `config` | `-f/--format`, `--watch` | Non-sensitive settings as two-column TSV or CSV with a `Setting`/`Value` header, JSON, or table |
+| `config` | `-f/--format`, `--watch` | Non-sensitive settings as a table by default, two-column TSV or CSV, or JSON |
 | `init` | none | Creates a mode-`0600` configuration interactively |
 | `update` | `--channel stable\|nightly` | Checks, verifies, and installs a release update |
 | `completion` | `bash\|zsh\|fish` | Prints a shell completion script without loading configuration |
@@ -191,16 +191,16 @@ toggl summary --days 7 --format table --watch
 ```
 
 `toggl client list` fetches clients from the configured workspace in API order.
-The default output is TSV with `id` and `name` headers. CSV uses commas and TSV
+The default output is a bordered table of names. CSV and TSV use `id` and `name` headers. CSV uses commas and TSV
 uses tabs. Fields containing the delimiter, quotes, or newlines are quoted.
 Empty CSV/TSV output contains only the header. This command does not change the
 configuration file.
 
 ```sh
-toggl client list                   # TSV: id and name columns
+toggl client list                   # Bordered table of names
 toggl client list --format csv      # CSV: id and name columns
 toggl client list --format json     # Objects with id and name
-toggl client list --format table    # Bordered table of names
+toggl client list --format tsv      # TSV with id and name columns
 ```
 
 Add `--daily-total` to `summary` to append a `Total` row to CSV, TSV, or table output:
@@ -245,7 +245,7 @@ toggl summary --template weekly --days 14 --format csv
 toggl summary --template weekly 2026-10-01 2026-10-31
 
 # Store only output settings and supply a period when running the summary.
-toggl template add spreadsheet --no-project --no-date --clipboard
+toggl template add spreadsheet --format tsv --no-project --no-date --clipboard
 toggl summary --template spreadsheet 2026-10-01 2026-10-31
 toggl summary --template spreadsheet --days 1 --project --date --no-clipboard
 
@@ -286,7 +286,7 @@ the summary runs, using the configured timezone or system timezone. Fixed dates
 remain fixed. A period must be available when executing a summary.
 
 Explicit command-line settings override the template, followed by the existing
-defaults (TSV, project column and date header, no clipboard).
+defaults (table, project column and date header, no clipboard).
 A command-line period replaces the saved period entirely. Supplying both a date
 range and `--days` on the command line is still an error. Use `--project`,
 `--date`, and `--no-clipboard` to reverse saved boolean settings; opposing flags

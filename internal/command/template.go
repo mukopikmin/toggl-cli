@@ -45,7 +45,7 @@ func summaryOptions(base model.SummaryOptions, o opts) (model.SummaryOptions, er
 		base.Clipboard = o.clipboard
 	}
 	if base.Format == "" {
-		base.Format = "tsv"
+		base.Format = "table"
 	}
 	return base, nil
 }
