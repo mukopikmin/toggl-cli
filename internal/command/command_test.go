@@ -80,7 +80,7 @@ func TestHelpVersionAndUsageErrors(t *testing.T) {
 	}
 }
 func TestConfigFormatsHideToken(t *testing.T) {
-	for _, format := range []string{"csv", "json", "table"} {
+	for _, format := range []string{"csv", "tsv", "json", "table"} {
 		t.Run(format, func(t *testing.T) {
 			app, out := configuredApp(t, &fakeClient{}, "")
 			if err := app.Run(context.Background(), []string{"config", "--format", format}); err != nil {
@@ -134,10 +134,8 @@ func TestDefaultOutputIsTable(t *testing.T) {
 
 func TestDefaultTableRejectsCSVOptionsBeforeConfiguration(t *testing.T) {
 	tests := [][]string{
-		{"summary", "--days", "1", "--separator", ","},
 		{"summary", "--days", "1", "--no-project"},
 		{"summary", "--days", "1", "--no-date"},
-		{"time-entry", "list", "1", "2", "--separator", ","},
 	}
 	for _, args := range tests {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
@@ -156,7 +154,7 @@ func TestDefaultTableRejectsCSVOptionsBeforeConfiguration(t *testing.T) {
 func TestProjectListAndSync(t *testing.T) {
 	client := &fakeClient{projects: []model.Project{{ID: 2, Name: "Hidden", DisplayName: "Hidden", Hidden: true}, {ID: 1, Name: "Client", DisplayName: "Shown", Active: true}}}
 	app, out := configuredApp(t, client, "")
-	if err := app.Run(context.Background(), []string{"project", "list", "--format", "csv"}); err != nil {
+	if err := app.Run(context.Background(), []string{"project", "list", "--format", "tsv"}); err != nil {
 		t.Fatal(err)
 	}
 	if out.String() != "Shown\n" {
@@ -172,9 +170,9 @@ func TestProjectListAndSync(t *testing.T) {
 	}
 }
 
-func TestEmptyProjectCSVListWritesNewline(t *testing.T) {
+func TestEmptyProjectListWritesNewline(t *testing.T) {
 	app, out := configuredApp(t, &fakeClient{}, "")
-	if err := app.Run(context.Background(), []string{"project", "list", "--format", "csv"}); err != nil {
+	if err := app.Run(context.Background(), []string{"project", "list", "--format", "tsv"}); err != nil {
 		t.Fatal(err)
 	}
 	if out.String() != "\n" {
@@ -188,7 +186,14 @@ func TestSummaryFormatsAndBoundaries(t *testing.T) {
 		name string
 		args []string
 		want string
-	}{{"csv", []string{"summary", "2026-05-01", "2026-05-02", "--format", "csv"}, "Project\t2026-05-01\t2026-05-02\nP\t1.5\t"}, {"json", []string{"summary", "--days", "2", "--format", "json"}, `"2026-05-01"`}, {"no headers", []string{"summary", "2026-05-01", "2026-05-02", "--format", "csv", "--no-project", "--no-date"}, "1.5\t"}}
+	}{
+		{"tsv", []string{"summary", "2026-05-01", "2026-05-02", "--format", "tsv"}, "Project\t2026-05-01\t2026-05-02\nP\t1.5\t"},
+		{"csv", []string{"summary", "2026-05-01", "2026-05-02", "--format", "csv"}, "Project,2026-05-01,2026-05-02\nP,1.5,"},
+		{"json", []string{"summary", "--days", "2", "--format", "json"}, `"2026-05-01"`},
+		{"table", []string{"summary", "--days", "2", "--format", "table"}, "│ Project"},
+		{"no headers tsv", []string{"summary", "2026-05-01", "2026-05-02", "-ftsv", "--no-project", "--no-date"}, "1.5\t"},
+		{"no headers csv", []string{"summary", "2026-05-01", "2026-05-02", "-fcsv", "--no-project", "--no-date"}, "1.5,"},
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app, out := configuredApp(t, client, "")
@@ -201,39 +206,21 @@ func TestSummaryFormatsAndBoundaries(t *testing.T) {
 		})
 	}
 	app, _ := configuredApp(t, client, "")
-	if err := app.Run(context.Background(), []string{"summary", "2026-05-01", "2026-05-02", "--format", "table", "--separator", ","}); err == nil {
-		t.Fatal("expected table/separator error")
+	for _, flag := range []string{"--no-project", "--no-date"} {
+		if err := app.Run(context.Background(), []string{"summary", "2026-05-01", "2026-05-02", "--format", "table", flag}); err == nil {
+			t.Fatalf("expected table/%s error", flag)
+		}
 	}
 }
 
-func TestSummaryAllowsEmptySeparator(t *testing.T) {
-	client := &fakeClient{projects: []model.Project{{ID: 1, DisplayName: "P"}}}
-	app, out := configuredApp(t, client, "")
-	if err := app.Run(context.Background(), []string{"summary", "2026-05-01", "2026-05-01", "--format", "csv", "--separator", ""}); err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(out.String(), "Project2026-05-01") {
-		t.Fatal(out.String())
-	}
-}
 func TestTimeEntryFormats(t *testing.T) {
 	pid := int64(8)
 	stop := "2026-05-01T01:00:00Z"
 	client := &fakeClient{entries: []model.TimeEntry{{ID: 2, ProjectID: &pid, Description: "a,b", Start: "2026-05-01T00:00:00Z", Stop: &stop, DurationSeconds: 3600}}}
-	for _, format := range []string{"csv", "json", "table"} {
+	for _, format := range []string{"csv", "tsv", "json", "table"} {
 		t.Run(format, func(t *testing.T) {
 			app, out := configuredApp(t, client, "")
-			if err := app.Run(context.Background(), []string{"time-entry", "list", "1", "2", "--format", format, "--separator", func() string {
-				if format == "table" {
-					return ""
-				}
-				return ","
-			}()}); format == "table" {
-				if err == nil {
-					t.Fatal("expected separator error")
-				}
-				return
-			} else if err != nil {
+			if err := app.Run(context.Background(), []string{"time-entry", "list", "1", "2", "--format", format}); err != nil {
 				t.Fatal(err)
 			}
 			if !strings.Contains(out.String(), "a,b") {
@@ -243,11 +230,27 @@ func TestTimeEntryFormats(t *testing.T) {
 	}
 }
 
-func TestTimeEntryRejectsEmptySeparator(t *testing.T) {
-	app, _ := configuredApp(t, &fakeClient{}, "")
-	err := app.Run(context.Background(), []string{"time-entry", "list", "1", "2", "--format", "csv", "--separator", ""})
-	if err == nil || err.Error() != "separator must not be empty" {
-		t.Fatalf("%v", err)
+func TestRemovedSeparatorRejectedBeforeConfiguration(t *testing.T) {
+	commands := [][]string{
+		{"summary", "2026-05-01", "2026-05-02"},
+		{"time-entry", "list", "1", "2"},
+		{"project", "list"},
+		{"config"},
+	}
+	for _, command := range commands {
+		for _, flags := range [][]string{{"--separator", ","}, {"--separator="}, {"-s", ","}, {"-s,"}} {
+			args := append(append([]string{}, command...), flags...)
+			t.Run(strings.Join(args, " "), func(t *testing.T) {
+				t.Setenv("HOME", t.TempDir())
+				client := &fakeClient{}
+				app := App{Client: client, Out: &bytes.Buffer{}}
+				err := app.Run(context.Background(), args)
+				var usageError UsageError
+				if !errors.As(err, &usageError) || !strings.Contains(err.Error(), "unknown option") || client.entryCalls != 0 || client.projectCalls != 0 {
+					t.Fatalf("expected unknown option before configuration/API access, got %v", err)
+				}
+			})
+		}
 	}
 }
 func TestInitCreatesProtectedConfig(t *testing.T) {

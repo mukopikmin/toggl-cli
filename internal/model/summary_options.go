@@ -8,10 +8,12 @@ import (
 
 // SummaryOptions describes a reusable summary without credentials or resolved dates.
 type SummaryOptions struct {
-	StartDate string  `toml:"start_date,omitempty"`
-	EndDate   string  `toml:"end_date,omitempty"`
-	Days      *int    `toml:"days,omitempty"`
-	Format    string  `toml:"format,omitempty"`
+	StartDate string `toml:"start_date,omitempty"`
+	EndDate   string `toml:"end_date,omitempty"`
+	Days      *int   `toml:"days,omitempty"`
+	Format    string `toml:"format,omitempty"`
+	// Separator is retained so templates created by older versions still load.
+	// Output delimiters are now fixed by Format.
 	Separator *string `toml:"separator,omitempty"`
 	NoProject bool    `toml:"no_project"`
 	NoDate    bool    `toml:"no_date"`
@@ -20,11 +22,11 @@ type SummaryOptions struct {
 
 // Validate allows a missing period when storing an output-only template.
 func (o SummaryOptions) Validate(requirePeriod bool) error {
-	if o.Format != "" && o.Format != "csv" && o.Format != "json" && o.Format != "table" {
-		return fmt.Errorf("format must be csv, json, or table")
+	if o.Format != "" && o.Format != "csv" && o.Format != "tsv" && o.Format != "json" && o.Format != "table" {
+		return fmt.Errorf("format must be csv, tsv, json, or table")
 	}
-	if o.Format == "table" && (o.Separator != nil || o.NoProject || o.NoDate) {
-		return fmt.Errorf("--separator, --no-project, and --no-date cannot be used with table format")
+	if o.Format == "table" && (o.NoProject || o.NoDate) {
+		return fmt.Errorf("--no-project and --no-date cannot be used with table format")
 	}
 	if o.Days != nil {
 		if *o.Days <= 0 || int64(*o.Days) > 9007199254740991 {

@@ -33,7 +33,7 @@ func TestTemplateLifecycleWithoutConfigurationOrAPI(t *testing.T) {
 		t.Fatalf("empty list = %q", got)
 	}
 	run("template", "add", "weekly", "--days", "6", "--format", "table")
-	run("template", "add", "spreadsheet", "--format", "csv", "--no-date", "--no-project")
+	run("template", "add", "spreadsheet", "-ftsv", "--no-date", "--no-project")
 	if got := run("template", "list"); got != "spreadsheet\nweekly\n" {
 		t.Fatal(got)
 	}
@@ -85,7 +85,8 @@ func TestTemplateUsageErrorsDoNotWrite(t *testing.T) {
 		{"template", "add", "weekly", "--days=-1"},
 		{"template", "add", "weekly", "--days", "0"},
 		{"summary", "--days", "0"},
-		{"template", "add", "weekly", "--format", "table", "--separator", ","},
+		{"template", "add", "weekly", "--format", "table", "--no-date"},
+		{"template", "add", "weekly", "--separator", ","},
 		{"template", "add", "weekly", "--format", "table", "--no-date"},
 		{"template", "add", "weekly", "--template", "other"},
 		{"template", "list", "extra"}, {"template", "list", "--force"},
@@ -135,10 +136,9 @@ func TestSummaryTemplateMatchesDirectExecution(t *testing.T) {
 		{"format override", []string{"--days", "6", "-ftable"}, []string{"--days", "1", "-fcsv"}, []string{"--days", "1", "-fcsv"}},
 		{"fixed replaces relative", []string{"--days", "6"}, []string{"2026-05-01", "2026-05-02"}, []string{"2026-05-01", "2026-05-02"}},
 		{"relative replaces fixed", []string{"2026-04-01", "2026-04-30"}, []string{"--days", "1"}, []string{"--days", "1"}},
-		{"output only", []string{"--format", "csv", "--no-project", "--no-date"}, []string{"2026-05-01", "2026-05-02"}, []string{"2026-05-01", "2026-05-02", "--format", "csv", "--no-project", "--no-date"}},
-		{"clear booleans", []string{"--days", "1", "--format", "csv", "--no-project", "--no-date", "--clipboard"}, []string{"--project", "--date", "--no-clipboard"}, []string{"--days", "1", "--format", "csv"}},
-		{"empty separator", []string{"--days", "1", "--format", "csv", "--separator", ""}, nil, []string{"--days", "1", "--format", "csv", "--separator", ""}},
-		{"override separator", []string{"--days", "1", "--format", "csv", "--separator", ","}, []string{"--separator", "|"}, []string{"--days", "1", "--format", "csv", "--separator", "|"}},
+		{"output only", []string{"-ftsv", "--no-project", "--no-date"}, []string{"2026-05-01", "2026-05-02"}, []string{"2026-05-01", "2026-05-02", "-ftsv", "--no-project", "--no-date"}},
+		{"clear booleans", []string{"--days", "1", "-ftsv", "--no-project", "--no-date", "--clipboard"}, []string{"--project", "--date", "--no-clipboard"}, []string{"--days", "1", "-ftsv"}},
+		{"csv format", []string{"--days", "1", "--format", "csv"}, nil, []string{"--days", "1", "--format", "csv"}},
 		{"json", []string{"--days", "1", "--format", "json"}, nil, []string{"--days", "1", "--format", "json"}},
 	}
 	for _, tt := range tests {
@@ -178,6 +178,28 @@ func TestSummaryTemplateMatchesDirectExecution(t *testing.T) {
 	}
 }
 
+func TestLegacyTemplateSeparatorDoesNotOverrideFormat(t *testing.T) {
+	projectID := int64(1)
+	fake := &fakeClient{
+		projects: []model.Project{{ID: projectID, DisplayName: "Project A"}},
+		entries:  []model.TimeEntry{{ProjectID: &projectID, Start: "2026-05-02T01:00:00Z", DurationSeconds: 90}},
+	}
+	app, out := configuredApp(t, fake, "")
+	path := filepath.Join(os.Getenv("HOME"), ".config", "toggl-cli", "templates.toml")
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("[templates.legacy]\ndays = 1\nformat = 'csv'\nseparator = '\\t'\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.Run(context.Background(), []string{"summary", "--template", "legacy"}); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := out.String(), "Project,2026-05-02\nProject A,1.5\n"; got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
 func TestCorruptTemplatesAreNotOverwritten(t *testing.T) {
 	for _, args := range [][]string{
 		{"template", "add", "weekly", "--days", "1", "--force"},
@@ -208,8 +230,8 @@ func TestCorruptTemplatesAreNotOverwritten(t *testing.T) {
 
 func TestSummaryValidatesMergedTemplateBeforeAPI(t *testing.T) {
 	tests := []struct{ settings, overrides []string }{
-		{[]string{"--days", "1", "--format", "csv", "--no-date"}, []string{"--format", "table"}},
-		{[]string{"--days", "1", "--format", "csv", "--separator", ""}, []string{"--format", "table"}},
+		{[]string{"--days", "1", "-ftsv", "--no-date"}, []string{"--format", "table"}},
+		{[]string{"--days", "1", "-ftsv", "--no-project"}, []string{"--format", "table"}},
 		{[]string{"--format", "table"}, nil},
 		{[]string{"--days", "1"}, []string{"2026-05-01"}},
 		{[]string{"--days", "1"}, []string{"2026-05-01", "2026-05-02", "--days", "1"}},

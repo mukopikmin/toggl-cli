@@ -8,7 +8,7 @@ import (
 )
 
 func TestParseOptsCompatibleForms(t *testing.T) {
-	allowed := map[string]bool{"format": true, "separator": true, "days": true, "no-date": true, "daily-total": true}
+	allowed := map[string]bool{"format": true, "days": true, "no-date": true, "daily-total": true}
 	one := 1
 	maxSafe := 9007199254740991
 	tests := []struct {
@@ -16,18 +16,15 @@ func TestParseOptsCompatibleForms(t *testing.T) {
 		args []string
 		want opts
 	}{
-		{"default format", nil, opts{format: "table", sep: "\t"}},
-		{"explicit csv", []string{"--format", "csv"}, opts{format: "csv", formatSet: true, sep: "\t"}},
-		{"attached format", []string{"-fjson"}, opts{format: "json", formatSet: true, sep: "\t"}},
-		{"attached days", []string{"-d1", "-fjson"}, opts{format: "json", formatSet: true, sep: "\t", days: &one}},
-		{"daily total", []string{"--daily-total"}, opts{format: "table", sep: "\t", dailyTotal: true}},
-		{"attached separator", []string{"-s,"}, opts{format: "table", sep: ",", separatorSet: true}},
-		{"end of options", []string{"--", "--no-date", "-fjson"}, opts{format: "table", sep: "\t", pos: []string{"--no-date", "-fjson"}}},
-		{"trailing end marker", []string{"--"}, opts{format: "table", sep: "\t"}},
-		{"explicit dash value", []string{"--separator=--no-date"}, opts{format: "table", sep: "--no-date", separatorSet: true}},
-		{"single dash value", []string{"-s", "-"}, opts{format: "table", sep: "-", separatorSet: true}},
-		{"leading zero days", []string{"--days", "01"}, opts{format: "table", sep: "\t", days: &one}},
-		{"safe integer boundary", []string{"--days", "9007199254740991"}, opts{format: "table", sep: "\t", days: &maxSafe}},
+		{"default format", nil, opts{format: "table"}},
+		{"attached format", []string{"-fjson"}, opts{format: "json", formatSet: true}},
+		{"daily total", []string{"--daily-total"}, opts{format: "table", dailyTotal: true}},
+		{"attached tsv", []string{"-ftsv"}, opts{format: "tsv", formatSet: true}},
+		{"attached days", []string{"-d1", "-fjson"}, opts{format: "json", formatSet: true, days: &one}},
+		{"end of options", []string{"--", "--no-date", "-fjson"}, opts{format: "table", pos: []string{"--no-date", "-fjson"}}},
+		{"trailing end marker", []string{"--"}, opts{format: "table"}},
+		{"leading zero days", []string{"--days", "01"}, opts{format: "table", days: &one}},
+		{"safe integer boundary", []string{"--days", "9007199254740991"}, opts{format: "table", days: &maxSafe}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -40,13 +37,13 @@ func TestParseOptsCompatibleForms(t *testing.T) {
 }
 
 func TestParseOptsRejectsInvalidValues(t *testing.T) {
-	allowed := map[string]bool{"format": true, "separator": true, "days": true, "no-project": true, "no-date": true, "clipboard": true}
+	allowed := map[string]bool{"format": true, "days": true, "no-project": true, "no-date": true, "clipboard": true}
 	tests := [][]string{
 		{"--no-date=false"}, {"--no-project=true"}, {"--clipboard=false"},
 		{"--days", "0"}, {"--days=00"}, {"-d0"},
 		{"--days", "+1"}, {"--days=-1"}, {"--days", "1.5"}, {"--days", ""},
 		{"--days", "9007199254740992"}, {"--days", "999999999999999999999999"},
-		{"--separator", "--no-date"}, {"--separator", "--"}, {"--separator", "-fjson"},
+		{"--separator", "--no-date"}, {"-s,"},
 		{"--format"}, {"--format", "--no-date"}, {"--days"}, {"--unknown=value"},
 	}
 	for _, args := range tests {

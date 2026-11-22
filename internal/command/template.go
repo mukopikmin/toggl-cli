@@ -9,7 +9,7 @@ import (
 
 func summaryFlags() map[string]bool {
 	return map[string]bool{
-		"format": true, "separator": true, "days": true,
+		"format": true, "days": true,
 		"no-project": true, "project": true, "no-date": true, "date": true,
 		"clipboard": true, "no-clipboard": true,
 	}
@@ -34,9 +34,6 @@ func summaryOptions(base model.SummaryOptions, o opts) (model.SummaryOptions, er
 	}
 	if o.formatSet {
 		base.Format = o.format
-	}
-	if o.separatorSet {
-		base.Separator = &o.sep
 	}
 	if o.noProjectSet {
 		base.NoProject = o.noProject

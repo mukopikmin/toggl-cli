@@ -31,11 +31,11 @@ func TestSummaryDailyTotalFormats(t *testing.T) {
 		args []string
 		want string
 	}{
-		{"csv", []string{"--format", "csv"}, "Project\t2026-05-01\t2026-05-02\t2026-05-03\nA\t0.02\t0.5\t\nB\t0.02\t\t\nTotal\t0.03\t0.5\t0\n"},
-		{"separator", []string{"--format", "csv", "--separator", ","}, "Project,2026-05-01,2026-05-02,2026-05-03\nA,0.02,0.5,\nB,0.02,,\nTotal,0.03,0.5,0\n"},
-		{"no project", []string{"--format", "csv", "--no-project"}, "2026-05-01\t2026-05-02\t2026-05-03\n0.02\t0.5\t\n0.02\t\t\n0.03\t0.5\t0\n"},
-		{"no date", []string{"--format", "csv", "--no-date"}, "A\t0.02\t0.5\t\nB\t0.02\t\t\nTotal\t0.03\t0.5\t0\n"},
-		{"no headers", []string{"--format", "csv", "--no-project", "--no-date"}, "0.02\t0.5\t\n0.02\t\t\n0.03\t0.5\t0\n"},
+		{"tsv", []string{"-ftsv"}, "Project\t2026-05-01\t2026-05-02\t2026-05-03\nA\t0.02\t0.5\t\nB\t0.02\t\t\nTotal\t0.03\t0.5\t0\n"},
+		{"csv", []string{"--format", "csv"}, "Project,2026-05-01,2026-05-02,2026-05-03\nA,0.02,0.5,\nB,0.02,,\nTotal,0.03,0.5,0\n"},
+		{"no project", []string{"-ftsv", "--no-project"}, "2026-05-01\t2026-05-02\t2026-05-03\n0.02\t0.5\t\n0.02\t\t\n0.03\t0.5\t0\n"},
+		{"no date", []string{"-ftsv", "--no-date"}, "A\t0.02\t0.5\t\nB\t0.02\t\t\nTotal\t0.03\t0.5\t0\n"},
+		{"no headers", []string{"-ftsv", "--no-project", "--no-date"}, "0.02\t0.5\t\n0.02\t\t\n0.03\t0.5\t0\n"},
 		{"default table", nil, "┌─────────┬────────────┬────────────┬────────────┐\n│ Project │ 2026-05-01 │ 2026-05-02 │ 2026-05-03 │\n├─────────┼────────────┼────────────┼────────────┤\n│ A       │ 0.02       │ 0.5        │            │\n│ B       │ 0.02       │            │            │\n│ Total   │ 0.03       │ 0.5        │ 0          │\n└─────────┴────────────┴────────────┴────────────┘\n"},
 	}
 	for _, tt := range tests {
@@ -62,7 +62,7 @@ func TestSummaryDailyTotalFormats(t *testing.T) {
 func TestSummaryDailyTotalEmpty(t *testing.T) {
 	for _, projects := range [][]model.Project{nil, {{ID: 1, DisplayName: "A"}}, {{ID: 1, Hidden: true}}} {
 		app, out := configuredApp(t, &fakeClient{projects: projects}, "")
-		if err := app.Run(context.Background(), []string{"summary", "2026-05-01", "2026-05-01", "--daily-total", "--format", "csv"}); err != nil {
+		if err := app.Run(context.Background(), []string{"summary", "2026-05-01", "2026-05-01", "--daily-total", "-ftsv"}); err != nil {
 			t.Fatal(err)
 		}
 		if !strings.HasSuffix(out.String(), "Total\t0\n") {
@@ -92,7 +92,7 @@ func TestSummaryDailyTotalMonthBoundaries(t *testing.T) {
 				t.Fatal(err)
 			}
 			app.Now = func() time.Time { return time.Date(2026, 2, 1, 12, 0, 0, 0, time.UTC) }
-			if err := app.Run(context.Background(), []string{"summary", "--days", "2", "--daily-total", "--format", "csv"}); err != nil {
+			if err := app.Run(context.Background(), []string{"summary", "--days", "2", "--daily-total", "-ftsv"}); err != nil {
 				t.Fatal(err)
 			}
 			if !strings.HasPrefix(out.String(), "Project\t2026-01-31\t2026-02-01\n") || !strings.HasSuffix(out.String(), tt.want) {
@@ -107,7 +107,7 @@ func TestSummaryDailyTotalInvalidUsage(t *testing.T) {
 		{"summary", "--days", "1", "--daily-total", "--format", "json"},
 		{"summary", "--days", "1", "--daily-total=false"},
 		{"project", "list", "--daily-total"},
-		{"time-entry", "list", "1", "2", "--daily-total", "--format", "csv"},
+		{"time-entry", "list", "1", "2", "--daily-total"},
 		{"config", "--daily-total"},
 	}
 	for _, args := range tests {
