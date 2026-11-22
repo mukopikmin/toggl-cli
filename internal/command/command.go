@@ -53,6 +53,8 @@ Commands:
 Options:
   -f, --format <format>  Set the output format: csv, tsv, json, or table (default: table)
       --watch            Redraw table output on terminal resize until Ctrl+C
+      --columns <list>   Select id, displayName, name, and/or hidden (project list table/CSV/TSV)
+      --include-hidden   Include projects hidden in the configuration (project list)
   -d, --days <days>      Aggregate this many calendar days, including today (>= 1)
       --clipboard        Copy the output to the clipboard as well as stdout
       --no-clipboard     Disable clipboard copying (summary/template add)
@@ -289,14 +291,8 @@ func (a App) project(ctx context.Context, args []string) error {
 	switch args[0] {
 	case "list":
 		var err error
-		listOptions, err = parseOpts(args[1:], map[string]bool{"format": true, "watch": true})
+		listOptions, err = a.parseProjectListOptions(args[1:])
 		if err != nil {
-			return err
-		}
-		if len(listOptions.pos) > 0 {
-			return usage("project list does not accept positional arguments")
-		}
-		if err := a.validateTableWatch(listOptions.watch, listOptions.format); err != nil {
 			return err
 		}
 	case "sync":
@@ -320,25 +316,7 @@ func (a App) project(ctx context.Context, args []string) error {
 	}
 	switch args[0] {
 	case "list":
-		ps = model.VisibleSorted(ps)
-		if listOptions.format == "json" {
-			b, _ := json.MarshalIndent(ps, "", "  ")
-			fmt.Fprintln(a.Out, string(b))
-		} else if listOptions.format == "table" {
-			rows := [][]string{}
-			for _, p := range ps {
-				rows = append(rows, []string{p.DisplayName})
-			}
-			options := tableOutputOptions{watch: listOptions.watch, truncateProjects: true}
-			return a.writeTable(ctx, options, []string{"Project"}, rows, []string{"Proj."})
-		} else {
-			rows := make([][]string, len(ps))
-			for i, p := range ps {
-				rows[i] = []string{p.DisplayName}
-			}
-			fmt.Fprintln(a.Out, delimited(nil, rows, listOptions.format))
-		}
-		return nil
+		return a.writeProjectList(ctx, ps, listOptions)
 	case "sync":
 		configured := d.Config.Projects
 		sort.Slice(ps, func(i, j int) bool { return ps[i].ID < ps[j].ID })

@@ -142,7 +142,7 @@ quotes, or line breaks are quoted, and embedded quotes are doubled.
 | `template show` | `<name>` | Template settings as TOML |
 | `template delete` | `<name>` | Deletes the named template |
 | `time-entry list` | `<start-day> <end-day>`; `-f/--format`, `--watch` | Entries as a bordered table by default, TSV, CSV, or JSON |
-| `project list` | `-f/--format`, `--watch` | Visible ordered projects as a table by default, TSV, CSV, or JSON |
+| `project list` | `-f/--format`, `--watch`, `--columns`, `--include-hidden` | Ordered projects as a table by default, TSV, CSV, or JSON |
 | `client list` | `-f/--format`, `--watch` | Client names as a table by default. Use TSV, CSV, or JSON for IDs and names |
 | `project sync` | none | Adds missing active projects to the TOML file |
 | `project reorder` | none | Interactively changes and saves visible-project order |
@@ -175,9 +175,9 @@ When space is tighter, the headings can show just the day of the month, such as
 `9` or `10`. For a range spanning multiple months, the first displayed date of
 each month includes the month and, if the range spans multiple years, the year.
 If shorter headings still leave the table too wide, `summary` and
-`project list` shorten project names with `…`. Other data cells keep their full
-contents, so the table can still exceed the terminal width. Piped and
-redirected output uses the full headings and project names.
+`project list` shorten project names in the first column with `…`. Other data
+cells keep their full contents, so the table can still exceed the terminal
+width. Piped and redirected output uses the full headings and project names.
 
 Use `--watch` with table format in a terminal to redraw the table after a
 resize. It reads the data once and displays the portion that fits on screen.
@@ -188,6 +188,26 @@ from a saved template.
 
 ```sh
 toggl summary --days 7 --format table --watch
+```
+
+`toggl project list` shows visible active project display names by default.
+Use `--columns` to select a comma-separated list of columns for table, CSV,
+or TSV output. The output follows the order of the selected columns. CSV and
+TSV include a header when `--columns` is set. JSON includes all project fields.
+
+| Column | Value |
+| --- | --- |
+| `id` | Toggl project ID |
+| `displayName` | Configured display name, or the Toggl name when unset |
+| `name` | Project name in Toggl |
+| `hidden` | `true` when the project is hidden in the local configuration, `false` when visible |
+
+Use `--include-hidden` with any format to include hidden active projects in the
+configured display order.
+
+```sh
+toggl project list --columns id,displayName,name,hidden --include-hidden
+toggl project list --format tsv --columns id,displayName
 ```
 
 `toggl client list` fetches clients from the configured workspace in API order.

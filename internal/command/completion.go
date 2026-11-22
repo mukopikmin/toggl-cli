@@ -86,6 +86,9 @@ func completionCandidates(words []string) []string {
 	if command == "summary" {
 		options += " -d --days --no-project --no-date --clipboard"
 	}
+	if command == "project" {
+		options += " --columns --include-hidden"
+	}
 	if command == "update" {
 		options = "--channel"
 	}
@@ -95,8 +98,18 @@ func completionCandidates(words []string) []string {
 			return "csv tsv json table"
 		case "--channel":
 			return "stable nightly"
+		case "--columns":
+			return "id displayName name hidden"
 		}
 		return ""
+	}
+	completeValue := func(option, prefix string) []string {
+		if option == "--columns" {
+			if i := strings.LastIndexByte(current, ','); i >= 0 {
+				prefix = current[:i+1]
+			}
+		}
+		return filter(values(option), prefix)
 	}
 	allowed := func(option string) bool {
 		return strings.Contains(" "+options+" ", " "+option+" ")
@@ -124,10 +137,10 @@ func completionCandidates(words []string) []string {
 		}
 	}
 	if pending != "" {
-		return filter(values(pending), "")
+		return completeValue(pending, "")
 	}
 	if key, _, ok := strings.Cut(current, "="); ok && allowed(key) {
-		return filter(values(key), key+"=")
+		return completeValue(key, key+"=")
 	}
 	if strings.HasPrefix(current, "-f") && len(current) > 2 && allowed("-f") {
 		return filter(values("-f"), "-f")

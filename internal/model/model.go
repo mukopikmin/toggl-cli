@@ -29,9 +29,16 @@ type TimeEntry struct {
 type Summary map[string]map[int64]float64
 
 func VisibleSorted(projects []Project) []Project {
-	r := make([]Project, len(projects))
-	copy(r, projects)
-	r = slicesDeleteHidden(r)
+	return SortedProjects(projects, false)
+}
+
+func SortedProjects(projects []Project, includeHidden bool) []Project {
+	r := make([]Project, 0, len(projects))
+	for _, p := range projects {
+		if includeHidden || !p.Hidden {
+			r = append(r, p)
+		}
+	}
 	sort.SliceStable(r, func(i, j int) bool {
 		a, b := r[i].DisplayOrder, r[j].DisplayOrder
 		if a == nil {
@@ -42,15 +49,6 @@ func VisibleSorted(projects []Project) []Project {
 		}
 		return *a < *b
 	})
-	return r
-}
-func slicesDeleteHidden(p []Project) []Project {
-	r := p[:0]
-	for _, v := range p {
-		if !v.Hidden {
-			r = append(r, v)
-		}
-	}
 	return r
 }
 
