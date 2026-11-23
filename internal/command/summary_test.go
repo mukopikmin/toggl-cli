@@ -31,12 +31,12 @@ func TestSummaryDailyTotalFormats(t *testing.T) {
 		args []string
 		want string
 	}{
-		{"default TSV", nil, "Project\t2026-05-01\t2026-05-02\t2026-05-03\nA\t0.02\t0.5\t\nB\t0.02\t\t\nTotal\t0.03\t0.5\t0\n"},
+		{"tsv", []string{"-ftsv"}, "Project\t2026-05-01\t2026-05-02\t2026-05-03\nA\t0.02\t0.5\t\nB\t0.02\t\t\nTotal\t0.03\t0.5\t0\n"},
 		{"csv", []string{"--format", "csv"}, "Project,2026-05-01,2026-05-02,2026-05-03\nA,0.02,0.5,\nB,0.02,,\nTotal,0.03,0.5,0\n"},
-		{"no project", []string{"--no-project"}, "2026-05-01\t2026-05-02\t2026-05-03\n0.02\t0.5\t\n0.02\t\t\n0.03\t0.5\t0\n"},
-		{"no date", []string{"--no-date"}, "A\t0.02\t0.5\t\nB\t0.02\t\t\nTotal\t0.03\t0.5\t0\n"},
-		{"no headers", []string{"--no-project", "--no-date"}, "0.02\t0.5\t\n0.02\t\t\n0.03\t0.5\t0\n"},
-		{"table", []string{"--format", "table"}, "┌─────────┬────────────┬────────────┬────────────┐\n│ Project │ 2026-05-01 │ 2026-05-02 │ 2026-05-03 │\n├─────────┼────────────┼────────────┼────────────┤\n│ A       │ 0.02       │ 0.5        │            │\n│ B       │ 0.02       │            │            │\n│ Total   │ 0.03       │ 0.5        │ 0          │\n└─────────┴────────────┴────────────┴────────────┘\n"},
+		{"no project", []string{"-ftsv", "--no-project"}, "2026-05-01\t2026-05-02\t2026-05-03\n0.02\t0.5\t\n0.02\t\t\n0.03\t0.5\t0\n"},
+		{"no date", []string{"-ftsv", "--no-date"}, "A\t0.02\t0.5\t\nB\t0.02\t\t\nTotal\t0.03\t0.5\t0\n"},
+		{"no headers", []string{"-ftsv", "--no-project", "--no-date"}, "0.02\t0.5\t\n0.02\t\t\n0.03\t0.5\t0\n"},
+		{"default table", nil, "┌─────────┬────────────┬────────────┬────────────┐\n│ Project │ 2026-05-01 │ 2026-05-02 │ 2026-05-03 │\n├─────────┼────────────┼────────────┼────────────┤\n│ A       │ 0.02       │ 0.5        │            │\n│ B       │ 0.02       │            │            │\n│ Total   │ 0.03       │ 0.5        │ 0          │\n└─────────┴────────────┴────────────┴────────────┘\n"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -63,7 +63,7 @@ func TestSummaryDailyTotalFormats(t *testing.T) {
 func TestSummaryDailyTotalEmpty(t *testing.T) {
 	for _, projects := range [][]model.Project{nil, {{ID: 1, Name: "A"}}} {
 		app, out := configuredApp(t, &fakeClient{projects: projects}, "")
-		if err := app.Run(context.Background(), []string{"summary", "2026-05-01", "2026-05-01", "--daily-total"}); err != nil {
+		if err := app.Run(context.Background(), []string{"summary", "2026-05-01", "2026-05-01", "--daily-total", "-ftsv"}); err != nil {
 			t.Fatal(err)
 		}
 		if !strings.HasSuffix(out.String(), "Total\t0\n") {
@@ -95,7 +95,7 @@ func TestSummaryDailyTotalMonthBoundaries(t *testing.T) {
 				t.Fatal(err)
 			}
 			app.Now = func() time.Time { return time.Date(2026, 2, 1, 12, 0, 0, 0, time.UTC) }
-			if err := app.Run(context.Background(), []string{"summary", "--days", "2", "--daily-total"}); err != nil {
+			if err := app.Run(context.Background(), []string{"summary", "--days", "2", "--daily-total", "-ftsv"}); err != nil {
 				t.Fatal(err)
 			}
 			if !strings.HasPrefix(out.String(), "Project\t2026-01-31\t2026-02-01\n") || !strings.HasSuffix(out.String(), tt.want) {

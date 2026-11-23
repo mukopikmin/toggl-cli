@@ -61,13 +61,10 @@ func TestCommandsUseFixedDelimiters(t *testing.T) {
 		{"config", []string{"config"}, [][]string{{"Setting", "Value"}, {"WORKSPACE", "1"}, {"TIMEZONE", "UTC"}}},
 	}
 	for _, tt := range tests {
-		for _, format := range []string{"default", "csv", "tsv"} {
+		for _, format := range []string{"csv", "tsv"} {
 			t.Run(tt.name+"/"+format, func(t *testing.T) {
 				app, out := configuredApp(t, client, "")
-				args := append([]string{}, tt.args...)
-				if format != "default" {
-					args = append(args, "--format", format)
-				}
+				args := append(append([]string{}, tt.args...), "--format", format)
 				if err := app.Run(context.Background(), args); err != nil {
 					t.Fatal(err)
 				}
