@@ -395,8 +395,8 @@ The `Test` workflow runs this suite against the executable extracted from a
 Linux release archive built by `make release`.
 
 The `Test` workflow runs for pull requests, pushes to `main`, and manual dispatches.
-Feature-branch pushes use the pull request run to avoid duplicate checks. Successful
-checks on `main` continue to trigger the Nightly workflow.
+Feature-branch pushes use the pull request run to avoid duplicate checks. Nightly
+publishes only after a successful `Test` push run on this repository's `main` branch.
 
 `make check-vuln` runs `govulncheck` v1.9.0 for the current platform, checking the
 Go standard library and dependencies for known vulnerabilities reachable from
