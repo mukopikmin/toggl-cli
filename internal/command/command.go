@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -23,6 +24,7 @@ import (
 const Help = `Usage:
   toggl summary <start-date> <end-date> [options]
   toggl summary --days <days> [options]
+  toggl summary --month <month> [options]
   toggl summary --template <name> [options]
   toggl template add <name> [<start-date> <end-date> | --days <days>] [options] [--force]
   toggl template list
@@ -50,9 +52,10 @@ Commands:
   completion  Print a shell completion script
 
 Options:
-  -f, --format <format>  Set the output format: csv, tsv, json, or table (default: tsv)
+  -f, --format <format>  Set the output format: csv, tsv, json, or table (default: table)
       --watch            Redraw table output on terminal resize until Ctrl+C
   -d, --days <days>      Aggregate this many calendar days, including today (>= 1)
+      --month <month>    Aggregate an entire month (YYYY-MM, YYYYMM, or YYYY/MM)
       --clipboard        Copy the output to the clipboard as well as stdout
       --no-clipboard     Disable clipboard copying (summary/template add)
       --template <name>  Use a saved summary template
@@ -361,14 +364,34 @@ func location(c config.Config) (*time.Location, error) {
 	}
 	return time.LoadLocation(c.Timezone)
 }
+func parseMonth(v string) (time.Time, error) {
+	if !regexp.MustCompile(`^\d{4}[-/]?\d{2}$`).MatchString(v) {
+		return time.Time{}, usage("month must use YYYY-MM, YYYYMM, or YYYY/MM")
+	}
+	v = strings.ReplaceAll(v, "/", "-")
+	if len(v) == 6 {
+		v = v[:4] + "-" + v[4:]
+	}
+	t, err := time.Parse("2006-01", v)
+	if err != nil {
+		return time.Time{}, usage("month must be a valid month")
+	}
+	return t, nil
+}
 func (a App) summary(ctx context.Context, args []string) error {
 	allowed := summaryFlags()
 	allowed["template"] = true
+	allowed["month"] = true
 	allowed["watch"] = true
 	allowed["daily-total"] = true
 	o, e := parseOpts(args, allowed)
 	if e != nil {
 		return e
+	}
+	if o.monthSet {
+		if o.days != nil || len(o.pos) > 0 {
+			return usage("summary accepts only one of start and end date, --days, or --month")
+		}
 	}
 	base := model.SummaryOptions{}
 	if o.templateSet {
@@ -388,6 +411,15 @@ func (a App) summary(ctx context.Context, args []string) error {
 	settings, e := summaryOptions(base, o)
 	if e != nil {
 		return e
+	}
+	if o.monthSet {
+		monthStart, err := parseMonth(o.month)
+		if err != nil {
+			return err
+		}
+		settings.Days = nil
+		settings.StartDate = monthStart.Format(time.DateOnly)
+		settings.EndDate = monthStart.AddDate(0, 1, -1).Format(time.DateOnly)
 	}
 	if o.dailyTotal && settings.Format == "json" {
 		return usage("--daily-total cannot be used with json format")

@@ -46,7 +46,7 @@ func TestSummaryDaysIncludesToday(t *testing.T) {
 			if err := os.WriteFile(config.Path(os.Getenv("HOME")), []byte(text), 0600); err != nil {
 				t.Fatal(err)
 			}
-			if err := app.Run(context.Background(), []string{"summary", "--days", strconv.Itoa(tt.days)}); err != nil {
+			if err := app.Run(context.Background(), []string{"summary", "--days", strconv.Itoa(tt.days), "--format", "tsv"}); err != nil {
 				t.Fatal(err)
 			}
 			wantEnd, _ := time.ParseInLocation(time.DateOnly, tt.wantEnd[:10], client.from.Location())
