@@ -352,6 +352,21 @@ func TestClipboardCommandParityAndFallback(t *testing.T) {
 	}
 }
 
+func TestJSONSummaryOmitsHiddenProjects(t *testing.T) {
+	hidden, visible := int64(42), int64(17)
+	client := &fakeClient{entries: []model.TimeEntry{{ProjectID: &hidden, Start: time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC), DurationSeconds: 60}, {ProjectID: &visible, Start: time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC), DurationSeconds: 60}}}
+	app, out := configuredApp(t, client, "")
+	if err := os.WriteFile(config.Path(os.Getenv("HOME")), []byte("workspace='1'\ntoken='secret'\n[projects.42]\nhidden=true\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.Run(context.Background(), []string{"summary", "--days", "2", "-fjson"}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), "42") || !strings.Contains(out.String(), "17") {
+		t.Fatal(out.String())
+	}
+}
+
 func TestTimeEntryListSortsByInstant(t *testing.T) {
 	tokyo := time.FixedZone("Tokyo", 9*60*60)
 	tokyoStart := time.Date(2026, 5, 2, 9, 0, 0, 0, tokyo)

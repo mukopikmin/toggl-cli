@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -428,6 +429,9 @@ func (a App) summary(ctx context.Context, args []string) error {
 	if e != nil {
 		return e
 	}
+	entries = slices.DeleteFunc(entries, func(entry model.TimeEntry) bool {
+		return entry.ProjectID != nil && d.Config.Projects[*entry.ProjectID].Hidden
+	})
 	sum := model.Summarize(entries, loc, now)
 	var projects []model.Project
 	if settings.Format != "json" {
@@ -438,7 +442,6 @@ func (a App) summary(ctx context.Context, args []string) error {
 	}
 	return a.writeSummary(ctx, settings, from, to, sum, projects, o.watch, o.dailyTotal)
 }
-
 func (a App) timeEntry(ctx context.Context, args []string) error {
 	if len(args) == 0 {
 		return usage("time-entry requires a subcommand: list")
