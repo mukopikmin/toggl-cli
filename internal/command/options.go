@@ -9,10 +9,12 @@ import (
 type opts struct {
 	format                       string
 	channel                      string
+	month                        string
 	days                         *int
 	noProject, noDate, clipboard bool
 	dailyTotal                   bool
 	channelSet                   bool
+	monthSet                     bool
 	formatSet                    bool
 	noProjectSet, noDateSet      bool
 	clipboardSet                 bool
@@ -23,7 +25,7 @@ type opts struct {
 }
 
 func parseOpts(args []string, allowed map[string]bool) (opts, error) {
-	o := opts{format: "tsv"}
+	o := opts{format: "table"}
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		if arg == "--" {
@@ -72,6 +74,15 @@ func parseOpts(args []string, allowed map[string]bool) (opts, error) {
 				return o, usage("days must be a positive integer")
 			}
 			o.days = &n
+		case "--month":
+			if !allowed["month"] {
+				return o, usagef("unknown option: %s", key)
+			}
+			v, e := take()
+			if e != nil {
+				return o, e
+			}
+			o.month, o.monthSet = v, true
 		case "--channel":
 			if !allowed["channel"] {
 				return o, usagef("unknown option: %s", key)

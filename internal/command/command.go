@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -17,13 +18,13 @@ import (
 	"github.com/mukopikmin/toggl-cli/internal/config"
 	"github.com/mukopikmin/toggl-cli/internal/model"
 	"github.com/mukopikmin/toggl-cli/internal/template"
-	"github.com/mukopikmin/toggl-cli/internal/toggl"
 	"golang.org/x/term"
 )
 
 const Help = `Usage:
   toggl summary <start-date> <end-date> [options]
   toggl summary --days <days> [options]
+  toggl summary --month <month> [options]
   toggl summary --template <name> [options]
   toggl template add <name> [<start-date> <end-date> | --days <days>] [options] [--force]
   toggl template list
@@ -51,9 +52,10 @@ Commands:
   completion  Print a shell completion script
 
 Options:
-  -f, --format <format>  Set the output format: csv, tsv, json, or table (default: tsv)
+  -f, --format <format>  Set the output format: csv, tsv, json, or table (default: table)
       --watch            Redraw table output on terminal resize until Ctrl+C
   -d, --days <days>      Aggregate this many calendar days, including today (>= 1)
+      --month <month>    Aggregate an entire month (YYYY-MM, YYYYMM, or YYYY/MM)
       --clipboard        Copy the output to the clipboard as well as stdout
       --no-clipboard     Disable clipboard copying (summary/template add)
       --template <name>  Use a saved summary template
@@ -67,11 +69,12 @@ Options:
       --version          Show the version`
 
 type App struct {
-	Client   toggl.Client
-	Out, Err io.Writer
-	In       io.Reader
-	Now      func() time.Time
-	Version  string
+	NewClient func(workspace, token string) TogglClient
+	Updater   Updater
+	Out, Err  io.Writer
+	In        io.Reader
+	Now       func() time.Time
+	Version   string
 }
 
 type UsageError struct{ Message string }
@@ -129,7 +132,7 @@ func (a App) Run(ctx context.Context, args []string) error {
 	case "time-entry":
 		return a.timeEntry(ctx, args[1:])
 	case "update":
-		return a.update(args[1:])
+		return a.update(ctx, args[1:])
 	default:
 		return usagef("unknown command: %s", args[0])
 	}
@@ -314,7 +317,7 @@ func (a App) project(ctx context.Context, args []string) error {
 	if e != nil {
 		return e
 	}
-	ps, e := a.Client.Projects(ctx, d.Config)
+	ps, e := a.projects(ctx, d.Config)
 	if e != nil {
 		return e
 	}
@@ -340,27 +343,13 @@ func (a App) project(ctx context.Context, args []string) error {
 		}
 		return nil
 	case "sync":
-		configured := d.Config.Projects
-		sort.Slice(ps, func(i, j int) bool { return ps[i].ID < ps[j].ID })
-		text := d.Text
-		count := 0
-		for _, p := range ps {
-			if _, ok := configured[p.ID]; ok {
-				continue
-			}
-			if !strings.HasSuffix(text, "\n") {
-				text += "\n"
-			}
-			name := strings.ReplaceAll(strings.ReplaceAll(p.Name, "\r\n", "\n"), "\r", "\n")
-			text += fmt.Sprintf("\n# %s\n[projects.\"%d\"]\nhidden = false\n", strings.ReplaceAll(name, "\n", "\n# "), p.ID)
-			count++
+		count, err := d.SyncProjects(ps)
+		if err != nil {
+			return err
 		}
 		if count == 0 {
 			fmt.Fprintln(a.Out, "All active projects are already configured")
 			return nil
-		}
-		if e = os.WriteFile(d.Path, []byte(text), 0600); e != nil {
-			return e
 		}
 		fmt.Fprintf(a.Out, "Added %d project(s) to the config file\n", count)
 		return nil
@@ -376,14 +365,34 @@ func location(c config.Config) (*time.Location, error) {
 	}
 	return time.LoadLocation(c.Timezone)
 }
+func parseMonth(v string) (time.Time, error) {
+	if !regexp.MustCompile(`^\d{4}[-/]?\d{2}$`).MatchString(v) {
+		return time.Time{}, usage("month must use YYYY-MM, YYYYMM, or YYYY/MM")
+	}
+	v = strings.ReplaceAll(v, "/", "-")
+	if len(v) == 6 {
+		v = v[:4] + "-" + v[4:]
+	}
+	t, err := time.Parse("2006-01", v)
+	if err != nil {
+		return time.Time{}, usage("month must be a valid month")
+	}
+	return t, nil
+}
 func (a App) summary(ctx context.Context, args []string) error {
 	allowed := summaryFlags()
 	allowed["template"] = true
+	allowed["month"] = true
 	allowed["watch"] = true
 	allowed["daily-total"] = true
 	o, e := parseOpts(args, allowed)
 	if e != nil {
 		return e
+	}
+	if o.monthSet {
+		if o.days != nil || len(o.pos) > 0 {
+			return usage("summary accepts only one of start and end date, --days, or --month")
+		}
 	}
 	base := model.SummaryOptions{}
 	if o.templateSet {
@@ -403,6 +412,15 @@ func (a App) summary(ctx context.Context, args []string) error {
 	settings, e := summaryOptions(base, o)
 	if e != nil {
 		return e
+	}
+	if o.monthSet {
+		monthStart, err := parseMonth(o.month)
+		if err != nil {
+			return err
+		}
+		settings.Days = nil
+		settings.StartDate = monthStart.Format(time.DateOnly)
+		settings.EndDate = monthStart.AddDate(0, 1, -1).Format(time.DateOnly)
 	}
 	if o.dailyTotal && settings.Format == "json" {
 		return usage("--daily-total cannot be used with json format")
@@ -426,94 +444,21 @@ func (a App) summary(ctx context.Context, args []string) error {
 	if e != nil {
 		return usage(e.Error())
 	}
-	entries, e := a.Client.TimeEntries(ctx, d.Config, from, to)
+	start := model.StartOfDate(from, loc)
+	end := model.StartOfDate(to.AddDate(0, 0, 1), loc)
+	entries, e := a.NewClient(d.Config.Workspace, d.Config.Token).TimeEntries(ctx, start, end)
 	if e != nil {
 		return e
 	}
-	sum, e := model.Summarize(entries, loc, now)
-	if e != nil {
-		return e
-	}
-	return a.writeSummary(ctx, d.Config, settings, from, to, sum, o.watch, o.dailyTotal)
-}
-
-func (a App) writeSummary(ctx context.Context, cfg config.Config, settings model.SummaryOptions, from, to time.Time, sum model.Summary, watch, dailyTotal bool) error {
-	var text string
-	if settings.Format == "json" {
-		b, _ := json.MarshalIndent(sum, "", "  ")
-		text = string(b)
-	} else {
-		ps, e := a.Client.Projects(ctx, cfg)
+	sum := model.Summarize(entries, loc, now)
+	var projects []model.Project
+	if settings.Format != "json" {
+		projects, e = a.projects(ctx, d.Config)
 		if e != nil {
 			return e
 		}
-		ps = model.VisibleSorted(ps)
-		days := model.DateRange(from, to)
-		rows := [][]string{}
-		for _, p := range ps {
-			r := []string{p.DisplayName}
-			for _, day := range days {
-				v := sum[day][p.ID]
-				if v == 0 {
-					r = append(r, "")
-				} else {
-					r = append(r, strconv.FormatFloat(float64(int(v*100+0.5))/100, 'f', -1, 64))
-				}
-			}
-			rows = append(rows, r)
-		}
-		if dailyTotal {
-			totals := model.DailyTotals(sum, ps, days)
-			r := []string{"Total"}
-			for _, day := range days {
-				v := totals[day]
-				r = append(r, strconv.FormatFloat(float64(int(v*100+0.5))/100, 'f', -1, 64))
-			}
-			rows = append(rows, r)
-		}
-		headers := append([]string{"Project"}, days...)
-		if settings.Format == "table" {
-			options := tableOutputOptions{watch: watch, clipboard: settings.Clipboard, truncateProjects: true}
-			return a.writeTable(ctx, options, headers, rows, summaryHeaderVariants(days, from, to)...)
-		}
-		if settings.NoProject {
-			headers = days
-			for i := range rows {
-				rows[i] = rows[i][1:]
-			}
-		}
-		if settings.NoDate {
-			headers = nil
-		}
-		text = a.terminalDelimited(headers, rows, settings.Format)
 	}
-	fmt.Fprintln(a.Out, text)
-	if settings.Clipboard {
-		return clipboard(text)
-	}
-	return nil
-}
-
-func summaryHeaderVariants(days []string, from, to time.Time) [][]string {
-	compact := append([]string{"Proj."}, days...)
-	minimal := append([]string{"Proj."}, days...)
-	sameYear := from.Year() == to.Year()
-	sameMonth := sameYear && from.Month() == to.Month()
-	var previousMonth string
-	for i, day := range days {
-		if sameYear {
-			compact[i+1] = day[len(day)-len("01-02"):]
-		}
-		month := day[:len(day)-len("-02")]
-		// Keep the first date of each month identifiable in a multi-month table.
-		if sameMonth || month == previousMonth {
-			minimal[i+1] = strings.TrimPrefix(day[len(day)-len("02"):], "0")
-		} else {
-			minimal[i+1] = compact[i+1]
-		}
-		previousMonth = month
-	}
-	return [][]string{compact, minimal}
+	return a.writeSummary(ctx, settings, from, to, sum, projects, o.watch, o.dailyTotal)
 }
 
 func (a App) timeEntry(ctx context.Context, args []string) error {
@@ -534,7 +479,6 @@ func (a App) timeEntry(ctx context.Context, args []string) error {
 		return err
 	}
 	now := a.Now()
-	y, m, _ := now.Date()
 	sd, ok := parseUnsignedInteger(o.pos[0])
 	if !ok {
 		return usage("start and end day must be valid integers")
@@ -543,44 +487,54 @@ func (a App) timeEntry(ctx context.Context, args []string) error {
 	if !ok {
 		return usage("start and end day must be valid integers")
 	}
-	lastDay := time.Date(y, m+1, 0, 0, 0, 0, 0, time.Local).Day()
-	if sd < 1 || ed < 1 || sd > lastDay || ed > lastDay {
+	if sd < 1 || ed < 1 || sd > 31 || ed > 31 {
 		return usage("start and end day must be valid dates")
 	}
-	from := time.Date(y, m, sd, 0, 0, 0, 0, time.Local)
-	to := time.Date(y, m, ed, 0, 0, 0, 0, time.Local)
-	if from.After(to) {
+	if sd > ed {
 		return usage("start day must not be after end day")
 	}
 	d, e := loadCfg()
 	if e != nil {
 		return e
 	}
-	entries, e := a.Client.TimeEntries(ctx, d.Config, from, to)
+	loc, e := location(d.Config)
+	if e != nil {
+		return e
+	}
+	y, m, _ := now.In(loc).Date()
+	lastDay := time.Date(y, m+1, 0, 0, 0, 0, 0, time.UTC).Day()
+	if ed > lastDay {
+		return usage("start and end day must be valid dates")
+	}
+	from := model.StartOfDate(time.Date(y, m, sd, 0, 0, 0, 0, time.UTC), loc)
+	end := model.StartOfDate(time.Date(y, m, ed+1, 0, 0, 0, 0, time.UTC), loc)
+	entries, e := a.NewClient(d.Config.Workspace, d.Config.Token).TimeEntries(ctx, from, end)
 	if e != nil {
 		return e
 	}
 	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].Start < entries[j].Start || entries[i].Start == entries[j].Start && entries[i].ID < entries[j].ID
+		if order := entries[i].Start.Compare(entries[j].Start); order != 0 {
+			return order < 0
+		}
+		return entries[i].ID < entries[j].ID
 	})
 	rows := [][]string{}
 	objects := []outputTimeEntry{}
 	for _, x := range entries {
-		seconds := x.DurationSeconds
-		if seconds < 0 {
-			seconds = a.Now().Unix() + seconds
-		}
-		minutes := float64(int(float64(seconds)/60*100+0.5)) / 100
+		minutes := float64(int(float64(x.ElapsedSeconds(now))/60*100+0.5)) / 100
+		start := x.Start.Format(time.RFC3339Nano)
 		pid := ""
 		if x.ProjectID != nil {
 			pid = strconv.FormatInt(*x.ProjectID, 10)
 		}
 		stop := ""
+		var stopJSON *string
 		if x.Stop != nil {
-			stop = *x.Stop
+			stop = x.Stop.Format(time.RFC3339Nano)
+			stopJSON = &stop
 		}
-		rows = append(rows, []string{strconv.FormatInt(x.ID, 10), x.Description, pid, x.Start, stop, strconv.FormatFloat(minutes, 'f', -1, 64)})
-		objects = append(objects, outputTimeEntry{ID: x.ID, Description: x.Description, ProjectID: x.ProjectID, Start: x.Start, Stop: x.Stop, DurationMinutes: minutes})
+		rows = append(rows, []string{strconv.FormatInt(x.ID, 10), x.Description, pid, start, stop, strconv.FormatFloat(minutes, 'f', -1, 64)})
+		objects = append(objects, outputTimeEntry{ID: x.ID, Description: x.Description, ProjectID: x.ProjectID, Start: start, Stop: stopJSON, DurationMinutes: minutes})
 	}
 	headers := []string{"id", "description", "project_id", "start", "stop", "duration_minutes"}
 	if o.format == "json" {

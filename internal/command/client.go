@@ -30,7 +30,7 @@ func (a App) client(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	clients, err := a.Client.Clients(ctx, d.Config)
+	clients, err := a.NewClient(d.Config.Workspace, d.Config.Token).Clients(ctx)
 	if err != nil {
 		return err
 	}
