@@ -120,7 +120,10 @@ projects first, and `hidden` excludes a project. The token is never shown by
 use `Asia/Tokyo`. If input ends before all three prompts are answered, no
 configuration file is created. The `projects` configuration must be a TOML
 table, such as `[projects.123456]` above; an empty table (`projects = {}`) is
-also accepted.
+also accepted. Project updates check whether the configuration changed while the
+command was running. Reordering preserves comments in standard project table
+headers. Some other TOML layouts, including inline tables and dotted keys, are
+rewritten in table form and may lose comments.
 
 To migrate an old `~/.toggl_config`, run this from a checkout:
 
@@ -153,6 +156,7 @@ quotes, or line breaks are quoted, and embedded quotes are doubled.
 | `--help`, `-h` | none | Help text |
 | `--version` | none | Build version |
 
+Time entry timestamps are rendered as RFC 3339 and sorted by start instant.
 Date ranges are inclusive. Invalid usage, configuration, API, clipboard, and
 I/O errors exit with status 1; successful commands exit with status 0.
 
@@ -170,8 +174,9 @@ The `--days N` option includes exactly N calendar days ending today in the
 configured timezone (or the system timezone when omitted). For example,
 `--days 1` includes only today, and `--days 7` includes today and the previous
 six days. The value must be a positive integer written using digits; zero is
-invalid. `time-entry list` days must exist in the current month. Invalid command
-usage is reported before configuration is loaded. An empty
+invalid. `time-entry list` days must exist in the current month in the configured
+timezone (or the system timezone when omitted). The CLI checks arguments that
+do not depend on configuration before loading it. An empty
 `project list --format json` or `client list --format json` result is `[]`.
 
 `toggl time-entry list` supports `id`, `description`, `project_id`, `start`,
@@ -350,11 +355,14 @@ replaces all settings, rather than merging them with the previous template.
 
 - `cmd/toggl/main.go`: argument entry point and dependency assembly.
 - `internal/command/`: CLI interpretation and output formatting. `options.go`
-  handles shared option parsing; `update_install.go` handles update installation.
+  handles shared option parsing.
+- `internal/selfupdate/`: release lookup, verification, and installation.
+- `internal/command/summary_output.go`: formats fetched summary data.
 - `internal/model/`: API-independent models and pure aggregation.
 - `internal/template/`: validated TOML storage for named summary settings.
-- `internal/toggl/`: HTTP client, private DTOs, and domain conversion.
-- `internal/config/`: configuration loading and validation.
+- `internal/toggl/`: authenticated HTTP client, private DTOs, and domain
+  conversion. The CLI applies local project display preferences.
+- `internal/config/`: configuration loading, validation, and project edits.
 
 ## Development
 

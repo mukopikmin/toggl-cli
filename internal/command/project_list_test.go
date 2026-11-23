@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -76,8 +77,33 @@ func TestProjectListFields(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client := &fakeClient{projects: tt.project}
+			client := &fakeClient{projects: append([]model.Project(nil), tt.project...)}
 			app, out := configuredApp(t, client, "")
+			var preferences strings.Builder
+			for i := range client.projects {
+				project := &client.projects[i]
+				if project.Alias != "" || project.Hidden || project.DisplayOrder != nil {
+					fmt.Fprintf(&preferences, "\n[projects.\"%d\"]\n", project.ID)
+					if project.Alias != "" {
+						fmt.Fprintf(&preferences, "display_name = %q\n", project.Alias)
+					} else if project.DisplayName != "" && project.DisplayName != project.Name {
+						fmt.Fprintf(&preferences, "display_name = %q\n", project.DisplayName)
+					}
+					if project.Hidden {
+						preferences.WriteString("hidden = true\n")
+					}
+					if project.DisplayOrder != nil {
+						fmt.Fprintf(&preferences, "display_order = %v\n", *project.DisplayOrder)
+					}
+				}
+				project.Alias = ""
+				project.DisplayName = ""
+				project.Hidden = false
+				project.DisplayOrder = nil
+			}
+			if preferences.Len() > 0 {
+				appendProjectConfig(t, preferences.String())
+			}
 			if err := app.Run(context.Background(), append([]string{"project", "list"}, tt.args...)); err != nil {
 				t.Fatal(err)
 			}
@@ -120,7 +146,31 @@ func TestProjectListJSONFields(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			app, out := configuredApp(t, &fakeClient{projects: projects}, "")
+			client := &fakeClient{projects: append([]model.Project(nil), projects...)}
+			app, out := configuredApp(t, client, "")
+			var preferences strings.Builder
+			for i := range client.projects {
+				project := &client.projects[i]
+				if project.Alias != "" || project.Hidden || project.DisplayOrder != nil {
+					fmt.Fprintf(&preferences, "\n[projects.\"%d\"]\n", project.ID)
+					if project.Alias != "" {
+						fmt.Fprintf(&preferences, "display_name = %q\n", project.Alias)
+					}
+					if project.Hidden {
+						preferences.WriteString("hidden = true\n")
+					}
+					if project.DisplayOrder != nil {
+						fmt.Fprintf(&preferences, "display_order = %v\n", *project.DisplayOrder)
+					}
+				}
+				project.Alias = ""
+				project.DisplayName = ""
+				project.Hidden = false
+				project.DisplayOrder = nil
+			}
+			if preferences.Len() > 0 {
+				appendProjectConfig(t, preferences.String())
+			}
 			if err := app.Run(context.Background(), append([]string{"project", "list", "--format", "json"}, tt.args...)); err != nil {
 				t.Fatal(err)
 			}
@@ -150,7 +200,7 @@ func TestProjectListInvalidOptionsBeforeConfiguration(t *testing.T) {
 		t.Run(strings.Join(tt.args, " "), func(t *testing.T) {
 			t.Setenv("HOME", t.TempDir())
 			client := &fakeClient{}
-			app := App{Client: client, Out: &bytes.Buffer{}}
+			app := App{NewClient: useClient(client), Out: &bytes.Buffer{}}
 			err := app.Run(context.Background(), append([]string{"project", "list"}, tt.args...))
 			var usageErr UsageError
 			if !errors.As(err, &usageErr) || !strings.Contains(err.Error(), tt.want) || client.projectCalls != 0 {

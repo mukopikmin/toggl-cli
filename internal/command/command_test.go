@@ -23,19 +23,23 @@ type fakeClient struct {
 	projectCalls, entryCalls int
 }
 
-func (f *fakeClient) Clients(context.Context, config.Config) ([]model.Client, error) {
+func (f *fakeClient) Clients(context.Context) ([]model.Client, error) {
 	f.clientCalls++
 	return f.clients, f.err
 }
 
-func (f *fakeClient) Projects(context.Context, config.Config) ([]model.Project, error) {
+func (f *fakeClient) Projects(context.Context) ([]model.Project, error) {
 	f.projectCalls++
 	return f.projects, f.err
 }
-func (f *fakeClient) TimeEntries(context.Context, config.Config, time.Time, time.Time) ([]model.TimeEntry, error) {
+func (f *fakeClient) TimeEntries(context.Context, time.Time, time.Time) ([]model.TimeEntry, error) {
 	f.entryCalls++
 	return f.entries, f.err
 }
+func useClient(client TogglClient) func(string, string) TogglClient {
+	return func(string, string) TogglClient { return client }
+}
+
 func configuredApp(t *testing.T, client *fakeClient, input string) (App, *bytes.Buffer) {
 	t.Helper()
 	home := t.TempDir()
@@ -48,7 +52,7 @@ func configuredApp(t *testing.T, client *fakeClient, input string) (App, *bytes.
 		t.Fatal(err)
 	}
 	out := &bytes.Buffer{}
-	return App{Client: client, Out: out, Err: &bytes.Buffer{}, In: strings.NewReader(input), Now: func() time.Time { return time.Date(2026, 5, 2, 12, 0, 0, 0, time.UTC) }, Version: "1.2.3"}, out
+	return App{NewClient: useClient(client), Out: out, Err: &bytes.Buffer{}, In: strings.NewReader(input), Now: func() time.Time { return time.Date(2026, 5, 2, 12, 0, 0, 0, time.UTC) }, Version: "1.2.3"}, out
 }
 func TestHelpVersionAndUsageErrors(t *testing.T) {
 	tests := []struct {
@@ -60,7 +64,7 @@ func TestHelpVersionAndUsageErrors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var out bytes.Buffer
-			a := App{Client: &fakeClient{}, Out: &out, Version: "1.2.3"}
+			a := App{NewClient: useClient(&fakeClient{}), Out: &out, Version: "1.2.3"}
 			err := a.Run(context.Background(), tt.args)
 			if (err != nil) != tt.fail {
 				t.Fatalf("%v", err)
@@ -95,8 +99,8 @@ func TestConfigFormatsHideToken(t *testing.T) {
 func TestDefaultOutputIsTable(t *testing.T) {
 	pid := int64(1)
 	client := &fakeClient{
-		projects: []model.Project{{ID: 1, Name: "Client", DisplayName: "Shown", Active: true}},
-		entries:  []model.TimeEntry{{ID: 2, ProjectID: &pid, Description: "Work", Start: "2026-05-01T00:00:00Z", DurationSeconds: 90}},
+		projects: []model.Project{{ID: 1, Name: "Shown", Active: true}},
+		entries:  []model.TimeEntry{{ID: 2, ProjectID: &pid, Description: "Work", Start: time.Date(2026, time.May, 1, 0, 0, 0, 0, time.UTC), DurationSeconds: 90}},
 	}
 	tests := []struct {
 		name string
@@ -141,7 +145,7 @@ func TestDefaultTableRejectsCSVOptionsBeforeConfiguration(t *testing.T) {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			t.Setenv("HOME", t.TempDir())
 			client := &fakeClient{}
-			app := App{Client: client, Out: &bytes.Buffer{}}
+			app := App{NewClient: useClient(client), Out: &bytes.Buffer{}}
 			err := app.Run(context.Background(), args)
 			var usageError UsageError
 			if !errors.As(err, &usageError) || !strings.Contains(err.Error(), "cannot be used with table format") || client.entryCalls != 0 || client.projectCalls != 0 {
@@ -152,8 +156,9 @@ func TestDefaultTableRejectsCSVOptionsBeforeConfiguration(t *testing.T) {
 }
 
 func TestProjectListAndSync(t *testing.T) {
-	client := &fakeClient{projects: []model.Project{{ID: 2, Name: "Hidden", DisplayName: "Hidden", Hidden: true}, {ID: 1, Name: "Client", Alias: "Shown", DisplayName: "Shown", Active: true}}}
+	client := &fakeClient{projects: []model.Project{{ID: 2, Name: "Hidden", Active: true}, {ID: 1, Name: "Client", Active: true}}}
 	app, out := configuredApp(t, client, "")
+	appendProjectConfig(t, "\n[projects.1]\ndisplay_name = \"Shown\"\n[projects.2]\nhidden = true\n")
 	if err := app.Run(context.Background(), []string{"project", "list", "--format", "tsv"}); err != nil {
 		t.Fatal(err)
 	}
@@ -161,12 +166,29 @@ func TestProjectListAndSync(t *testing.T) {
 		t.Fatal(out.String())
 	}
 	out.Reset()
+	client.projects = append(client.projects, model.Project{ID: 3, Name: "New", Active: true})
 	if err := app.Run(context.Background(), []string{"project", "sync"}); err != nil {
 		t.Fatal(err)
 	}
 	b, _ := os.ReadFile(config.Path(os.Getenv("HOME")))
-	if !strings.Contains(string(b), "[projects.\"1\"]") || !strings.Contains(string(b), "[projects.\"2\"]") {
+	if !strings.Contains(string(b), "[projects.\"3\"]") {
 		t.Fatal(string(b))
+	}
+}
+
+func appendProjectConfig(t *testing.T, text string) {
+	t.Helper()
+	file, err := os.OpenFile(config.Path(os.Getenv("HOME")), os.O_WRONLY|os.O_APPEND, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = file.WriteString(text)
+	closeErr := file.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if closeErr != nil {
+		t.Fatal(closeErr)
 	}
 }
 
@@ -181,7 +203,7 @@ func TestEmptyProjectListWritesHeaders(t *testing.T) {
 }
 func TestSummaryFormatsAndBoundaries(t *testing.T) {
 	pid := int64(1)
-	client := &fakeClient{projects: []model.Project{{ID: 1, Name: "P", DisplayName: "P", Active: true}}, entries: []model.TimeEntry{{ID: 1, ProjectID: &pid, Start: "2026-05-01T23:30:00Z", DurationSeconds: 90}}}
+	client := &fakeClient{projects: []model.Project{{ID: 1, Name: "P", Active: true}}, entries: []model.TimeEntry{{ID: 1, ProjectID: &pid, Start: time.Date(2026, 5, 1, 23, 30, 0, 0, time.UTC), DurationSeconds: 90}}}
 	tests := []struct {
 		name string
 		args []string
@@ -215,8 +237,8 @@ func TestSummaryFormatsAndBoundaries(t *testing.T) {
 
 func TestTimeEntryFormats(t *testing.T) {
 	pid := int64(8)
-	stop := "2026-05-01T01:00:00Z"
-	client := &fakeClient{entries: []model.TimeEntry{{ID: 2, ProjectID: &pid, Description: "a,b", Start: "2026-05-01T00:00:00Z", Stop: &stop, DurationSeconds: 3600}}}
+	stop := time.Date(2026, 5, 1, 1, 0, 0, 0, time.UTC)
+	client := &fakeClient{entries: []model.TimeEntry{{ID: 2, ProjectID: &pid, Description: "a,b", Start: time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC), Stop: &stop, DurationSeconds: 3600}}}
 	for _, format := range []string{"csv", "tsv", "json", "table"} {
 		t.Run(format, func(t *testing.T) {
 			app, out := configuredApp(t, client, "")
@@ -243,7 +265,7 @@ func TestRemovedSeparatorRejectedBeforeConfiguration(t *testing.T) {
 			t.Run(strings.Join(args, " "), func(t *testing.T) {
 				t.Setenv("HOME", t.TempDir())
 				client := &fakeClient{}
-				app := App{Client: client, Out: &bytes.Buffer{}}
+				app := App{NewClient: useClient(client), Out: &bytes.Buffer{}}
 				err := app.Run(context.Background(), args)
 				var usageError UsageError
 				if !errors.As(err, &usageError) || !strings.Contains(err.Error(), "unknown option") || client.entryCalls != 0 || client.projectCalls != 0 {
@@ -257,7 +279,7 @@ func TestInitCreatesProtectedConfig(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	out := &bytes.Buffer{}
-	app := App{Client: &fakeClient{}, Out: out, In: strings.NewReader("workspace\ntoken\nUTC\n")}
+	app := App{NewClient: useClient(&fakeClient{}), Out: out, In: strings.NewReader("workspace\ntoken\nUTC\n")}
 	if err := app.Run(context.Background(), []string{"init"}); err != nil {
 		t.Fatal(err)
 	}
@@ -282,7 +304,7 @@ func TestInitCreatesProtectedConfig(t *testing.T) {
 func TestInitRejectsIncompleteInputWithoutCreatingFile(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	app := App{Client: &fakeClient{}, Out: &bytes.Buffer{}, In: strings.NewReader("workspace\n")}
+	app := App{NewClient: useClient(&fakeClient{}), Out: &bytes.Buffer{}, In: strings.NewReader("workspace\n")}
 	if err := app.Run(context.Background(), []string{"init"}); err == nil || !strings.Contains(err.Error(), "API token") {
 		t.Fatal(err)
 	}
@@ -294,7 +316,7 @@ func TestInitRejectsIncompleteInputWithoutCreatingFile(t *testing.T) {
 func TestInitRejectsEmptyNonInteractiveRequiredValue(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	app := App{Client: &fakeClient{}, Out: &bytes.Buffer{}, In: strings.NewReader("\n")}
+	app := App{NewClient: useClient(&fakeClient{}), Out: &bytes.Buffer{}, In: strings.NewReader("\n")}
 	err := app.Run(context.Background(), []string{"init"})
 	if err == nil || err.Error() != "Workspace is required" {
 		t.Fatalf("%v", err)
@@ -327,5 +349,24 @@ func TestClipboardCommandParityAndFallback(t *testing.T) {
 	}
 	if strings.Join(attempts, ",") != "wl-copy:summary output,xclip:summary output" {
 		t.Fatalf("%v", attempts)
+	}
+}
+
+func TestTimeEntryListSortsByInstant(t *testing.T) {
+	tokyo := time.FixedZone("Tokyo", 9*60*60)
+	tokyoStart := time.Date(2026, 5, 2, 9, 0, 0, 0, tokyo)
+	utcStart := tokyoStart.UTC()
+	client := &fakeClient{entries: []model.TimeEntry{
+		{ID: 3, Start: utcStart.Add(time.Hour)},
+		{ID: 2, Start: utcStart},
+		{ID: 1, Start: tokyoStart},
+	}}
+	app, out := configuredApp(t, client, "")
+	if err := app.Run(context.Background(), []string{"time-entry", "list", "2", "2", "--format", "tsv"}); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(out.String(), "\n")
+	if !strings.HasPrefix(lines[1], "1\t") || !strings.HasPrefix(lines[2], "2\t") || !strings.HasPrefix(lines[3], "3\t") {
+		t.Fatal(out.String())
 	}
 }

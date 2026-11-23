@@ -15,22 +15,23 @@ import (
 
 func TestTimeEntryListSelectedFields(t *testing.T) {
 	projectID := int64(8)
-	stop := "2026-05-01T01:00:00Z"
-	start := "2026-05-01T00:00:00Z"
+	stopTime := time.Date(2026, 5, 1, 1, 0, 0, 0, time.UTC)
+	stop := stopTime.Format(time.RFC3339Nano)
+	start := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
 	now := time.Date(2026, 5, 2, 12, 0, 0, 0, time.UTC)
 	entries := []model.TimeEntry{
-		{ID: 2, ProjectID: &projectID, Description: "Finished, entry", Start: start, Stop: &stop, DurationSeconds: 3600},
-		{ID: 1, Description: "Running", Start: start, DurationSeconds: 90 - now.Unix()},
+		{ID: 2, ProjectID: &projectID, Description: "Finished, entry", Start: start, Stop: &stopTime, DurationSeconds: 3600},
+		{ID: 1, Description: "Running", Start: now.Add(-90 * time.Second), Running: true},
 	}
 	for _, tt := range []struct {
 		format, fields, want string
 	}{
-		{"table", "duration_minutes,id", table([]string{"duration_minutes", "id"}, [][]string{{"1.5", "1"}, {"60", "2"}}, tableLayout{}) + "\n"},
-		{"csv", "stop", "stop\n\"\"\n" + stop + "\n"},
-		{"tsv", "description, project_id", "description\tproject_id\nRunning\t\nFinished, entry\t8\n"},
+		{"table", "duration_minutes,id", table([]string{"duration_minutes", "id"}, [][]string{{"60", "2"}, {"1.5", "1"}}, tableLayout{}) + "\n"},
+		{"csv", "stop", "stop\n" + stop + "\n\"\"\n"},
+		{"tsv", "description, project_id", "description\tproject_id\nFinished, entry\t8\nRunning\t\n"},
 		{"json", "stop,project_id,duration_minutes", `[
-			{"stop": null, "project_id": null, "duration_minutes": 1.5},
-			{"stop": "2026-05-01T01:00:00Z", "project_id": 8, "duration_minutes": 60}
+			{"stop": "2026-05-01T01:00:00Z", "project_id": 8, "duration_minutes": 60},
+			{"stop": null, "project_id": null, "duration_minutes": 1.5}
 		]`},
 	} {
 		t.Run(tt.format, func(t *testing.T) {
@@ -70,7 +71,7 @@ func TestTimeEntryListInvalidFieldsBeforeConfiguration(t *testing.T) {
 		t.Run(tt.field, func(t *testing.T) {
 			t.Setenv("HOME", t.TempDir())
 			client := &fakeClient{}
-			app := App{Client: client, Out: &bytes.Buffer{}}
+			app := App{NewClient: useClient(client), Out: &bytes.Buffer{}}
 			err := app.Run(context.Background(), []string{"time-entry", "list", "1", "2", "--fields", tt.field})
 			var usageErr UsageError
 			if !errors.As(err, &usageErr) || !strings.Contains(err.Error(), tt.want) || client.entryCalls != 0 {

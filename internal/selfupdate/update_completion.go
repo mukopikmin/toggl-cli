@@ -1,4 +1,4 @@
-package command
+package selfupdate
 
 import (
 	"archive/tar"
