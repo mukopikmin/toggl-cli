@@ -1,4 +1,4 @@
-package command
+package selfupdate
 
 import (
 	"archive/tar"
@@ -81,7 +81,7 @@ func TestUpdateRefreshesCompletions(t *testing.T) {
 				return &http.Response{StatusCode: 200, Body: io.NopCloser(bytes.NewReader(b))}, nil
 			})}
 			var out, warnings bytes.Buffer
-			plan := updatePlan{Archive: "release.tar.gz", Target: "linux-x64", TargetVersion: "2.0.0", Executable: exe, DownloadURL: "https://update.test/release"}
+			plan := Plan{Archive: "release.tar.gz", Target: "linux-x64", TargetVersion: "2.0.0", Executable: exe, DownloadURL: "https://update.test/release"}
 			err := installUpdateWithRuntime(context.Background(), plan, client, updateInstallRuntime{goos: "linux", binaryVersion: func(string) (string, error) { return tc.version, nil }, completionOut: &out, completionErr: &warnings})
 			success := !tc.badChecksum && tc.version == "2.0.0"
 			if (err == nil) != success {

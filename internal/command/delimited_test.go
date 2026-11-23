@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mukopikmin/toggl-cli/internal/model"
 )
@@ -46,8 +47,8 @@ func TestDelimitedEmptyAndHeaderlessOutput(t *testing.T) {
 func TestCommandsUseFixedDelimiters(t *testing.T) {
 	name := "Client, A\t\"quoted\"\nnext line"
 	client := &fakeClient{
-		projects: []model.Project{{ID: 1, DisplayName: name}},
-		entries:  []model.TimeEntry{{ID: 1, Description: name, Start: "2026-05-01T00:00:00Z", DurationSeconds: 60}},
+		projects: []model.Project{{ID: 1, Name: name, DisplayName: name, Active: true}},
+		entries:  []model.TimeEntry{{ID: 1, Description: name, Start: time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC), DurationSeconds: 60}},
 	}
 	tests := []struct {
 		name string
@@ -56,17 +57,14 @@ func TestCommandsUseFixedDelimiters(t *testing.T) {
 	}{
 		{"summary", []string{"summary", "2026-05-01", "2026-05-01"}, [][]string{{"Project", "2026-05-01"}, {name, ""}}},
 		{"time entry", []string{"time-entry", "list", "1", "1"}, [][]string{{"id", "description", "project_id", "start", "stop", "duration_minutes"}, {"1", name, "", "2026-05-01T00:00:00Z", "", "1"}}},
-		{"project", []string{"project", "list"}, [][]string{{name}}},
+		{"project", []string{"project", "list"}, [][]string{{"name", "id", "alias", "displayName", "hidden", "active", "displayOrder"}, {name, "1", "", name, "false", "true", ""}}},
 		{"config", []string{"config"}, [][]string{{"Setting", "Value"}, {"WORKSPACE", "1"}, {"TIMEZONE", "UTC"}}},
 	}
 	for _, tt := range tests {
-		for _, format := range []string{"default", "csv", "tsv"} {
+		for _, format := range []string{"csv", "tsv"} {
 			t.Run(tt.name+"/"+format, func(t *testing.T) {
 				app, out := configuredApp(t, client, "")
-				args := append([]string{}, tt.args...)
-				if format != "default" {
-					args = append(args, "--format", format)
-				}
+				args := append(append([]string{}, tt.args...), "--format", format)
 				if err := app.Run(context.Background(), args); err != nil {
 					t.Fatal(err)
 				}
@@ -79,6 +77,19 @@ func TestCommandsUseFixedDelimiters(t *testing.T) {
 					t.Fatalf("got %q, %v; want %q (output %q)", got, err, tt.want, out.String())
 				}
 			})
+		}
+	}
+}
+
+func TestSpreadsheetTextExport(t *testing.T) {
+	for _, format := range []string{"csv", "tsv", "json", "table"} {
+		app, out := configuredApp(t, &fakeClient{clients: []model.Client{{ID: 1, Name: " =example"}}}, "")
+		if err := app.Run(context.Background(), []string{"client", "list", "-f", format}); err != nil {
+			t.Fatal(err)
+		}
+		protected := strings.Contains(out.String(), "' =example")
+		if protected != (format == "csv" || format == "tsv") {
+			t.Fatalf("%s: %q", format, out.String())
 		}
 	}
 }

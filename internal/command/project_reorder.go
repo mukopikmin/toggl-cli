@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/mukopikmin/toggl-cli/internal/config"
@@ -56,7 +54,7 @@ func renderReorder(s reorderState) string {
 				marker = "*"
 			}
 		}
-		lines = append(lines, fmt.Sprintf("%s %s", marker, p.DisplayName))
+		lines = append(lines, fmt.Sprintf("%s %s", marker, terminalText(p.DisplayName)))
 	}
 	// Raw mode disables the terminal's automatic carriage return on newline.
 	return strings.Join(lines, "\r\n")
@@ -127,76 +125,6 @@ func selectOrderLoop(projects []model.Project, in io.Reader, out io.Writer) ([]m
 	}
 }
 
-var projectHeader = regexp.MustCompile(`^\s*\[\s*projects\.(?:"(\d+)"|'(\d+)'|(\d+))\s*\]\s*(?:#.*)?$`)
-var orderLine = regexp.MustCompile(`^\s*display_order\s*=`)
-
-func updateProjectOrders(text string, ids []int64) string {
-	if len(ids) == 0 {
-		return text
-	}
-	newline := "\n"
-	if strings.Contains(text, "\r\n") {
-		newline = "\r\n"
-	}
-	trailing := strings.HasSuffix(text, "\n")
-	lines := regexp.MustCompile(`\r?\n`).Split(text, -1)
-	if trailing {
-		lines = lines[:len(lines)-1]
-	}
-	remaining := map[int64]int{}
-	for i, id := range ids {
-		remaining[id] = i + 1
-	}
-	out := []string{}
-	for i := 0; i < len(lines); {
-		m := projectHeader.FindStringSubmatch(lines[i])
-		if m == nil {
-			out = append(out, lines[i])
-			i++
-			continue
-		}
-		idText := m[1] + m[2] + m[3]
-		id, _ := strconv.ParseInt(idText, 10, 64)
-		order, ok := remaining[id]
-		out = append(out, lines[i])
-		i++
-		found := false
-		for i < len(lines) && !strings.HasPrefix(strings.TrimSpace(lines[i]), "[") {
-			line := lines[i]
-			if ok && orderLine.MatchString(line) {
-				indent := line[:len(line)-len(strings.TrimLeft(line, " \t"))]
-				comment := ""
-				if at := strings.Index(line, " #"); at >= 0 {
-					comment = line[at:]
-				}
-				line = fmt.Sprintf("%sdisplay_order = %d%s", indent, order, comment)
-				found = true
-			}
-			out = append(out, line)
-			i++
-		}
-		if ok && !found {
-			out = append(out, fmt.Sprintf("display_order = %d", order))
-		}
-		delete(remaining, id)
-	}
-	for _, id := range ids {
-		order, ok := remaining[id]
-		if !ok {
-			continue
-		}
-		if len(out) > 0 && out[len(out)-1] != "" {
-			out = append(out, "")
-		}
-		out = append(out, fmt.Sprintf("[projects.\"%d\"]", id), fmt.Sprintf("display_order = %d", order))
-	}
-	result := strings.Join(out, newline)
-	if trailing {
-		result += newline
-	}
-	return result
-}
-
 func (a App) reorderProjects(doc config.Document, projects []model.Project) error {
 	if len(projects) == 0 {
 		fmt.Fprintln(a.Out, "No visible projects to reorder")
@@ -219,11 +147,7 @@ func (a App) reorderProjects(doc config.Document, projects []model.Project) erro
 	for i, p := range ordered {
 		ids[i] = p.ID
 	}
-	text := updateProjectOrders(doc.Text, ids)
-	if _, err = config.Parse(text); err != nil {
-		return err
-	}
-	if err = os.WriteFile(doc.Path, []byte(text), 0600); err != nil {
+	if err = doc.SaveProjectOrder(ids); err != nil {
 		return err
 	}
 	fmt.Fprintf(a.Out, "Saved the order of %d project(s)\n", len(ordered))

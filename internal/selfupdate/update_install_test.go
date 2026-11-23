@@ -1,4 +1,4 @@
-package command
+package selfupdate
 
 import (
 	"archive/zip"
@@ -58,7 +58,7 @@ func TestWindowsUpdateHandoffPreservesStagedBinary(t *testing.T) {
 			if err := os.WriteFile(executable, []byte("old binary"), 0755); err != nil {
 				t.Fatal(err)
 			}
-			plan := updatePlan{TargetVersion: "2.0.0", Target: "windows-x64", Executable: executable, Archive: root + ".zip", DownloadURL: "https://update.test/archive"}
+			plan := Plan{TargetVersion: "2.0.0", Target: "windows-x64", Executable: executable, Archive: root + ".zip", DownloadURL: "https://update.test/archive"}
 			var staged, helper string
 			platform := updateInstallRuntime{
 				goos: "windows",

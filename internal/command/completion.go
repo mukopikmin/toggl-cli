@@ -3,6 +3,7 @@ package command
 import (
 	"embed"
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -84,7 +85,15 @@ func completionCandidates(words []string) []string {
 
 	options := "-f --format --watch"
 	if command == "summary" {
-		options += " -d --days --no-project --no-date --clipboard"
+		options += " -d --days --month --no-project --no-date --clipboard"
+	}
+	var fieldNames []string
+	if command == "project" {
+		fieldNames = projectFields.names()
+		options += " --include-hidden"
+	}
+	if len(fieldNames) > 0 {
+		options += " --fields"
 	}
 	if command == "update" {
 		options = "--channel"
@@ -95,8 +104,24 @@ func completionCandidates(words []string) []string {
 			return "csv tsv json table"
 		case "--channel":
 			return "stable nightly"
+		case "--fields":
+			return strings.Join(fieldNames, " ")
 		}
 		return ""
+	}
+	completeValue := func(option, prefix string) []string {
+		if option == "--fields" {
+			if i := strings.LastIndexByte(current, ','); i >= 0 {
+				selected := strings.Split(strings.TrimPrefix(current[:i], prefix), ",")
+				names := slices.DeleteFunc(slices.Clone(fieldNames), func(name string) bool {
+					return slices.ContainsFunc(selected, func(field string) bool {
+						return strings.TrimSpace(field) == name
+					})
+				})
+				return filter(strings.Join(names, " "), current[:i+1])
+			}
+		}
+		return filter(values(option), prefix)
 	}
 	allowed := func(option string) bool {
 		return strings.Contains(" "+options+" ", " "+option+" ")
@@ -119,15 +144,15 @@ func completionCandidates(words []string) []string {
 			}
 			return nil
 		}
-		if allowed(arg) && (values(arg) != "" || arg == "-d" || arg == "--days") {
+		if allowed(arg) && (values(arg) != "" || arg == "-d" || arg == "--days" || arg == "--month") {
 			pending = arg
 		}
 	}
 	if pending != "" {
-		return filter(values(pending), "")
+		return completeValue(pending, "")
 	}
 	if key, _, ok := strings.Cut(current, "="); ok && allowed(key) {
-		return filter(values(key), key+"=")
+		return completeValue(key, key+"=")
 	}
 	if strings.HasPrefix(current, "-f") && len(current) > 2 && allowed("-f") {
 		return filter(values("-f"), "-f")

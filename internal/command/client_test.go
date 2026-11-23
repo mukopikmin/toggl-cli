@@ -66,8 +66,8 @@ func TestClientListDefaultAndEmptyOutput(t *testing.T) {
 		options []string
 		want    string
 	}{
-		{"default", []model.Client{{ID: 1, Name: "Client A"}}, nil, "id\tname\n1\tClient A\n"},
-		{"empty default", nil, nil, "id\tname\n"},
+		{"default", []model.Client{{ID: 1, Name: "Client A"}}, nil, table([]string{"Client"}, [][]string{{"Client A"}}, tableLayout{}) + "\n"},
+		{"empty default", nil, nil, table([]string{"Client"}, nil, tableLayout{}) + "\n"},
 		{"CSV", []model.Client{{ID: 1, Name: "Client A"}}, []string{"-fcsv"}, "id,name\n1,Client A\n"},
 		{"empty CSV", nil, []string{"--format", "csv"}, "id,name\n"},
 		{"nil JSON", nil, []string{"-fjson"}, "[]\n"},
@@ -98,7 +98,7 @@ func TestClientUsageBeforeConfiguration(t *testing.T) {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			t.Setenv("HOME", t.TempDir())
 			client := &fakeClient{}
-			app := App{Client: client, Out: &bytes.Buffer{}}
+			app := App{NewClient: useClient(client), Out: &bytes.Buffer{}}
 			err := app.Run(context.Background(), args)
 			var usageError UsageError
 			if !errors.As(err, &usageError) || client.clientCalls != 0 {
@@ -143,7 +143,7 @@ func TestClientListErrors(t *testing.T) {
 	t.Run("missing configuration", func(t *testing.T) {
 		t.Setenv("HOME", t.TempDir())
 		client := &fakeClient{}
-		app := App{Client: client, Out: &bytes.Buffer{}}
+		app := App{NewClient: useClient(client), Out: &bytes.Buffer{}}
 		var missing config.FileNotFoundError
 		if err := app.Run(context.Background(), []string{"client", "list"}); !errors.As(err, &missing) || client.clientCalls != 0 {
 			t.Fatalf("expected configuration error without API access, got %v", err)

@@ -12,14 +12,17 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: nightly-release
-  cancel-in-progress: false
-
 jobs:
   nightly:
     name: Publish nightly
-    if: github.event.workflow_run.conclusion == 'success'
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    concurrency:
+      group: nightly-release
+      cancel-in-progress: false
     runs-on: ubuntu-latest
 
     steps:

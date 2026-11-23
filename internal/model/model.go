@@ -13,6 +13,7 @@ type Client struct {
 type Project struct {
 	ID           int64    `json:"id"`
 	Name         string   `json:"name"`
+	Alias        string   `json:"alias,omitempty"`
 	DisplayName  string   `json:"displayName"`
 	Active       bool     `json:"active"`
 	Hidden       bool     `json:"hidden"`
@@ -21,17 +22,35 @@ type Project struct {
 type TimeEntry struct {
 	ID              int64
 	ProjectID       *int64
-	Start           string
-	Stop            *string
+	Start           time.Time
+	Stop            *time.Time
 	DurationSeconds int64
+	Running         bool
 	Description     string
 }
+
+// ElapsedSeconds returns the stored duration for finished entries and
+// measures running entries against the caller's reporting time.
+func (e TimeEntry) ElapsedSeconds(now time.Time) int64 {
+	if e.Running {
+		return now.Unix() - e.Start.Unix()
+	}
+	return e.DurationSeconds
+}
+
 type Summary map[string]map[int64]float64
 
 func VisibleSorted(projects []Project) []Project {
-	r := make([]Project, len(projects))
-	copy(r, projects)
-	r = slicesDeleteHidden(r)
+	return SortedProjects(projects, false)
+}
+
+func SortedProjects(projects []Project, includeHidden bool) []Project {
+	r := make([]Project, 0, len(projects))
+	for _, p := range projects {
+		if includeHidden || !p.Hidden {
+			r = append(r, p)
+		}
+	}
 	sort.SliceStable(r, func(i, j int) bool {
 		a, b := r[i].DisplayOrder, r[j].DisplayOrder
 		if a == nil {
@@ -44,37 +63,20 @@ func VisibleSorted(projects []Project) []Project {
 	})
 	return r
 }
-func slicesDeleteHidden(p []Project) []Project {
-	r := p[:0]
-	for _, v := range p {
-		if !v.Hidden {
-			r = append(r, v)
-		}
-	}
-	return r
-}
 
-func Summarize(entries []TimeEntry, location *time.Location, now time.Time) (Summary, error) {
+func Summarize(entries []TimeEntry, location *time.Location, now time.Time) Summary {
 	r := Summary{}
 	for _, e := range entries {
 		if e.ProjectID == nil {
 			continue
 		}
-		start, err := time.Parse(time.RFC3339Nano, e.Start)
-		if err != nil {
-			return nil, err
-		}
-		day := start.In(location).Format(time.DateOnly)
+		day := e.Start.In(location).Format(time.DateOnly)
 		if r[day] == nil {
 			r[day] = map[int64]float64{}
 		}
-		seconds := e.DurationSeconds
-		if seconds < 0 {
-			seconds = now.Unix() + seconds
-		}
-		r[day][*e.ProjectID] += float64(seconds) / 60
+		r[day][*e.ProjectID] += float64(e.ElapsedSeconds(now)) / 60
 	}
-	return r, nil
+	return r
 }
 
 // DailyTotals sums unrounded minutes for the supplied projects and dates.
