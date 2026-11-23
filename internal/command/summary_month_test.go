@@ -31,7 +31,7 @@ func TestSummaryMonth(t *testing.T) {
 				fake := &fakeClient{}
 				client := &dateRangeClient{fakeClient: fake}
 				app, out := configuredApp(t, fake, "")
-				app.Client = client
+				app.NewClient = useClient(client)
 				now, err := time.Parse(time.RFC3339, tt.now)
 				if err != nil {
 					t.Fatal(err)
@@ -43,7 +43,7 @@ func TestSummaryMonth(t *testing.T) {
 				if err := app.Run(context.Background(), []string{"summary", "--month", month, "--format", "tsv"}); err != nil {
 					t.Fatal(err)
 				}
-				if fake.entryCalls != 1 || client.from.Format(time.DateOnly) != tt.start || client.to.Format(time.DateOnly) != tt.end {
+				if fake.entryCalls != 1 || client.from.Format(time.DateOnly) != tt.start || client.to.AddDate(0, 0, -1).Format(time.DateOnly) != tt.end {
 					t.Fatalf("calls=%d from=%s to=%s", fake.entryCalls, client.from, client.to)
 				}
 				header := strings.Split(strings.TrimSuffix(out.String(), "\n"), "\t")
@@ -99,7 +99,7 @@ func TestMonthUsageBeforeConfiguration(t *testing.T) {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			t.Setenv("HOME", t.TempDir())
 			client := &fakeClient{}
-			app := App{Client: client, Out: &bytes.Buffer{}}
+			app := App{NewClient: useClient(client), Out: &bytes.Buffer{}}
 			err := app.Run(context.Background(), args)
 			var usageError UsageError
 			if !errors.As(err, &usageError) || client.entryCalls != 0 || client.projectCalls != 0 {

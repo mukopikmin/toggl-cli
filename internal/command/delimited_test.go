@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mukopikmin/toggl-cli/internal/model"
 )
@@ -46,8 +47,8 @@ func TestDelimitedEmptyAndHeaderlessOutput(t *testing.T) {
 func TestCommandsUseFixedDelimiters(t *testing.T) {
 	name := "Client, A\t\"quoted\"\nnext line"
 	client := &fakeClient{
-		projects: []model.Project{{ID: 1, DisplayName: name}},
-		entries:  []model.TimeEntry{{ID: 1, Description: name, Start: "2026-05-01T00:00:00Z", DurationSeconds: 60}},
+		projects: []model.Project{{ID: 1, Name: name}},
+		entries:  []model.TimeEntry{{ID: 1, Description: name, Start: time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC), DurationSeconds: 60}},
 	}
 	tests := []struct {
 		name string
