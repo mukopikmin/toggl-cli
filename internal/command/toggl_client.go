@@ -24,6 +24,7 @@ func (a App) projects(ctx context.Context, cfg config.Config) ([]model.Project, 
 	views := make([]model.Project, len(projects))
 	for i, project := range projects {
 		preferences := cfg.Projects[project.ID]
+		project.Alias = preferences.DisplayName
 		project.DisplayName = preferences.DisplayName
 		if project.DisplayName == "" {
 			project.DisplayName = project.Name

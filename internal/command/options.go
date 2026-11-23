@@ -21,6 +21,8 @@ type opts struct {
 	template                     string
 	templateSet, force           bool
 	watch                        bool
+	fields                       []string
+	includeHidden                bool
 	pos                          []string
 }
 
@@ -61,6 +63,15 @@ func parseOpts(args []string, allowed map[string]bool) (opts, error) {
 				return o, e
 			}
 			o.format, o.formatSet = v, true
+		case "--fields":
+			if !allowed["fields"] {
+				return o, usagef("unknown option: %s", key)
+			}
+			v, e := take()
+			if e != nil {
+				return o, e
+			}
+			o.fields = strings.Split(v, ",")
 		case "-d", "--days":
 			if !allowed["days"] {
 				return o, usagef("unknown option: %s", key)
@@ -109,7 +120,7 @@ func parseOpts(args []string, allowed map[string]bool) (opts, error) {
 				return o, usagef("Option '%s' does not take an argument", key)
 			}
 			o.dailyTotal = true
-		case "--no-project", "--project", "--no-date", "--date", "--clipboard", "--no-clipboard", "--force", "--watch":
+		case "--no-project", "--project", "--no-date", "--date", "--clipboard", "--no-clipboard", "--force", "--watch", "--include-hidden":
 			if !allowed[strings.TrimPrefix(key, "--")] {
 				return o, usagef("unknown option: %s", key)
 			}
@@ -127,6 +138,8 @@ func parseOpts(args []string, allowed map[string]bool) (opts, error) {
 				o.force = true
 			case "--watch":
 				o.watch = true
+			case "--include-hidden":
+				o.includeHidden = true
 			}
 		default:
 			if strings.HasPrefix(arg, "-") {
