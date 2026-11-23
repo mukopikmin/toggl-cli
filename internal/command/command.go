@@ -444,7 +444,9 @@ func (a App) summary(ctx context.Context, args []string) error {
 	if e != nil {
 		return usage(e.Error())
 	}
-	entries, e := a.Client.TimeEntries(ctx, d.Config, from, to)
+	start := model.StartOfDate(from, loc)
+	end := model.StartOfDate(to.AddDate(0, 0, 1), loc)
+	entries, e := a.Client.TimeEntries(ctx, d.Config, start, end)
 	if e != nil {
 		return e
 	}
@@ -552,7 +554,6 @@ func (a App) timeEntry(ctx context.Context, args []string) error {
 		return err
 	}
 	now := a.Now()
-	y, m, _ := now.Date()
 	sd, ok := parseUnsignedInteger(o.pos[0])
 	if !ok {
 		return usage("start and end day must be valid integers")
@@ -561,20 +562,28 @@ func (a App) timeEntry(ctx context.Context, args []string) error {
 	if !ok {
 		return usage("start and end day must be valid integers")
 	}
-	lastDay := time.Date(y, m+1, 0, 0, 0, 0, 0, time.Local).Day()
-	if sd < 1 || ed < 1 || sd > lastDay || ed > lastDay {
+	if sd < 1 || ed < 1 || sd > 31 || ed > 31 {
 		return usage("start and end day must be valid dates")
 	}
-	from := time.Date(y, m, sd, 0, 0, 0, 0, time.Local)
-	to := time.Date(y, m, ed, 0, 0, 0, 0, time.Local)
-	if from.After(to) {
+	if sd > ed {
 		return usage("start day must not be after end day")
 	}
 	d, e := loadCfg()
 	if e != nil {
 		return e
 	}
-	entries, e := a.Client.TimeEntries(ctx, d.Config, from, to)
+	loc, e := location(d.Config)
+	if e != nil {
+		return e
+	}
+	y, m, _ := now.In(loc).Date()
+	lastDay := time.Date(y, m+1, 0, 0, 0, 0, 0, time.UTC).Day()
+	if ed > lastDay {
+		return usage("start and end day must be valid dates")
+	}
+	from := model.StartOfDate(time.Date(y, m, sd, 0, 0, 0, 0, time.UTC), loc)
+	end := model.StartOfDate(time.Date(y, m, ed+1, 0, 0, 0, 0, time.UTC), loc)
+	entries, e := a.Client.TimeEntries(ctx, d.Config, from, end)
 	if e != nil {
 		return e
 	}
