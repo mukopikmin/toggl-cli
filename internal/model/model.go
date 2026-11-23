@@ -21,11 +21,22 @@ type Project struct {
 type TimeEntry struct {
 	ID              int64
 	ProjectID       *int64
-	Start           string
-	Stop            *string
+	Start           time.Time
+	Stop            *time.Time
 	DurationSeconds int64
+	Running         bool
 	Description     string
 }
+
+// ElapsedSeconds returns the stored duration for finished entries and
+// measures running entries against the caller's reporting time.
+func (e TimeEntry) ElapsedSeconds(now time.Time) int64 {
+	if e.Running {
+		return now.Unix() - e.Start.Unix()
+	}
+	return e.DurationSeconds
+}
+
 type Summary map[string]map[int64]float64
 
 func VisibleSorted(projects []Project) []Project {
@@ -54,27 +65,19 @@ func slicesDeleteHidden(p []Project) []Project {
 	return r
 }
 
-func Summarize(entries []TimeEntry, location *time.Location, now time.Time) (Summary, error) {
+func Summarize(entries []TimeEntry, location *time.Location, now time.Time) Summary {
 	r := Summary{}
 	for _, e := range entries {
 		if e.ProjectID == nil {
 			continue
 		}
-		start, err := time.Parse(time.RFC3339Nano, e.Start)
-		if err != nil {
-			return nil, err
-		}
-		day := start.In(location).Format(time.DateOnly)
+		day := e.Start.In(location).Format(time.DateOnly)
 		if r[day] == nil {
 			r[day] = map[int64]float64{}
 		}
-		seconds := e.DurationSeconds
-		if seconds < 0 {
-			seconds = now.Unix() + seconds
-		}
-		r[day][*e.ProjectID] += float64(seconds) / 60
+		r[day][*e.ProjectID] += float64(e.ElapsedSeconds(now)) / 60
 	}
-	return r, nil
+	return r
 }
 
 // DailyTotals sums unrounded minutes for the supplied projects and dates.

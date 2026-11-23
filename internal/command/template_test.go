@@ -20,7 +20,7 @@ func TestTemplateLifecycleWithoutConfigurationOrAPI(t *testing.T) {
 	t.Setenv("HOME", home)
 	client := &fakeClient{err: errors.New("must not call API")}
 	var out bytes.Buffer
-	app := App{Client: client, Out: &out}
+	app := App{NewClient: useClient(client), Out: &out}
 	run := func(args ...string) string {
 		t.Helper()
 		out.Reset()
@@ -33,7 +33,7 @@ func TestTemplateLifecycleWithoutConfigurationOrAPI(t *testing.T) {
 		t.Fatalf("empty list = %q", got)
 	}
 	run("template", "add", "weekly", "--days", "6", "--format", "table")
-	run("template", "add", "spreadsheet", "--no-date", "--no-project")
+	run("template", "add", "spreadsheet", "-ftsv", "--no-date", "--no-project")
 	if got := run("template", "list"); got != "spreadsheet\nweekly\n" {
 		t.Fatal(got)
 	}
@@ -56,7 +56,7 @@ func TestTemplateLifecycleWithoutConfigurationOrAPI(t *testing.T) {
 	}
 	run("template", "add", "weekly", "--days", "1", "--force")
 	doc, err = template.Load()
-	if err != nil || *doc.Templates["weekly"].Days != 1 || doc.Templates["weekly"].Format != "tsv" {
+	if err != nil || *doc.Templates["weekly"].Days != 1 || doc.Templates["weekly"].Format != "table" {
 		t.Fatalf("force did not replace the template: %+v, %v", doc, err)
 	}
 	if !doc.Templates["spreadsheet"].NoDate {
@@ -136,8 +136,8 @@ func TestSummaryTemplateMatchesDirectExecution(t *testing.T) {
 		{"format override", []string{"--days", "6", "-ftable"}, []string{"--days", "1", "-fcsv"}, []string{"--days", "1", "-fcsv"}},
 		{"fixed replaces relative", []string{"--days", "6"}, []string{"2026-05-01", "2026-05-02"}, []string{"2026-05-01", "2026-05-02"}},
 		{"relative replaces fixed", []string{"2026-04-01", "2026-04-30"}, []string{"--days", "1"}, []string{"--days", "1"}},
-		{"output only", []string{"--no-project", "--no-date"}, []string{"2026-05-01", "2026-05-02"}, []string{"2026-05-01", "2026-05-02", "--no-project", "--no-date"}},
-		{"clear booleans", []string{"--days", "1", "--no-project", "--no-date", "--clipboard"}, []string{"--project", "--date", "--no-clipboard"}, []string{"--days", "1"}},
+		{"output only", []string{"-ftsv", "--no-project", "--no-date"}, []string{"2026-05-01", "2026-05-02"}, []string{"2026-05-01", "2026-05-02", "-ftsv", "--no-project", "--no-date"}},
+		{"clear booleans", []string{"--days", "1", "-ftsv", "--no-project", "--no-date", "--clipboard"}, []string{"--project", "--date", "--no-clipboard"}, []string{"--days", "1", "-ftsv"}},
 		{"csv format", []string{"--days", "1", "--format", "csv"}, nil, []string{"--days", "1", "--format", "csv"}},
 		{"json", []string{"--days", "1", "--format", "json"}, nil, []string{"--days", "1", "--format", "json"}},
 	}
@@ -145,12 +145,12 @@ func TestSummaryTemplateMatchesDirectExecution(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			projectID := int64(1)
 			fake := &fakeClient{
-				projects: []model.Project{{ID: projectID, DisplayName: "Client A", Active: true}},
-				entries:  []model.TimeEntry{{ID: 1, ProjectID: &projectID, Start: "2026-05-02T01:00:00Z", DurationSeconds: 5400}},
+				projects: []model.Project{{ID: projectID, Name: "Client A", Active: true}},
+				entries:  []model.TimeEntry{{ID: 1, ProjectID: &projectID, Start: time.Date(2026, 5, 2, 1, 0, 0, 0, time.UTC), DurationSeconds: 5400}},
 			}
 			app, out := configuredApp(t, fake, "")
 			client := &dateRangeClient{fakeClient: fake}
-			app.Client = client
+			app.NewClient = useClient(client)
 			configBefore, _ := os.ReadFile(config.Path(os.Getenv("HOME")))
 			if err := app.Run(context.Background(), append([]string{"template", "add", "test"}, tt.settings...)); err != nil {
 				t.Fatal(err)
@@ -181,8 +181,8 @@ func TestSummaryTemplateMatchesDirectExecution(t *testing.T) {
 func TestLegacyTemplateSeparatorDoesNotOverrideFormat(t *testing.T) {
 	projectID := int64(1)
 	fake := &fakeClient{
-		projects: []model.Project{{ID: projectID, DisplayName: "Project A"}},
-		entries:  []model.TimeEntry{{ProjectID: &projectID, Start: "2026-05-02T01:00:00Z", DurationSeconds: 90}},
+		projects: []model.Project{{ID: projectID, Name: "Project A"}},
+		entries:  []model.TimeEntry{{ProjectID: &projectID, Start: time.Date(2026, 5, 2, 1, 0, 0, 0, time.UTC), DurationSeconds: 90}},
 	}
 	app, out := configuredApp(t, fake, "")
 	path := filepath.Join(os.Getenv("HOME"), ".config", "toggl-cli", "templates.toml")
@@ -230,8 +230,8 @@ func TestCorruptTemplatesAreNotOverwritten(t *testing.T) {
 
 func TestSummaryValidatesMergedTemplateBeforeAPI(t *testing.T) {
 	tests := []struct{ settings, overrides []string }{
-		{[]string{"--days", "1", "--no-date"}, []string{"--format", "table"}},
-		{[]string{"--days", "1", "--no-project"}, []string{"--format", "table"}},
+		{[]string{"--days", "1", "-ftsv", "--no-date"}, []string{"--format", "table"}},
+		{[]string{"--days", "1", "-ftsv", "--no-project"}, []string{"--format", "table"}},
 		{[]string{"--format", "table"}, nil},
 		{[]string{"--days", "1"}, []string{"2026-05-01"}},
 		{[]string{"--days", "1"}, []string{"2026-05-01", "2026-05-02", "--days", "1"}},
@@ -256,7 +256,7 @@ func TestSummaryTemplateResolvesDaysAtExecution(t *testing.T) {
 	fake := &fakeClient{}
 	app, out := configuredApp(t, fake, "")
 	client := &dateRangeClient{fakeClient: fake}
-	app.Client = client
+	app.NewClient = useClient(client)
 	p := config.Path(os.Getenv("HOME"))
 	if err := os.WriteFile(p, []byte("workspace='1'\ntoken='test'\ntimezone='Asia/Tokyo'\n"), 0600); err != nil {
 		t.Fatal(err)
@@ -275,7 +275,7 @@ func TestSummaryTemplateResolvesDaysAtExecution(t *testing.T) {
 		if err := app.Run(context.Background(), []string{"summary", "--template", "rolling"}); err != nil {
 			t.Fatal(err)
 		}
-		if client.from.Format(time.DateOnly) != tt.from || client.to.Format(time.DateOnly) != tt.to {
+		if client.from.Format(time.DateOnly) != tt.from || client.to.AddDate(0, 0, -1).Format(time.DateOnly) != tt.to {
 			t.Fatalf("at %s: got %s to %s", tt.now, client.from, client.to)
 		}
 		_, offset := client.to.Zone()

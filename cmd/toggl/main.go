@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/mukopikmin/toggl-cli/internal/command"
 	"github.com/mukopikmin/toggl-cli/internal/config"
+	"github.com/mukopikmin/toggl-cli/internal/selfupdate"
 	"github.com/mukopikmin/toggl-cli/internal/toggl"
 	"io"
 	"os"
@@ -15,7 +16,13 @@ import (
 var version = "0.0.0-dev"
 
 func run(args []string, stdout, stderr io.Writer) int {
-	app := command.App{Client: toggl.HTTPClient{}, Version: version, Out: stdout, Err: stderr}
+	app := command.App{
+		NewClient: func(workspace, token string) command.TogglClient {
+			return toggl.HTTPClient{Workspace: workspace, Token: token}
+		},
+		Updater: selfupdate.Service{},
+		Version: version, Out: stdout, Err: stderr,
+	}
 	if err := app.Run(context.Background(), args); err != nil {
 		fmt.Fprintf(stderr, "Error: %v\n", err)
 		var notFound config.FileNotFoundError
