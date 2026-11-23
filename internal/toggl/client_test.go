@@ -9,8 +9,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/mukopikmin/toggl-cli/internal/config"
 )
 
 func TestTimeEntriesDateRange(t *testing.T) {
@@ -29,9 +27,13 @@ func TestTimeEntriesDateRange(t *testing.T) {
 			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { q = r.URL.Query(); w.Write([]byte("[]")) }))
 			defer s.Close()
 			c := HTTPClient{Endpoint: s.URL}
-			from, _ := time.Parse(time.DateOnly, tt.from)
-			to, _ := time.Parse(time.DateOnly, tt.to)
-			_, err := c.TimeEntries(context.Background(), config.Config{Timezone: tt.zone}, from, to)
+			loc, err := time.LoadLocation(tt.zone)
+			if err != nil {
+				t.Fatal(err)
+			}
+			from, _ := time.ParseInLocation(time.DateOnly, tt.from, loc)
+			to, _ := time.ParseInLocation(time.DateOnly, tt.to, loc)
+			_, err = c.TimeEntries(context.Background(), from, to.AddDate(0, 0, 1))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -41,20 +43,19 @@ func TestTimeEntriesDateRange(t *testing.T) {
 		})
 	}
 }
-func TestProjectsMapsDTOSettingsAndAuthorization(t *testing.T) {
+func TestProjectsMapsDTOAndAuthorization(t *testing.T) {
 	var auth, path string
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		auth, path = r.Header.Get("Authorization"), r.URL.Path
 		w.Write([]byte(`[{"id":1,"project_name":"Old","project_active":true},{"id":2,"name":"New","active":false}]`))
 	}))
 	defer s.Close()
-	order := float64(4)
-	client := HTTPClient{Endpoint: s.URL}
-	projects, err := client.Projects(context.Background(), config.Config{Workspace: "a/b", Token: "secret", Projects: map[int64]config.Project{1: {DisplayName: "Custom", Hidden: true, DisplayOrder: &order}}})
+	client := HTTPClient{Endpoint: s.URL, Workspace: "a/b", Token: "secret"}
+	projects, err := client.Projects(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(projects) != 1 || projects[0].Name != "Old" || projects[0].Alias != "Custom" || projects[0].DisplayName != "Custom" || !projects[0].Hidden || *projects[0].DisplayOrder != 4 {
+	if len(projects) != 1 || projects[0].Name != "Old" || !projects[0].Active {
 		t.Fatalf("%+v", projects)
 	}
 	if auth != "Basic "+base64.StdEncoding.EncodeToString([]byte("secret:api_token")) {
@@ -65,21 +66,22 @@ func TestProjectsMapsDTOSettingsAndAuthorization(t *testing.T) {
 	}
 }
 func TestTimeEntriesMapsFallbackPIDAndErrors(t *testing.T) {
-	pid := int64(9)
-	_ = pid
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`[{"id":1,"pid":9,"start":"2026-01-01T00:00:00Z","stop":null,"duration":60,"description":"work"}]`))
+		w.Write([]byte(`[{"id":1,"pid":9,"start":"2026-01-01T00:00:00Z","stop":null,"duration":-1767225600,"description":"work"}]`))
 	}))
 	defer s.Close()
 	client := HTTPClient{Endpoint: s.URL}
 	day, _ := time.Parse(time.DateOnly, "2026-01-01")
-	entries, err := client.TimeEntries(context.Background(), config.Config{Timezone: "UTC"}, day, day)
+	entries, err := client.TimeEntries(context.Background(), day, day.AddDate(0, 0, 1))
 	if err != nil || len(entries) != 1 || entries[0].ProjectID == nil || *entries[0].ProjectID != 9 {
 		t.Fatalf("%+v %v", entries, err)
 	}
+	if entries[0].Stop != nil || !entries[0].Running || entries[0].ElapsedSeconds(day.Add(time.Minute)) != 60 {
+		t.Fatalf("unexpected running entry: %+v", entries[0])
+	}
 	bad := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.Error(w, "no", http.StatusUnauthorized) }))
 	defer bad.Close()
-	if _, err = (HTTPClient{Endpoint: bad.URL}).Projects(context.Background(), config.Config{}); err == nil {
+	if _, err = (HTTPClient{Endpoint: bad.URL}).Projects(context.Background()); err == nil {
 		t.Fatal("expected API error")
 	}
 }
