@@ -16,15 +16,15 @@ func TestParseOptsCompatibleForms(t *testing.T) {
 		args []string
 		want opts
 	}{
-		{"default format", nil, opts{format: "tsv"}},
+		{"default format", nil, opts{format: "table"}},
 		{"attached format", []string{"-fjson"}, opts{format: "json", formatSet: true}},
-		{"daily total", []string{"--daily-total"}, opts{format: "tsv", dailyTotal: true}},
+		{"daily total", []string{"--daily-total"}, opts{format: "table", dailyTotal: true}},
 		{"attached tsv", []string{"-ftsv"}, opts{format: "tsv", formatSet: true}},
 		{"attached days", []string{"-d1", "-fjson"}, opts{format: "json", formatSet: true, days: &one}},
-		{"end of options", []string{"--", "--no-date", "-fjson"}, opts{format: "tsv", pos: []string{"--no-date", "-fjson"}}},
-		{"trailing end marker", []string{"--"}, opts{format: "tsv"}},
-		{"leading zero days", []string{"--days", "01"}, opts{format: "tsv", days: &one}},
-		{"safe integer boundary", []string{"--days", "9007199254740991"}, opts{format: "tsv", days: &maxSafe}},
+		{"end of options", []string{"--", "--no-date", "-fjson"}, opts{format: "table", pos: []string{"--no-date", "-fjson"}}},
+		{"trailing end marker", []string{"--"}, opts{format: "table"}},
+		{"leading zero days", []string{"--days", "01"}, opts{format: "table", days: &one}},
+		{"safe integer boundary", []string{"--days", "9007199254740991"}, opts{format: "table", days: &maxSafe}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
