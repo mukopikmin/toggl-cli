@@ -16,14 +16,14 @@ import (
 func TestSummaryDailyTotalFormats(t *testing.T) {
 	one, two, hidden, absent := int64(1), int64(2), int64(3), int64(4)
 	client := &fakeClient{
-		projects: []model.Project{{ID: one, DisplayName: "A"}, {ID: hidden, DisplayName: "Hidden", Hidden: true}, {ID: two, DisplayName: "B"}},
+		projects: []model.Project{{ID: one, Name: "A"}, {ID: hidden, Name: "Hidden"}, {ID: two, Name: "B"}},
 		entries: []model.TimeEntry{
-			{ProjectID: &one, Start: "2026-05-01T00:00:00Z", DurationSeconds: 1},
-			{ProjectID: &two, Start: "2026-05-01T01:00:00Z", DurationSeconds: 1},
-			{ProjectID: &hidden, Start: "2026-05-01T02:00:00Z", DurationSeconds: 3600},
-			{ProjectID: &absent, Start: "2026-05-01T03:00:00Z", DurationSeconds: 3600},
-			{Start: "2026-05-01T04:00:00Z", DurationSeconds: 3600},
-			{ProjectID: &one, Start: "2026-05-02T11:59:30Z", DurationSeconds: -time.Date(2026, 5, 2, 11, 59, 30, 0, time.UTC).Unix()},
+			{ProjectID: &one, Start: time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC), DurationSeconds: 1},
+			{ProjectID: &two, Start: time.Date(2026, 5, 1, 1, 0, 0, 0, time.UTC), DurationSeconds: 1},
+			{ProjectID: &hidden, Start: time.Date(2026, 5, 1, 2, 0, 0, 0, time.UTC), DurationSeconds: 3600},
+			{ProjectID: &absent, Start: time.Date(2026, 5, 1, 3, 0, 0, 0, time.UTC), DurationSeconds: 3600},
+			{Start: time.Date(2026, 5, 1, 4, 0, 0, 0, time.UTC), DurationSeconds: 3600},
+			{ProjectID: &one, Start: time.Date(2026, 5, 2, 11, 59, 30, 0, time.UTC), Running: true},
 		},
 	}
 	tests := []struct {
@@ -31,16 +31,17 @@ func TestSummaryDailyTotalFormats(t *testing.T) {
 		args []string
 		want string
 	}{
-		{"default TSV", nil, "Project\t2026-05-01\t2026-05-02\t2026-05-03\nA\t0.02\t0.5\t\nB\t0.02\t\t\nTotal\t0.03\t0.5\t0\n"},
+		{"tsv", []string{"-ftsv"}, "Project\t2026-05-01\t2026-05-02\t2026-05-03\nA\t0.02\t0.5\t\nB\t0.02\t\t\nTotal\t0.03\t0.5\t0\n"},
 		{"csv", []string{"--format", "csv"}, "Project,2026-05-01,2026-05-02,2026-05-03\nA,0.02,0.5,\nB,0.02,,\nTotal,0.03,0.5,0\n"},
-		{"no project", []string{"--no-project"}, "2026-05-01\t2026-05-02\t2026-05-03\n0.02\t0.5\t\n0.02\t\t\n0.03\t0.5\t0\n"},
-		{"no date", []string{"--no-date"}, "A\t0.02\t0.5\t\nB\t0.02\t\t\nTotal\t0.03\t0.5\t0\n"},
-		{"no headers", []string{"--no-project", "--no-date"}, "0.02\t0.5\t\n0.02\t\t\n0.03\t0.5\t0\n"},
-		{"table", []string{"--format", "table"}, "┌─────────┬────────────┬────────────┬────────────┐\n│ Project │ 2026-05-01 │ 2026-05-02 │ 2026-05-03 │\n├─────────┼────────────┼────────────┼────────────┤\n│ A       │ 0.02       │ 0.5        │            │\n│ B       │ 0.02       │            │            │\n│ Total   │ 0.03       │ 0.5        │ 0          │\n└─────────┴────────────┴────────────┴────────────┘\n"},
+		{"no project", []string{"-ftsv", "--no-project"}, "2026-05-01\t2026-05-02\t2026-05-03\n0.02\t0.5\t\n0.02\t\t\n0.03\t0.5\t0\n"},
+		{"no date", []string{"-ftsv", "--no-date"}, "A\t0.02\t0.5\t\nB\t0.02\t\t\nTotal\t0.03\t0.5\t0\n"},
+		{"no headers", []string{"-ftsv", "--no-project", "--no-date"}, "0.02\t0.5\t\n0.02\t\t\n0.03\t0.5\t0\n"},
+		{"default table", nil, "┌─────────┬────────────┬────────────┬────────────┐\n│ Project │ 2026-05-01 │ 2026-05-02 │ 2026-05-03 │\n├─────────┼────────────┼────────────┼────────────┤\n│ A       │ 0.02       │ 0.5        │            │\n│ B       │ 0.02       │            │            │\n│ Total   │ 0.03       │ 0.5        │ 0          │\n└─────────┴────────────┴────────────┴────────────┘\n"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app, out := configuredApp(t, client, "")
+			appendProjectConfig(t, "\n[projects.3]\nhidden = true\n")
 			args := append([]string{"summary", "2026-05-01", "2026-05-03", "--daily-total"}, tt.args...)
 			if err := app.Run(context.Background(), args); err != nil {
 				t.Fatal(err)
@@ -60,9 +61,9 @@ func TestSummaryDailyTotalFormats(t *testing.T) {
 }
 
 func TestSummaryDailyTotalEmpty(t *testing.T) {
-	for _, projects := range [][]model.Project{nil, {{ID: 1, DisplayName: "A"}}, {{ID: 1, Hidden: true}}} {
+	for _, projects := range [][]model.Project{nil, {{ID: 1, Name: "A"}}} {
 		app, out := configuredApp(t, &fakeClient{projects: projects}, "")
-		if err := app.Run(context.Background(), []string{"summary", "2026-05-01", "2026-05-01", "--daily-total"}); err != nil {
+		if err := app.Run(context.Background(), []string{"summary", "2026-05-01", "2026-05-01", "--daily-total", "-ftsv"}); err != nil {
 			t.Fatal(err)
 		}
 		if !strings.HasSuffix(out.String(), "Total\t0\n") {
@@ -82,9 +83,11 @@ func TestSummaryDailyTotalMonthBoundaries(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.zone, func(t *testing.T) {
-			client := &fakeClient{projects: []model.Project{{ID: pid, DisplayName: "A"}}, entries: []model.TimeEntry{
-				{ProjectID: &pid, Start: tt.start, DurationSeconds: 60},
-				{ProjectID: &pid, Start: tt.end, DurationSeconds: 120},
+			start, _ := time.Parse(time.RFC3339, tt.start)
+			end, _ := time.Parse(time.RFC3339, tt.end)
+			client := &fakeClient{projects: []model.Project{{ID: pid, Name: "A"}}, entries: []model.TimeEntry{
+				{ProjectID: &pid, Start: start, DurationSeconds: 60},
+				{ProjectID: &pid, Start: end, DurationSeconds: 120},
 			}}
 			app, out := configuredApp(t, client, "")
 			text := "workspace=\"1\"\ntoken=\"secret\"\ntimezone=\"" + tt.zone + "\"\n"
@@ -92,7 +95,7 @@ func TestSummaryDailyTotalMonthBoundaries(t *testing.T) {
 				t.Fatal(err)
 			}
 			app.Now = func() time.Time { return time.Date(2026, 2, 1, 12, 0, 0, 0, time.UTC) }
-			if err := app.Run(context.Background(), []string{"summary", "--days", "2", "--daily-total"}); err != nil {
+			if err := app.Run(context.Background(), []string{"summary", "--days", "2", "--daily-total", "-ftsv"}); err != nil {
 				t.Fatal(err)
 			}
 			if !strings.HasPrefix(out.String(), "Project\t2026-01-31\t2026-02-01\n") || !strings.HasSuffix(out.String(), tt.want) {
@@ -114,12 +117,27 @@ func TestSummaryDailyTotalInvalidUsage(t *testing.T) {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			t.Setenv("HOME", t.TempDir())
 			client := &fakeClient{}
-			app := App{Client: client, Out: &bytes.Buffer{}}
+			app := App{NewClient: useClient(client), Out: &bytes.Buffer{}}
 			err := app.Run(context.Background(), args)
 			var usageError UsageError
 			if !errors.As(err, &usageError) || client.entryCalls != 0 || client.projectCalls != 0 {
 				t.Fatalf("expected usage error before API access, got %v", err)
 			}
 		})
+	}
+}
+
+type failingSummaryWriter struct {
+	err error
+}
+
+func (w failingSummaryWriter) Write([]byte) (int, error) { return 0, w.err }
+
+func TestSummaryReportsOutputFailure(t *testing.T) {
+	want := errors.New("output unavailable")
+	app, _ := configuredApp(t, &fakeClient{}, "")
+	app.Out = failingSummaryWriter{err: want}
+	if err := app.Run(context.Background(), []string{"summary", "--days", "1"}); !errors.Is(err, want) {
+		t.Fatalf("got %v, want %v", err, want)
 	}
 }

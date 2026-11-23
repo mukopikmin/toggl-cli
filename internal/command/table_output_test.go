@@ -81,7 +81,7 @@ func TestTableWatchRequiresTableFormatAndTerminal(t *testing.T) {
 		args []string
 		want string
 	}{
-		{[]string{"config", "--watch"}, "requires table format"},
+		{[]string{"config", "--format", "csv", "--watch"}, "requires table format"},
 		{[]string{"client", "list", "--format", "json", "--watch"}, "requires table format"},
 		{[]string{"config", "--format", "table", "--watch"}, "requires a terminal on stdout"},
 		{[]string{"project", "list", "--format", "table", "--watch"}, "requires a terminal on stdout"},

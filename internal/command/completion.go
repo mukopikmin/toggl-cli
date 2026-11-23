@@ -84,7 +84,7 @@ func completionCandidates(words []string) []string {
 
 	options := "-f --format --watch"
 	if command == "summary" {
-		options += " -d --days --no-project --no-date --clipboard"
+		options += " -d --days --month --no-project --no-date --clipboard"
 	}
 	if command == "update" {
 		options = "--channel"
@@ -119,7 +119,7 @@ func completionCandidates(words []string) []string {
 			}
 			return nil
 		}
-		if allowed(arg) && (values(arg) != "" || arg == "-d" || arg == "--days") {
+		if allowed(arg) && (values(arg) != "" || arg == "-d" || arg == "--days" || arg == "--month") {
 			pending = arg
 		}
 	}

@@ -36,7 +36,7 @@ func TestDailyTotals(t *testing.T) {
 
 func TestSummarizeTimeZonesAndMonthBoundaries(t *testing.T) {
 	pid := int64(1)
-	entries := []TimeEntry{{ProjectID: &pid, Start: "2026-01-31T14:59:59Z", DurationSeconds: 60}, {ProjectID: &pid, Start: "2026-01-31T15:00:00Z", DurationSeconds: 120}}
+	entries := []TimeEntry{{ProjectID: &pid, Start: time.Date(2026, 1, 31, 14, 59, 59, 0, time.UTC), DurationSeconds: 60}, {ProjectID: &pid, Start: time.Date(2026, 1, 31, 15, 0, 0, 0, time.UTC), DurationSeconds: 120}}
 	tests := []struct {
 		name, zone string
 		jan, feb   float64
@@ -44,10 +44,7 @@ func TestSummarizeTimeZonesAndMonthBoundaries(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			loc, _ := time.LoadLocation(tt.zone)
-			got, e := Summarize(entries, loc, time.Now())
-			if e != nil {
-				t.Fatal(e)
-			}
+			got := Summarize(entries, loc, time.Now())
 			if got["2026-01-31"][1] != tt.jan || got["2026-02-01"][1] != tt.feb {
 				t.Fatalf("%v", got)
 			}
@@ -78,11 +75,8 @@ func TestVisibleSortedDoesNotMutate(t *testing.T) {
 func TestSummarizeRunningAndUnassigned(t *testing.T) {
 	pid := int64(7)
 	start := time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)
-	entries := []TimeEntry{{ProjectID: &pid, Start: start.Format(time.RFC3339), DurationSeconds: -start.Unix()}, {ProjectID: nil, Start: start.Format(time.RFC3339), DurationSeconds: 3600}}
-	got, err := Summarize(entries, time.UTC, start.Add(45*time.Minute))
-	if err != nil {
-		t.Fatal(err)
-	}
+	entries := []TimeEntry{{ProjectID: &pid, Start: start, Running: true}, {ProjectID: nil, Start: start, DurationSeconds: 3600}}
+	got := Summarize(entries, time.UTC, start.Add(45*time.Minute))
 	if got["2026-05-01"][7] != 45 || len(got["2026-05-01"]) != 1 {
 		t.Fatalf("%v", got)
 	}
