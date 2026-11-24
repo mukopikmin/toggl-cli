@@ -146,7 +146,7 @@ quotes, or line breaks are quoted, and embedded quotes are doubled.
 | `template delete` | `<name>` | Deletes the named template |
 | `time-entry list` | `<start-day> <end-day>`; `-f/--format`, `--watch` | Entries as a bordered table by default, TSV, CSV, or JSON |
 | `project list` | `-f/--format`, `--watch`, `--fields`, `--include-hidden` | Ordered projects as a table by default, TSV, CSV, or JSON |
-| `client list` | `-f/--format`, `--watch` | Client names as a table by default. Use TSV, CSV, or JSON for IDs and names |
+| `client list` | `-f/--format`, `--watch`, `--fields` | Client IDs and names as a table by default, TSV, CSV, or JSON |
 | `project sync` | none | Adds missing active projects to the TOML file |
 | `project reorder` | none | Interactively changes and saves visible-project order |
 | `config` | `-f/--format`, `--watch` | Non-sensitive settings as a table by default, two-column TSV or CSV, or JSON |
@@ -235,16 +235,14 @@ CSV and TSV protect text fields for spreadsheet import. JSON preserves the
 original values.
 
 `toggl client list` fetches clients from the configured workspace in API order.
-The default output is a bordered table of names. CSV and TSV use `id` and `name` headers. CSV uses commas and TSV
-uses tabs. Fields containing the delimiter, quotes, or newlines are quoted.
-Empty CSV/TSV output contains only the header. This command does not change the
-configuration file.
+All formats include `id` and `name` by default. Use `--fields` to select the
+fields to output. Table, CSV, and TSV follow the specified field order and
+include headers. Empty CSV and TSV output contains only the header.
 
 ```sh
-toggl client list                   # Bordered table of names
-toggl client list --format csv      # CSV: id and name columns
-toggl client list --format json     # Objects with id and name
-toggl client list --format tsv      # TSV with id and name columns
+toggl client list                          # Table with ID and name
+toggl client list --format csv --fields name
+toggl client list --format json --fields id
 ```
 
 Add `--daily-total` to `summary` to append a `Total` row to CSV, TSV, or table output:

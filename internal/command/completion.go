@@ -88,6 +88,9 @@ func completionCandidates(words []string) []string {
 		options += " -d --days --month --no-project --no-date --clipboard"
 	}
 	var fieldNames []string
+	if command == "client" {
+		fieldNames = clientFields.names()
+	}
 	if command == "project" {
 		fieldNames = projectFields.names()
 		options += " --include-hidden"
