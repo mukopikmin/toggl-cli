@@ -95,6 +95,9 @@ func completionCandidates(words []string) []string {
 		fieldNames = projectFields.names()
 		options += " --include-hidden"
 	}
+	if command == "time-entry" {
+		fieldNames = timeEntryFields.names()
+	}
 	if len(fieldNames) > 0 {
 		options += " --fields"
 	}

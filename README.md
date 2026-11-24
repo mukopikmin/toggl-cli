@@ -144,7 +144,7 @@ quotes, or line breaks are quoted, and embedded quotes are doubled.
 | `template list` | none | Template names in alphabetical order |
 | `template show` | `<name>` | Template settings as TOML |
 | `template delete` | `<name>` | Deletes the named template |
-| `time-entry list` | `<start-day> <end-day>`; `-f/--format`, `--watch` | Entries as a bordered table by default, TSV, CSV, or JSON |
+| `time-entry list` | `<start-day> <end-day>`; `-f/--format`, `--watch`, `--fields` | Entries as a bordered table by default, TSV, CSV, or JSON |
 | `project list` | `-f/--format`, `--watch`, `--fields`, `--include-hidden` | Ordered projects as a table by default, TSV, CSV, or JSON |
 | `client list` | `-f/--format`, `--watch`, `--fields` | Client IDs and names as a table by default, TSV, CSV, or JSON |
 | `project sync` | none | Adds missing active projects to the TOML file |
@@ -178,6 +178,16 @@ invalid. `time-entry list` days must exist in the current month in the configure
 timezone (or the system timezone when omitted). The CLI checks arguments that
 do not depend on configuration before loading it. An empty
 `project list --format json` or `client list --format json` result is `[]`.
+
+`toggl time-entry list` supports `id`, `description`, `project_id`, `start`,
+`stop`, and `duration_minutes` in every format. The default output includes all
+six fields. Use `--fields` to select the fields to output. Table, CSV, and TSV
+follow the specified field order and include headers. Unset project IDs and
+stop times appear as empty cells in table, CSV, and TSV and as `null` in JSON.
+
+```sh
+toggl time-entry list 1 7 --format tsv --fields project_id,duration_minutes
+```
 
 Table output uses the terminal width at the time of rendering. If the full
 headings are too wide, it uses shorter headings when they reduce the table width.
