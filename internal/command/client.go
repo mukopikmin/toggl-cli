@@ -2,12 +2,14 @@ package command
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-	"strconv"
 
 	"github.com/mukopikmin/toggl-cli/internal/model"
 )
+
+var clientFields = listFields[model.Client]{
+	{"id", "ID", "ID", func(c model.Client) any { return c.ID }},
+	{"name", "Client", "Clnt", func(c model.Client) any { return c.Name }},
+}
 
 func (a App) client(ctx context.Context, args []string) error {
 	if len(args) == 0 {
@@ -16,7 +18,7 @@ func (a App) client(ctx context.Context, args []string) error {
 	if args[0] != "list" {
 		return usagef("unknown client subcommand: %s", args[0])
 	}
-	o, err := parseOpts(args[1:], map[string]bool{"format": true, "watch": true})
+	o, err := parseOpts(args[1:], map[string]bool{"format": true, "watch": true, "fields": true})
 	if err != nil {
 		return err
 	}
@@ -24,6 +26,10 @@ func (a App) client(ctx context.Context, args []string) error {
 		return usage("client list does not accept positional arguments")
 	}
 	if err := a.validateTableWatch(o.watch, o.format); err != nil {
+		return err
+	}
+	fields, err := clientFields.selectFields("client", o.fields)
+	if err != nil {
 		return err
 	}
 	d, err := loadCfg()
@@ -34,29 +40,5 @@ func (a App) client(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	switch o.format {
-	case "json":
-		if clients == nil {
-			clients = []model.Client{}
-		}
-		b, err := json.MarshalIndent(clients, "", "  ")
-		if err != nil {
-			return err
-		}
-		_, err = fmt.Fprintln(a.Out, string(b))
-		return err
-	case "table":
-		rows := make([][]string, len(clients))
-		for i, c := range clients {
-			rows[i] = []string{c.Name}
-		}
-		return a.writeTable(ctx, tableOutputOptions{watch: o.watch}, []string{"Client"}, rows, []string{"Clnt"})
-	default:
-		rows := make([][]string, len(clients))
-		for i, c := range clients {
-			rows[i] = []string{strconv.FormatInt(c.ID, 10), c.Name}
-		}
-		_, err = fmt.Fprintln(a.Out, a.terminalDelimited([]string{"id", "name"}, rows, o.format))
-		return err
-	}
+	return writeList(ctx, a, clients, fields, o.format, tableOutputOptions{watch: o.watch})
 }

@@ -10,8 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -54,6 +54,8 @@ Commands:
 Options:
   -f, --format <format>  Set the output format: csv, tsv, json, or table (default: table)
       --watch            Redraw table output on terminal resize until Ctrl+C
+      --fields <list>    Select comma-separated fields in list output (default: all where supported)
+      --include-hidden   Include projects hidden in the configuration (project list)
   -d, --days <days>      Aggregate this many calendar days, including today (>= 1)
       --month <month>    Aggregate an entire month (YYYY-MM, YYYYMM, or YYYY/MM)
       --clipboard        Copy the output to the clipboard as well as stdout
@@ -139,12 +141,21 @@ func (a App) Run(ctx context.Context, args []string) error {
 }
 
 type outputTimeEntry struct {
-	ID              int64   `json:"id"`
-	Description     string  `json:"description"`
-	ProjectID       *int64  `json:"project_id"`
-	Start           string  `json:"start"`
-	Stop            *string `json:"stop"`
-	DurationMinutes float64 `json:"duration_minutes"`
+	ID              int64
+	Description     string
+	ProjectID       *int64
+	Start           string
+	Stop            *string
+	DurationMinutes float64
+}
+
+var timeEntryFields = listFields[outputTimeEntry]{
+	{"id", "id", "id", func(e outputTimeEntry) any { return e.ID }},
+	{"description", "description", "desc", func(e outputTimeEntry) any { return e.Description }},
+	{"project_id", "project_id", "proj_id", func(e outputTimeEntry) any { return optionalListValue(e.ProjectID) }},
+	{"start", "start", "start", func(e outputTimeEntry) any { return e.Start }},
+	{"stop", "stop", "stop", func(e outputTimeEntry) any { return optionalListValue(e.Stop) }},
+	{"duration_minutes", "duration_minutes", "mins", func(e outputTimeEntry) any { return e.DurationMinutes }},
 }
 
 func loadCfg() (config.Document, error) { return config.Load() }
@@ -179,7 +190,7 @@ func (a App) showConfig(ctx context.Context, args []string) error {
 	rows := [][]string{}
 	for _, k := range []string{"WORKSPACE", "TIMEZONE"} {
 		if x, ok := v[k]; ok {
-			rows = append(rows, []string{k, x})
+			rows = append(rows, []string{k, spreadsheetText(o.format, x)})
 		}
 	}
 	if o.format == "table" {
@@ -288,18 +299,12 @@ func (a App) project(ctx context.Context, args []string) error {
 	if len(args) == 0 {
 		return usage("project requires a subcommand: list, reorder, or sync")
 	}
-	var listOptions opts
+	var listOptions projectListOptions
 	switch args[0] {
 	case "list":
 		var err error
-		listOptions, err = parseOpts(args[1:], map[string]bool{"format": true, "watch": true})
+		listOptions, err = a.parseProjectListOptions(args[1:])
 		if err != nil {
-			return err
-		}
-		if len(listOptions.pos) > 0 {
-			return usage("project list does not accept positional arguments")
-		}
-		if err := a.validateTableWatch(listOptions.watch, listOptions.format); err != nil {
 			return err
 		}
 	case "sync":
@@ -323,25 +328,7 @@ func (a App) project(ctx context.Context, args []string) error {
 	}
 	switch args[0] {
 	case "list":
-		ps = model.VisibleSorted(ps)
-		if listOptions.format == "json" {
-			b, _ := json.MarshalIndent(ps, "", "  ")
-			fmt.Fprintln(a.Out, string(b))
-		} else if listOptions.format == "table" {
-			rows := [][]string{}
-			for _, p := range ps {
-				rows = append(rows, []string{p.DisplayName})
-			}
-			options := tableOutputOptions{watch: listOptions.watch, truncateProjects: true}
-			return a.writeTable(ctx, options, []string{"Project"}, rows, []string{"Proj."})
-		} else {
-			rows := make([][]string, len(ps))
-			for i, p := range ps {
-				rows[i] = []string{p.DisplayName}
-			}
-			fmt.Fprintln(a.Out, a.terminalDelimited(nil, rows, listOptions.format))
-		}
-		return nil
+		return a.writeProjectList(ctx, ps, listOptions)
 	case "sync":
 		count, err := d.SyncProjects(ps)
 		if err != nil {
@@ -450,6 +437,9 @@ func (a App) summary(ctx context.Context, args []string) error {
 	if e != nil {
 		return e
 	}
+	entries = slices.DeleteFunc(entries, func(entry model.TimeEntry) bool {
+		return entry.ProjectID != nil && d.Config.Projects[*entry.ProjectID].Hidden
+	})
 	sum := model.Summarize(entries, loc, now)
 	var projects []model.Project
 	if settings.Format != "json" {
@@ -460,7 +450,6 @@ func (a App) summary(ctx context.Context, args []string) error {
 	}
 	return a.writeSummary(ctx, settings, from, to, sum, projects, o.watch, o.dailyTotal)
 }
-
 func (a App) timeEntry(ctx context.Context, args []string) error {
 	if len(args) == 0 {
 		return usage("time-entry requires a subcommand: list")
@@ -468,7 +457,7 @@ func (a App) timeEntry(ctx context.Context, args []string) error {
 	if args[0] != "list" {
 		return usagef("unknown time-entry subcommand: %s", args[0])
 	}
-	o, e := parseOpts(args[1:], map[string]bool{"format": true, "watch": true})
+	o, e := parseOpts(args[1:], map[string]bool{"format": true, "watch": true, "fields": true})
 	if e != nil {
 		return e
 	}
@@ -477,6 +466,10 @@ func (a App) timeEntry(ctx context.Context, args []string) error {
 	}
 	if err := a.validateTableWatch(o.watch, o.format); err != nil {
 		return err
+	}
+	fields, e := timeEntryFields.selectFields("time-entry", o.fields)
+	if e != nil {
+		return e
 	}
 	now := a.Now()
 	sd, ok := parseUnsignedInteger(o.pos[0])
@@ -518,33 +511,16 @@ func (a App) timeEntry(ctx context.Context, args []string) error {
 		}
 		return entries[i].ID < entries[j].ID
 	})
-	rows := [][]string{}
-	objects := []outputTimeEntry{}
+	objects := make([]outputTimeEntry, 0, len(entries))
 	for _, x := range entries {
 		minutes := float64(int(float64(x.ElapsedSeconds(now))/60*100+0.5)) / 100
-		start := x.Start.Format(time.RFC3339Nano)
-		pid := ""
-		if x.ProjectID != nil {
-			pid = strconv.FormatInt(*x.ProjectID, 10)
-		}
-		stop := ""
-		var stopJSON *string
+		start := spreadsheetText(o.format, x.Start.Format(time.RFC3339Nano))
+		var stop *string
 		if x.Stop != nil {
-			stop = x.Stop.Format(time.RFC3339Nano)
-			stopJSON = &stop
+			formatted := spreadsheetText(o.format, x.Stop.Format(time.RFC3339Nano))
+			stop = &formatted
 		}
-		rows = append(rows, []string{strconv.FormatInt(x.ID, 10), x.Description, pid, start, stop, strconv.FormatFloat(minutes, 'f', -1, 64)})
-		objects = append(objects, outputTimeEntry{ID: x.ID, Description: x.Description, ProjectID: x.ProjectID, Start: start, Stop: stopJSON, DurationMinutes: minutes})
+		objects = append(objects, outputTimeEntry{ID: x.ID, Description: spreadsheetText(o.format, x.Description), ProjectID: x.ProjectID, Start: start, Stop: stop, DurationMinutes: minutes})
 	}
-	headers := []string{"id", "description", "project_id", "start", "stop", "duration_minutes"}
-	if o.format == "json" {
-		b, _ := json.MarshalIndent(objects, "", "  ")
-		fmt.Fprintln(a.Out, string(b))
-	} else if o.format == "table" {
-		compactHeaders := []string{"id", "desc", "proj_id", "start", "stop", "mins"}
-		return a.writeTable(ctx, tableOutputOptions{watch: o.watch}, headers, rows, compactHeaders)
-	} else {
-		fmt.Fprintln(a.Out, a.terminalDelimited(headers, rows, o.format))
-	}
-	return nil
+	return writeList(ctx, a, objects, fields, o.format, tableOutputOptions{watch: o.watch})
 }

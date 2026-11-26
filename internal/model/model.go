@@ -13,6 +13,7 @@ type Client struct {
 type Project struct {
 	ID           int64    `json:"id"`
 	Name         string   `json:"name"`
+	Alias        string   `json:"alias,omitempty"`
 	DisplayName  string   `json:"displayName"`
 	Active       bool     `json:"active"`
 	Hidden       bool     `json:"hidden"`
@@ -40,9 +41,16 @@ func (e TimeEntry) ElapsedSeconds(now time.Time) int64 {
 type Summary map[string]map[int64]float64
 
 func VisibleSorted(projects []Project) []Project {
-	r := make([]Project, len(projects))
-	copy(r, projects)
-	r = slicesDeleteHidden(r)
+	return SortedProjects(projects, false)
+}
+
+func SortedProjects(projects []Project, includeHidden bool) []Project {
+	r := make([]Project, 0, len(projects))
+	for _, p := range projects {
+		if includeHidden || !p.Hidden {
+			r = append(r, p)
+		}
+	}
 	sort.SliceStable(r, func(i, j int) bool {
 		a, b := r[i].DisplayOrder, r[j].DisplayOrder
 		if a == nil {
@@ -53,15 +61,6 @@ func VisibleSorted(projects []Project) []Project {
 		}
 		return *a < *b
 	})
-	return r
-}
-func slicesDeleteHidden(p []Project) []Project {
-	r := p[:0]
-	for _, v := range p {
-		if !v.Hidden {
-			r = append(r, v)
-		}
-	}
 	return r
 }
 

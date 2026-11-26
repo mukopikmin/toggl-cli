@@ -109,9 +109,9 @@ func TestDefaultOutputIsTable(t *testing.T) {
 	}{
 		{"summary", []string{"summary", "2026-05-01", "2026-05-02"}, []string{"Project", "2026-05-01", "Shown", "1.5"}},
 		{"time entries", []string{"time-entry", "list", "1", "2"}, []string{"description", "duration_minutes", "Work", "1.5"}},
-		{"projects", []string{"project", "list"}, []string{"Project", "Shown"}},
+		{"projects", []string{"project", "list"}, []string{"Toggl name", "Display name", "Shown"}},
 		{"config", []string{"config"}, []string{"Setting", "Value", "WORKSPACE", "UTC"}},
-		{"empty projects", []string{"project", "list"}, []string{"Project"}},
+		{"empty projects", []string{"project", "list"}, []string{"Toggl name", "Display name"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -162,7 +162,7 @@ func TestProjectListAndSync(t *testing.T) {
 	if err := app.Run(context.Background(), []string{"project", "list", "--format", "tsv"}); err != nil {
 		t.Fatal(err)
 	}
-	if out.String() != "Shown\n" {
+	if out.String() != "name\tid\talias\tdisplayName\thidden\tactive\tdisplayOrder\nClient\t1\tShown\tShown\tfalse\ttrue\t\n" {
 		t.Fatal(out.String())
 	}
 	out.Reset()
@@ -192,12 +192,12 @@ func appendProjectConfig(t *testing.T, text string) {
 	}
 }
 
-func TestEmptyProjectListWritesNewline(t *testing.T) {
+func TestEmptyProjectListWritesHeaders(t *testing.T) {
 	app, out := configuredApp(t, &fakeClient{}, "")
 	if err := app.Run(context.Background(), []string{"project", "list", "--format", "tsv"}); err != nil {
 		t.Fatal(err)
 	}
-	if out.String() != "\n" {
+	if out.String() != "name\tid\talias\tdisplayName\thidden\tactive\tdisplayOrder\n" {
 		t.Fatalf("%q", out.String())
 	}
 }
@@ -349,6 +349,21 @@ func TestClipboardCommandParityAndFallback(t *testing.T) {
 	}
 	if strings.Join(attempts, ",") != "wl-copy:summary output,xclip:summary output" {
 		t.Fatalf("%v", attempts)
+	}
+}
+
+func TestJSONSummaryOmitsHiddenProjects(t *testing.T) {
+	hidden, visible := int64(42), int64(17)
+	client := &fakeClient{entries: []model.TimeEntry{{ProjectID: &hidden, Start: time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC), DurationSeconds: 60}, {ProjectID: &visible, Start: time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC), DurationSeconds: 60}}}
+	app, out := configuredApp(t, client, "")
+	if err := os.WriteFile(config.Path(os.Getenv("HOME")), []byte("workspace='1'\ntoken='secret'\n[projects.42]\nhidden=true\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.Run(context.Background(), []string{"summary", "--days", "2", "-fjson"}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), "42") || !strings.Contains(out.String(), "17") {
+		t.Fatal(out.String())
 	}
 }
 
