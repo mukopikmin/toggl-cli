@@ -468,6 +468,8 @@ for notes. These commands require Git, an authenticated GitHub CLI, and a checko
 with the annotated release tag (including its `Previous-Stable-Tag` trailer) and
 comparison tag available. Notes generation uses GitHub's
 generate-notes API. Nightly publication continues independently after successful
-tests on `main`.
+tests on `main`. Each run claims the nightly tag before changing release
+assets. Older and divergent commits are skipped. A rerun for the tagged commit
+can finish an interrupted upload.
 
 CSV and TSV exports prefix formula-like text fields with an apostrophe for spreadsheet import. JSON preserves the original text.
