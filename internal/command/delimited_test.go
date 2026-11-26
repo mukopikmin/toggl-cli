@@ -47,7 +47,7 @@ func TestDelimitedEmptyAndHeaderlessOutput(t *testing.T) {
 func TestCommandsUseFixedDelimiters(t *testing.T) {
 	name := "Client, A\t\"quoted\"\nnext line"
 	client := &fakeClient{
-		projects: []model.Project{{ID: 1, Name: name}},
+		projects: []model.Project{{ID: 1, Name: name, DisplayName: name, Active: true}},
 		entries:  []model.TimeEntry{{ID: 1, Description: name, Start: time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC), DurationSeconds: 60}},
 	}
 	tests := []struct {
@@ -57,7 +57,7 @@ func TestCommandsUseFixedDelimiters(t *testing.T) {
 	}{
 		{"summary", []string{"summary", "2026-05-01", "2026-05-01"}, [][]string{{"Project", "2026-05-01"}, {name, ""}}},
 		{"time entry", []string{"time-entry", "list", "1", "1"}, [][]string{{"id", "description", "project_id", "start", "stop", "duration_minutes"}, {"1", name, "", "2026-05-01T00:00:00Z", "", "1"}}},
-		{"project", []string{"project", "list"}, [][]string{{name}}},
+		{"project", []string{"project", "list"}, [][]string{{"name", "id", "alias", "displayName", "hidden", "active", "displayOrder"}, {name, "1", "", name, "false", "true", ""}}},
 		{"config", []string{"config"}, [][]string{{"Setting", "Value"}, {"WORKSPACE", "1"}, {"TIMEZONE", "UTC"}}},
 	}
 	for _, tt := range tests {

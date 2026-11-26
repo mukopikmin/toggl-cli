@@ -110,3 +110,9 @@ func TestProjectTableShortensHeadingAndNameTogether(t *testing.T) {
 		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
 	}
 }
+
+func TestTerminalTextEscapesControls(t *testing.T) {
+	if got := terminalText("日本\x1b\u202e"); got != "日本\\x1b\\u202e" {
+		t.Fatalf("%q", got)
+	}
+}

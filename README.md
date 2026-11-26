@@ -144,9 +144,9 @@ quotes, or line breaks are quoted, and embedded quotes are doubled.
 | `template list` | none | Template names in alphabetical order |
 | `template show` | `<name>` | Template settings as TOML |
 | `template delete` | `<name>` | Deletes the named template |
-| `time-entry list` | `<start-day> <end-day>`; `-f/--format`, `--watch` | Entries as a bordered table by default, TSV, CSV, or JSON |
-| `project list` | `-f/--format`, `--watch` | Visible ordered projects as a table by default, TSV, CSV, or JSON |
-| `client list` | `-f/--format`, `--watch` | Client names as a table by default. Use TSV, CSV, or JSON for IDs and names |
+| `time-entry list` | `<start-day> <end-day>`; `-f/--format`, `--watch`, `--fields` | Entries as a bordered table by default, TSV, CSV, or JSON |
+| `project list` | `-f/--format`, `--watch`, `--fields`, `--include-hidden` | Ordered projects as a table by default, TSV, CSV, or JSON |
+| `client list` | `-f/--format`, `--watch`, `--fields` | Client IDs and names as a table by default, TSV, CSV, or JSON |
 | `project sync` | none | Adds missing active projects to the TOML file |
 | `project reorder` | none | Interactively changes and saves visible-project order |
 | `config` | `-f/--format`, `--watch` | Non-sensitive settings as a table by default, two-column TSV or CSV, or JSON |
@@ -179,6 +179,16 @@ timezone (or the system timezone when omitted). The CLI checks arguments that
 do not depend on configuration before loading it. An empty
 `project list --format json` or `client list --format json` result is `[]`.
 
+`toggl time-entry list` supports `id`, `description`, `project_id`, `start`,
+`stop`, and `duration_minutes` in every format. The default output includes all
+six fields. Use `--fields` to select the fields to output. Table, CSV, and TSV
+follow the specified field order and include headers. Unset project IDs and
+stop times appear as empty cells in table, CSV, and TSV and as `null` in JSON.
+
+```sh
+toggl time-entry list 1 7 --format tsv --fields project_id,duration_minutes
+```
+
 Table output uses the terminal width at the time of rendering. If the full
 headings are too wide, it uses shorter headings when they reduce the table width.
 In a `summary` covering a single year, shorter date headings use `MM-DD`.
@@ -186,9 +196,9 @@ When space is tighter, the headings can show just the day of the month, such as
 `9` or `10`. For a range spanning multiple months, the first displayed date of
 each month includes the month and, if the range spans multiple years, the year.
 If shorter headings still leave the table too wide, `summary` and
-`project list` shorten project names with `…`. Other data cells keep their full
-contents, so the table can still exceed the terminal width. Piped and
-redirected output uses the full headings and project names.
+`project list` shorten project names in the first column with `…`. Other data
+cells keep their full contents, so the table can still exceed the terminal
+width. Piped and redirected output uses the full headings and project names.
 
 Use `--watch` with table format in a terminal to redraw the table after a
 resize. It reads the data once and displays the portion that fits on screen.
@@ -201,17 +211,48 @@ from a saved template.
 toggl summary --days 7 --format table --watch
 ```
 
-`toggl client list` fetches clients from the configured workspace in API order.
-The default output is a bordered table of names. CSV and TSV use `id` and `name` headers. CSV uses commas and TSV
-uses tabs. Fields containing the delimiter, quotes, or newlines are quoted.
-Empty CSV/TSV output contains only the header. This command does not change the
-configuration file.
+`toggl project list` shows all public fields for visible active projects by
+default in table, CSV, TSV, and JSON. Use `--fields` with a comma-separated list
+to output only those fields in any format. Table, CSV, and TSV follow the field
+order and include headers. For JSON, each project is an object with the selected
+keys. Unset aliases and display orders appear as empty cells in table, CSV,
+and TSV and as `null` in JSON.
+
+| Field | Value |
+| --- | --- |
+| `name` | Project name in Toggl |
+| `id` | Toggl project ID |
+| `alias` | Project name set by `display_name` in the local configuration |
+| `displayName` | Configured display name, or the Toggl name when unset |
+| `hidden` | `true` when the project is hidden in the local configuration, `false` when visible |
+| `active` | Toggl activation status. The list contains active projects |
+| `displayOrder` | Project order set by `display_order` in the local configuration |
+
+Use `--include-hidden` with any format to include hidden active projects in the
+configured display order.
 
 ```sh
-toggl client list                   # Bordered table of names
-toggl client list --format csv      # CSV: id and name columns
-toggl client list --format json     # Objects with id and name
-toggl client list --format tsv      # TSV with id and name columns
+toggl project list --include-hidden
+toggl project list --format csv --fields id,name
+toggl project list --format json --fields id,alias,hidden
+```
+
+CSV and TSV previously returned one headerless column of display names. Use
+`--fields displayName` to select that field and account for the header in
+existing scripts. Explicit field selection also keeps the output shape stable
+when public fields are added.
+CSV and TSV protect text fields for spreadsheet import. JSON preserves the
+original values.
+
+`toggl client list` fetches clients from the configured workspace in API order.
+All formats include `id` and `name` by default. Use `--fields` to select the
+fields to output. Table, CSV, and TSV follow the specified field order and
+include headers. Empty CSV and TSV output contains only the header.
+
+```sh
+toggl client list                          # Table with ID and name
+toggl client list --format csv --fields name
+toggl client list --format json --fields id
 ```
 
 Add `--daily-total` to `summary` to append a `Total` row to CSV, TSV, or table output:
@@ -329,7 +370,8 @@ Install Make and the Go version required by `go.mod`. From a checkout:
 make                     # Show available commands
 make run ARGS="summary 2026-06-01 2026-06-15"
 make fmt                 # Format Go source files
-make check               # Run all CI checks
+make check               # Run the standard checks
+make test-e2e            # Run CLI end-to-end tests in Docker
 make build               # Build ./out/toggl
 ```
 
@@ -338,9 +380,31 @@ make build               # Build ./out/toggl
 these same targets for formatting, installer shell syntax, third-party notices,
 static analysis, tests, package builds, and known vulnerabilities.
 
+`make test-e2e` requires Docker with Linux containers. By default it builds a
+CLI binary from the checkout. Set `TOGGL_E2E_BINARY` to test a prebuilt static
+Linux executable that matches the Docker engine's architecture.
+
+```sh
+make test-e2e TOGGL_E2E_BINARY=/path/to/extracted/toggl
+```
+
+With a prebuilt binary, the local Go toolchain compiles only the test suite.
+The test runs the supplied executable as a subprocess and checks its output,
+exit status, and HTTPS behavior. The container uses Docker's `--network none`
+and maps `api.track.toggl.com` to an HTTPS mock on loopback. The suite uses a
+temporary configuration with dummy credentials and supplies the test CA via
+`SSL_CERT_FILE`.
+
+The suite compares client JSON values and summary CSV records across a month
+boundary in Japan Standard Time. It checks HTTP 401 handling against a response
+recorded by the mock. For an untrusted CA, it checks that the CLI reports an
+error and that the mock observes a TLS attempt with no HTTP request.
+The `Test` workflow runs this suite against the executable extracted from a
+Linux release archive built by `make release`.
+
 The `Test` workflow runs for pull requests, pushes to `main`, and manual dispatches.
-Feature-branch pushes use the pull request run to avoid duplicate checks. Successful
-checks on `main` continue to trigger the Nightly workflow.
+Feature-branch pushes use the pull request run to avoid duplicate checks. Nightly
+publishes only after a successful `Test` push run on this repository's `main` branch.
 
 `make check-vuln` runs `govulncheck` v1.9.0 for the current platform, checking the
 Go standard library and dependencies for known vulnerabilities reachable from
@@ -404,6 +468,8 @@ for notes. These commands require Git, an authenticated GitHub CLI, and a checko
 with the annotated release tag (including its `Previous-Stable-Tag` trailer) and
 comparison tag available. Notes generation uses GitHub's
 generate-notes API. Nightly publication continues independently after successful
-tests on `main`.
+tests on `main`. Each run claims the nightly tag before changing release
+assets. Older and divergent commits are skipped. A rerun for the tagged commit
+can finish an interrupted upload.
 
 CSV and TSV exports prefix formula-like text fields with an apostrophe for spreadsheet import. JSON preserves the original text.

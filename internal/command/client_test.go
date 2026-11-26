@@ -36,7 +36,8 @@ func TestClientListFormats(t *testing.T) {
 					t.Fatalf("output=%q error=%v", out.String(), err)
 				}
 			case "table":
-				if !strings.Contains(out.String(), "│ Client") || !strings.Contains(out.String(), "Beta") || !strings.Contains(out.String(), "取引先 A") {
+				want := table([]string{"ID", "Client"}, [][]string{{"2", "Beta"}, {"1", "取引先 A"}}, tableLayout{}) + "\n"
+				if out.String() != want {
 					t.Fatal(out.String())
 				}
 			default:
@@ -66,8 +67,8 @@ func TestClientListDefaultAndEmptyOutput(t *testing.T) {
 		options []string
 		want    string
 	}{
-		{"default", []model.Client{{ID: 1, Name: "Client A"}}, nil, table([]string{"Client"}, [][]string{{"Client A"}}, tableLayout{}) + "\n"},
-		{"empty default", nil, nil, table([]string{"Client"}, nil, tableLayout{}) + "\n"},
+		{"default", []model.Client{{ID: 1, Name: "Client A"}}, nil, table([]string{"ID", "Client"}, [][]string{{"1", "Client A"}}, tableLayout{}) + "\n"},
+		{"empty default", nil, nil, table([]string{"ID", "Client"}, nil, tableLayout{}) + "\n"},
 		{"CSV", []model.Client{{ID: 1, Name: "Client A"}}, []string{"-fcsv"}, "id,name\n1,Client A\n"},
 		{"empty CSV", nil, []string{"--format", "csv"}, "id,name\n"},
 		{"nil JSON", nil, []string{"-fjson"}, "[]\n"},
@@ -86,6 +87,29 @@ func TestClientListDefaultAndEmptyOutput(t *testing.T) {
 	}
 }
 
+func TestClientListSelectedFields(t *testing.T) {
+	clients := []model.Client{{ID: 2, Name: "Client, B"}, {ID: 1, Name: "Client A"}}
+	for _, tt := range []struct {
+		format, fields, want string
+	}{
+		{"table", "name", table([]string{"Client"}, [][]string{{"Client, B"}, {"Client A"}}, tableLayout{}) + "\n"},
+		{"csv", "name", "name\n\"Client, B\"\nClient A\n"},
+		{"tsv", "name, id", "name\tid\nClient, B\t2\nClient A\t1\n"},
+		{"json", "id", "[\n  {\n    \"id\": 2\n  },\n  {\n    \"id\": 1\n  }\n]\n"},
+	} {
+		t.Run(tt.format, func(t *testing.T) {
+			app, out := configuredApp(t, &fakeClient{clients: clients}, "")
+			args := []string{"client", "list", "--format", tt.format, "--fields", tt.fields}
+			if err := app.Run(context.Background(), args); err != nil {
+				t.Fatal(err)
+			}
+			if got := out.String(); got != tt.want {
+				t.Fatalf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestClientUsageBeforeConfiguration(t *testing.T) {
 	tests := [][]string{
 		{"client"}, {"client", "get"}, {"client", "list", "extra"},
@@ -93,6 +117,8 @@ func TestClientUsageBeforeConfiguration(t *testing.T) {
 		{"client", "list", "--separator", ""}, {"client", "list", "--separator"},
 		{"client", "list", "--format", "table", "--separator", ","},
 		{"client", "list", "--clipboard"},
+		{"client", "list", "--fields"}, {"client", "list", "--fields="},
+		{"client", "list", "--fields", "id,id"}, {"client", "list", "--fields", "hidden"},
 	}
 	for _, args := range tests {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
