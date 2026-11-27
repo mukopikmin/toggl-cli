@@ -2,6 +2,7 @@ package config
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -70,7 +71,11 @@ func Parse(text string) (Config, error) {
 	var raw rawConfig
 	metadata, err := toml.Decode(text, &raw)
 	if err != nil {
-		return Config{}, fmt.Errorf("Invalid configuration: %w", err)
+		var diagnostic toml.ParseError
+		if errors.As(err, &diagnostic) && diagnostic.Position.Line > 0 {
+			return Config{}, fmt.Errorf("Invalid configuration at line %d", diagnostic.Position.Line)
+		}
+		return Config{}, errors.New("Invalid configuration")
 	}
 	// Implicit parent tables have no metadata type; explicit values must be tables.
 	if kind := metadata.Type("projects"); kind != "" && kind != "Hash" {
