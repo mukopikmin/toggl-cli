@@ -1,122 +1,53 @@
 # Repository Guidelines
 
-## General Principles
+## Changes
 
-- Keep changes limited to the requested objective. Do not include unrelated
-  refactoring.
-- Prefer the existing design, naming conventions, and Deno standard
-  functionality. Add dependencies or abstractions only when their necessity can
-  be clearly justified.
-- Treat implementation, tests, and documentation as a single unit. Do not leave
-  any of them outdated.
+- Keep changes scoped to the task. Follow existing Go conventions and prefer the
+  standard library. Add dependencies or abstractions only when justified.
+- Keep implementation, tests, and documentation in sync. Update the README and
+  related docs when their commands, options, configuration, outputs, Go
+  requirements, or referenced paths change. Verify examples against the current
+  implementation, `go.mod`, and `Makefile` as applicable.
 - Never commit credentials, API tokens, or local configuration files.
 
-## CLI Command Design
+## CLI and package boundaries
 
-- Name resource-oriented top-level commands with a singular noun, such as
-  `project`, rather than a plural collection name such as `projects`.
-- Put resource operations under explicit verb subcommands, such as
-  `project list` and `project sync`. Do not make a bare resource command imply a
-  default operation; require the subcommand instead.
-- Keep standalone use cases that are not resource namespaces as direct top-level
-  commands, such as `summary`, `config`, `init`, and `update`.
-- When adding or renaming a resource command, use the same
-  `<resource> <operation>` terminology in argument parsing, command dispatch,
-  help text, tests, and documentation.
+- Use singular resource names with explicit verb subcommands, such as
+  `project list` and `project sync`. Require a subcommand for resources. Keep
+  standalone operations such as `summary` and `init` at the top level.
+- Use the same command names in parsing, dispatch, help, tests, and docs.
+- Keep `cmd/toggl/main.go` focused on argument dispatch and dependency assembly.
+  Use `internal/command` for CLI input, coordination, and output formatting.
+- Keep API calls, private DTOs, and conversion in `internal/toggl`. Its public
+  methods return domain models. Keep `internal/model` independent of the API
+  adapter, with pure date calculations and aggregation where possible.
+- Keep configuration loading and validation in `internal/config`. Leave
+  command-specific behavior in `internal/command`.
 
-## Language
+## Tests and CI
 
-- Use English for commit messages, branch names, pull request titles and
-  descriptions, issue text, and review comments.
-- Use clear, concise English that explains the purpose and impact of a change.
-  Avoid mixing languages in repository and GitHub communication.
-- Do not add tool-specific prefixes such as `[codex]` to pull request titles.
-  Write titles that describe the change directly.
-- When work was started for the purpose of resolving an issue, include
-  `Closes #<issue_number>` or an equivalent closing keyword in the pull request
-  description so that merging the pull request closes the issue.
+- Test behavior changes on normal paths, boundaries, and major error cases. Add
+  a regression test for bug fixes when practical. For date and timezone changes,
+  cover both ends of a month and dates that differ from UTC.
+- Test API-dependent code through the client boundary using test doubles or
+  local test servers. Keep real API calls out of unit tests.
+- Before every push, inspect the current workflows in `.github/workflows/` and
+  run the applicable checks against the exact changes being pushed. Use
+  `.github/workflows/test.yml` as the source for CI checks. Rerun affected checks
+  after further edits. Fix failures without weakening checks, and explain any
+  necessary changes to the checks themselves.
+- Verify `go.mod` and `go.sum` after changing dependencies. Review `git diff`
+  and `git status` for unintended changes before reporting results and any
+  verification blockers.
 
-## Tool Usage
+## GitHub
 
-- If `gh auth status` fails inside the sandbox, do not immediately conclude that
-  the token is invalid. Run `gh auth status` again with network-enabled or
-  escalated execution.
-- Ask the user to reauthenticate only when the network-enabled or escalated
-  check also confirms that the token is invalid or expired.
-- If an authenticated GitHub CLI is unavailable but GitHub MCP is available, use
-  GitHub MCP for repository and pull request operations.
-- Treat Git remote authentication, including authentication used by `git push`,
-  independently from GitHub CLI authentication.
-- Ask the user to authenticate or intervene only when neither an authenticated
-  GitHub CLI nor GitHub MCP is available.
-
-## Documentation Consistency
-
-- When changing commands, options, configuration fields, required Deno versions,
-  output formats, or module structure, update `README.md` and any related
-  documentation in the same change.
-- Ensure code examples and commands work with the current implementation. Remove
-  references to obsolete APIs, deleted options, and nonexistent files.
-- When CI, `deno.json`, and the README describe the same procedure, verify that
-  they agree. Treat `.github/workflows/test.yml` as the source of truth for the
-  checks performed by CI.
-- Even for documentation-only changes, verify the content against the code and
-  configuration files.
-
-## Separation of Responsibilities
-
-- Keep `main.ts` focused on argument parsing, dependency assembly, and
-  delegation to commands. Do not add API communication or complex aggregation
-  logic directly to it.
-- Use `command/` for CLI use cases, input interpretation, and output formatting.
-- Use `model/` for API-independent domain models and pure domain operations.
-  Derived models such as `TimeEntrySummary` belong with the source models and
-  must be computable without depending on an API client or API DTO.
-- Use `toggl/` for Toggl API communication, request and response DTOs, and
-  translation between those DTOs and domain models. Keep DTOs private to the
-  adapter when they are not shared by multiple Toggl modules.
-- Public API client methods must return domain models rather than exposing API
-  DTOs. Dependencies must point from `toggl/` adapters to `model/`; code in
-  `model/` must not import from `toggl/`.
-- Keep fetching and derived operations separate. Commands may coordinate them,
-  for example by fetching `TimeEntry[]` and then deriving a `TimeEntrySummary`.
-- Keep `config.ts` responsible for configuration loading and validation. Do not
-  add command-specific behavior to it.
-- Split a file or function when it begins to hold multiple independent
-  responsibilities. Do not introduce an abstraction that has only one caller and
-  does not reduce complexity.
-- Separate external communication, date calculations, aggregation, and output
-  formatting. Prefer pure functions that can be tested without side effects.
-
-## Testing
-
-- When behavior changes, add or update tests covering boundary values and major
-  error conditions as well as the normal path.
-- For changes involving dates, time zones, or month boundaries, explicitly test
-  the beginning and end of a month and date differences from UTC.
-- Test code that depends on external APIs through the client boundary. Regular
-  unit tests must not call the real API.
-- For bug fixes, add a regression test that fails before the fix whenever
-  practical.
-
-## Required Checks Before Push
-
-- Immediately before every push, inspect the latest workflows under
-  `.github/workflows/` and run all applicable CI checks locally.
-- Do not rely on a previously remembered command list, an earlier run, or the
-  commands documented in the README. The current CI workflows are the source of
-  truth.
-- Fix the cause of a failed check. Do not make a check pass by disabling,
-  excluding, or weakening it. If a check itself must change, clearly explain the
-  reason and impact.
-- After changing dependencies, including `deno.lock`, verify that the lockfile
-  and import definitions remain consistent.
-- If code changes after the final checks, rerun the affected checks. The
-  verification results must correspond to the exact contents being pushed.
-
-## Completing Changes
-
-- Review `git diff` and `git status` for unintended files, generated artifacts,
-  or credentials.
-- Briefly report the changes made, documentation updated, and checks run.
-- If any check could not be run, state the reason and the remaining risk.
+- Use concise English for branch names, commits, issues, pull requests, and
+  reviews. Use descriptive pull request titles without tool prefixes. Add
+  `Closes #<issue_number>` to the pull request when resolving an issue.
+- If `gh auth status` fails in the sandbox, retry with network access before
+  diagnosing credentials. Use GitHub MCP if authenticated `gh` is unavailable.
+  Ask the user to reauthenticate only if the network-enabled check confirms an
+  invalid or expired token and no authenticated GitHub tool is available.
+  Ask for help with GitHub operations only if neither tool is available. Diagnose
+  Git remote authentication separately.
