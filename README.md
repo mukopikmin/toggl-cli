@@ -30,17 +30,6 @@ toggl summary --days 7 --format table
 Run `toggl --help` for commands and options, or `toggl update` to update a
 release binary.
 
-## Architecture
-
-- `cmd/toggl` assembles dependencies and dispatches commands.
-- `internal/command` handles CLI arguments, terminal interaction, and output.
-- `internal/usecase` coordinates time-entry retrieval, project selection, and
-  project sync.
-- `internal/model` holds settings, time entries, and pure calculation rules.
-- `internal/config` reads and writes `config.toml` and `templates.toml`.
-- `internal/toggl` sends API requests and converts responses to models.
-- `internal/selfupdate` verifies and installs release updates.
-
 ## Development
 
 Install Make and the Go version specified in [go.mod](go.mod). Run `make build`

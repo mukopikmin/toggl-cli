@@ -16,8 +16,6 @@
   `project list` and `project sync`. Require a subcommand for resources. Keep
   standalone operations such as `summary` and `init` at the top level.
 - Use the same command names in parsing, dispatch, help, tests, and docs.
-- Follow the [README architecture](README.md#architecture) for package
-  responsibilities.
 - Keep Toggl API DTOs private to the adapter. Public client methods return
   models. Compute derived models from their source models using pure functions.
 
