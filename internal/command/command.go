@@ -1,19 +1,11 @@
 package command
 
 import (
-	"bufio"
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
-	"strings"
 	"time"
-
-	"github.com/mukopikmin/toggl-cli/internal/config"
-	"github.com/mukopikmin/toggl-cli/internal/model"
-	"golang.org/x/term"
 )
 
 const Help = `Usage:
@@ -133,125 +125,4 @@ func (a App) Run(ctx context.Context, args []string) error {
 	default:
 		return usagef("unknown command: %s", args[0])
 	}
-}
-
-func (a App) showConfig(ctx context.Context, args []string) error {
-	o, e := parseOpts(args, map[string]bool{"format": true, "watch": true})
-	if e != nil {
-		return e
-	}
-	if len(o.pos) > 0 {
-		return usage("config does not accept positional arguments")
-	}
-	if err := a.validateTableWatch(o.watch, o.format); err != nil {
-		return err
-	}
-	d, e := config.Load()
-	if e != nil {
-		return e
-	}
-	v := map[string]string{"WORKSPACE": d.Settings.Workspace}
-	if d.Settings.Timezone != "" {
-		v["TIMEZONE"] = d.Settings.Timezone
-	}
-	if o.format == "json" {
-		visible := struct {
-			Workspace string `json:"WORKSPACE"`
-			Timezone  string `json:"TIMEZONE,omitempty"`
-		}{d.Settings.Workspace, d.Settings.Timezone}
-		b, _ := json.MarshalIndent(visible, "", "  ")
-		fmt.Fprintln(a.Out, string(b))
-		return nil
-	}
-	rows := [][]string{}
-	for _, k := range []string{"WORKSPACE", "TIMEZONE"} {
-		if x, ok := v[k]; ok {
-			rows = append(rows, []string{k, spreadsheetText(o.format, x)})
-		}
-	}
-	if o.format == "table" {
-		return a.writeTable(ctx, tableOutputOptions{watch: o.watch}, []string{"Setting", "Value"}, rows, []string{"Key", "Val"})
-	} else {
-		fmt.Fprintln(a.Out, a.terminalDelimited([]string{"Setting", "Value"}, rows, o.format))
-	}
-	return nil
-}
-func (a App) init(args []string) error {
-	if len(args) > 0 {
-		return usage("init does not accept arguments")
-	}
-	path, err := config.PrepareCreate()
-	if err != nil {
-		return err
-	}
-	r := bufio.NewReader(a.In)
-	interactive := false
-	if in, ok := a.In.(*os.File); ok {
-		interactive = term.IsTerminal(int(in.Fd()))
-	}
-	ask := func(label, def string, secret bool) (string, error) {
-		for {
-			if def != "" {
-				fmt.Fprintf(a.Out, "%s [%s]: ", label, def)
-			} else {
-				fmt.Fprintf(a.Out, "%s: ", label)
-			}
-			var v string
-			var e error
-			if secret {
-				if in, ok := a.In.(*os.File); ok && term.IsTerminal(int(in.Fd())) {
-					var value []byte
-					value, e = term.ReadPassword(int(in.Fd()))
-					fmt.Fprintln(a.Out)
-					v = string(value)
-				} else {
-					v, e = r.ReadString('\n')
-				}
-			} else {
-				v, e = r.ReadString('\n')
-			}
-			if e != nil && !(errors.Is(e, io.EOF) && v != "") {
-				if errors.Is(e, io.EOF) {
-					return "", fmt.Errorf("Input ended before %s was provided", label)
-				}
-				return "", fmt.Errorf("Unable to read %s: %w", label, e)
-			}
-			v = strings.TrimSpace(v)
-			if v != "" {
-				return v, nil
-			}
-			if def != "" {
-				return def, nil
-			}
-			if !interactive {
-				return "", fmt.Errorf("%s is required", label)
-			}
-			fmt.Fprintf(a.Out, "%s is required. Please enter a value.\n", label)
-		}
-	}
-	w, e := ask("Workspace", "", false)
-	if e != nil {
-		return e
-	}
-	t, e := ask("API token", "", true)
-	if e != nil {
-		return e
-	}
-	z, e := ask("Timezone", "Asia/Tokyo", false)
-	if e != nil {
-		return e
-	}
-	settings := model.Settings{Workspace: w, Token: t, Timezone: z}
-	if err := config.Create(path, settings); err != nil {
-		return err
-	}
-	fmt.Fprintf(a.Out, "Wrote %s\n", config.DisplayPath)
-	return nil
-}
-
-func location(settings model.Settings) (*time.Location, error) {
-	if settings.Timezone == "" {
-		return time.Local, nil
-	}
-	return time.LoadLocation(settings.Timezone)
 }

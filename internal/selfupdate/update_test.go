@@ -10,9 +10,6 @@ import (
 	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"runtime"
-	"strings"
 	"testing"
 	"time"
 )
@@ -31,6 +28,7 @@ func TestReleaseTarget(t *testing.T) {
 		})
 	}
 }
+
 func TestVersionAndArchiveCompatibility(t *testing.T) {
 	v, err := nightlyVersion(time.Date(2026, 8, 24, 23, 54, 0, 0, time.UTC), "c1648a3b01234567890123456789012345678901")
 	if err != nil || v != "nightly-20260824-c1648a3" {
@@ -64,6 +62,7 @@ func TestVerifyChecksum(t *testing.T) {
 		t.Fatal("expected mismatch")
 	}
 }
+
 func TestExtractTarBinary(t *testing.T) {
 	var archive bytes.Buffer
 	gz := gzip.NewWriter(&archive)
@@ -116,50 +115,5 @@ func TestDesiredVersionUsesGitHubResponses(t *testing.T) {
 				t.Fatalf("%q %v", got, err)
 			}
 		})
-	}
-}
-
-func TestInstallUpdateVerifiesAndReplacesExecutable(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("Windows uses a deferred replacement helper")
-	}
-	root := "toggl-cli-v2.0.0-linux-x64"
-	binary := []byte("#!/bin/sh\nprintf '2.0.0\\n'\n")
-	var archive bytes.Buffer
-	gz := gzip.NewWriter(&archive)
-	tw := tar.NewWriter(gz)
-	_ = tw.WriteHeader(&tar.Header{Name: root + "/toggl", Mode: 0755, Size: int64(len(binary))})
-	_, _ = tw.Write(binary)
-	tw.Close()
-	gz.Close()
-	sum := sha256.Sum256(archive.Bytes())
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasSuffix(r.URL.Path, ".sha256") {
-			w.Write([]byte(hex.EncodeToString(sum[:])))
-			return
-		}
-		w.Write(archive.Bytes())
-	}))
-	defer server.Close()
-	exe := t.TempDir() + "/toggl"
-	if err := os.WriteFile(exe, []byte("old"), 0755); err != nil {
-		t.Fatal(err)
-	}
-	plan := Plan{Channel: "stable", CurrentVersion: "1.0.0", TargetVersion: "2.0.0", Target: "linux-x64", Executable: exe, Archive: root + ".tar.gz", DownloadURL: server.URL + "/archive"}
-	if err := (Service{Client: server.Client()}).Install(context.Background(), plan, nil, nil); err != nil {
-		t.Fatal(err)
-	}
-	got, err := os.ReadFile(exe)
-	if err != nil || !bytes.Equal(got, binary) {
-		t.Fatalf("%q %v", got, err)
-	}
-}
-
-func TestWindowsUpdateScriptCleansUpAndQuotesPaths(t *testing.T) {
-	script := windowsUpdateScript(42, `C:\O'Brien\stage.exe`, `C:\O'Brien\toggl.exe`)
-	for _, want := range []string{`try {`, `finally {`, `C:\O''Brien\stage.exe`, `C:\O''Brien\toggl.exe`, `Remove-Item -LiteralPath $PSCommandPath`} {
-		if !strings.Contains(script, want) {
-			t.Fatalf("script lacks %q:\n%s", want, script)
-		}
 	}
 }

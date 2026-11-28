@@ -1,16 +1,20 @@
 package selfupdate
 
 import (
+	"archive/tar"
 	"archive/zip"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -103,5 +107,50 @@ func TestWindowsUpdateHandoffPreservesStagedBinary(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestInstallUpdateVerifiesAndReplacesExecutable(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows uses a deferred replacement helper")
+	}
+	root := "toggl-cli-v2.0.0-linux-x64"
+	binary := []byte("#!/bin/sh\nprintf '2.0.0\\n'\n")
+	var archive bytes.Buffer
+	gz := gzip.NewWriter(&archive)
+	tw := tar.NewWriter(gz)
+	_ = tw.WriteHeader(&tar.Header{Name: root + "/toggl", Mode: 0755, Size: int64(len(binary))})
+	_, _ = tw.Write(binary)
+	tw.Close()
+	gz.Close()
+	sum := sha256.Sum256(archive.Bytes())
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, ".sha256") {
+			w.Write([]byte(hex.EncodeToString(sum[:])))
+			return
+		}
+		w.Write(archive.Bytes())
+	}))
+	defer server.Close()
+	exe := t.TempDir() + "/toggl"
+	if err := os.WriteFile(exe, []byte("old"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	plan := Plan{Channel: "stable", CurrentVersion: "1.0.0", TargetVersion: "2.0.0", Target: "linux-x64", Executable: exe, Archive: root + ".tar.gz", DownloadURL: server.URL + "/archive"}
+	if err := (Service{Client: server.Client()}).Install(context.Background(), plan, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(exe)
+	if err != nil || !bytes.Equal(got, binary) {
+		t.Fatalf("%q %v", got, err)
+	}
+}
+
+func TestWindowsUpdateScriptCleansUpAndQuotesPaths(t *testing.T) {
+	script := windowsUpdateScript(42, `C:\O'Brien\stage.exe`, `C:\O'Brien\toggl.exe`)
+	for _, want := range []string{`try {`, `finally {`, `C:\O''Brien\stage.exe`, `C:\O''Brien\toggl.exe`, `Remove-Item -LiteralPath $PSCommandPath`} {
+		if !strings.Contains(script, want) {
+			t.Fatalf("script lacks %q:\n%s", want, script)
+		}
 	}
 }
