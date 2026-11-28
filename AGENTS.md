@@ -16,8 +16,15 @@
   `project list` and `project sync`. Require a subcommand for resources. Keep
   standalone operations such as `summary` and `init` at the top level.
 - Use the same command names in parsing, dispatch, help, tests, and docs.
-- Keep Toggl API DTOs private to the adapter. Public client methods return
-  models. Compute derived models from their source models using pure functions.
+- Use `internal/command` for CLI argument handling, terminal interaction, and
+  output formatting.
+- Use `internal/usecase` to coordinate application workflows, such as retrieving
+  entries for a summary or selecting and saving projects during sync.
+- Use `internal/model` for application data and pure rules. Compute derived
+  models from their source models.
+- Use `internal/config` to read and write settings and summary templates in TOML.
+- Use `internal/toggl` for Toggl API calls and conversion to model types. Keep
+  API DTOs private to the adapter.
 
 ## Tests and CI
 
