@@ -3,8 +3,8 @@ package command
 import (
 	"fmt"
 
+	"github.com/mukopikmin/toggl-cli/internal/config"
 	"github.com/mukopikmin/toggl-cli/internal/model"
-	"github.com/mukopikmin/toggl-cli/internal/template"
 )
 
 func summaryFlags() map[string]bool {
@@ -24,30 +24,43 @@ func summaryOptions(base model.SummaryOptions, o opts) (model.SummaryOptions, er
 		return base, usage("summary requires start and end date or --days")
 	}
 	if o.days != nil {
-		base.Days, base.StartDate, base.EndDate = o.days, "", ""
+		base.Period = model.SummaryPeriod{Days: o.days}
 	} else if len(o.pos) == 2 {
-		base.Days, base.StartDate, base.EndDate = nil, o.pos[0], o.pos[1]
+		base.Period = model.SummaryPeriod{StartDate: o.pos[0], EndDate: o.pos[1]}
 		// Empty CLI dates are invalid, rather than an output-only template.
-		if base.StartDate == "" || base.EndDate == "" {
+		if base.Period.StartDate == "" || base.Period.EndDate == "" {
 			return base, usage("start and end date must use YYYY-MM-DD")
 		}
 	}
 	if o.formatSet {
-		base.Format = o.format
+		base.Output.Format = o.format
 	}
 	if o.noProjectSet {
-		base.NoProject = o.noProject
+		base.Output.NoProject = o.noProject
 	}
 	if o.noDateSet {
-		base.NoDate = o.noDate
+		base.Output.NoDate = o.noDate
 	}
 	if o.clipboardSet {
-		base.Clipboard = o.clipboard
+		base.Output.Clipboard = o.clipboard
 	}
-	if base.Format == "" {
-		base.Format = "table"
+	if base.Output.Format == "" {
+		base.Output.Format = "table"
 	}
 	return base, nil
+}
+
+func summaryUsage(err error) error {
+	switch err {
+	case model.ErrSummaryPeriodRequired:
+		return usage("summary requires start and end date or --days")
+	case model.ErrSummaryPeriodConflict:
+		return usage("summary accepts either start and end date or --days, not both")
+	case model.ErrSummaryTableColumns:
+		return usage("--no-project and --no-date cannot be used with table format")
+	default:
+		return usage(err.Error())
+	}
 }
 
 func (a App) template(args []string) error {
@@ -75,7 +88,7 @@ func (a App) template(args []string) error {
 			return err
 		}
 		if err = settings.Validate(false); err != nil {
-			return usage(err.Error())
+			return summaryUsage(err)
 		}
 	case "list":
 		if len(args) != 1 {
@@ -94,11 +107,11 @@ func (a App) template(args []string) error {
 		return usagef("unknown template subcommand: %s", args[0])
 	}
 	if args[0] != "list" {
-		if err := template.ValidateName(name); err != nil {
+		if err := config.ValidateTemplateName(name); err != nil {
 			return usage(err.Error())
 		}
 	}
-	d, err := template.Load()
+	d, err := config.LoadTemplates()
 	if err != nil {
 		return err
 	}
@@ -108,7 +121,7 @@ func (a App) template(args []string) error {
 		if exists && !force {
 			return fmt.Errorf("template %q already exists; use template add --force to replace it", name)
 		}
-		d.Templates[name] = settings
+		d.Templates[name] = config.SavedSummary{Options: settings}
 		if err := d.Write(); err != nil {
 			return err
 		}
@@ -121,7 +134,7 @@ func (a App) template(args []string) error {
 		if !exists {
 			return fmt.Errorf("unknown template: %s", name)
 		}
-		text, err := (template.Document{Templates: map[string]model.SummaryOptions{name: existing}}).Encode()
+		text, err := (config.TemplateDocument{Templates: map[string]config.SavedSummary{name: existing}}).Encode()
 		if err != nil {
 			return err
 		}

@@ -1,6 +1,7 @@
 package model
 
 import (
+	"errors"
 	"testing"
 	"time"
 )
@@ -28,7 +29,7 @@ func TestSummaryOptionsDateRange(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			from, to, err := (SummaryOptions{Days: &tt.days}).DateRange(now, loc)
+			from, to, err := (SummaryPeriod{Days: &tt.days}).DateRange(now, loc)
 			if err != nil || from.Format(time.DateOnly) != tt.start || to.Format(time.DateOnly) != tt.end {
 				t.Fatalf("range = %s to %s, %v", from, to, err)
 			}
@@ -40,19 +41,19 @@ func TestSummaryOptionsDateRange(t *testing.T) {
 }
 
 func TestSummaryOptionsOptionalPeriod(t *testing.T) {
-	o := SummaryOptions{Format: "table"}
+	o := SummaryOptions{Output: SummaryOutput{Format: "table"}}
 	if err := o.Validate(false); err != nil {
 		t.Fatal(err)
 	}
 	if err := o.Validate(true); err == nil {
 		t.Fatal("execution accepted missing period")
 	}
-	if _, _, err := o.DateRange(time.Now(), time.UTC); err == nil {
+	if _, _, err := o.Period.DateRange(time.Now(), time.UTC); err == nil {
 		t.Fatal("resolved missing period")
 	}
-	o = SummaryOptions{StartDate: "2024-02-29", EndDate: "2024-03-01"}
-	from, to, err := o.DateRange(time.Now(), time.UTC)
-	if err != nil || from.Format(time.DateOnly) != o.StartDate || to.Format(time.DateOnly) != o.EndDate {
+	period := SummaryPeriod{StartDate: "2024-02-29", EndDate: "2024-03-01"}
+	from, to, err := period.DateRange(time.Now(), time.UTC)
+	if err != nil || from.Format(time.DateOnly) != period.StartDate || to.Format(time.DateOnly) != period.EndDate {
 		t.Fatalf("fixed range = %s to %s, %v", from, to, err)
 	}
 }
@@ -60,32 +61,21 @@ func TestSummaryOptionsOptionalPeriod(t *testing.T) {
 func TestSummaryOptionsRejectsZeroDays(t *testing.T) {
 	days := 0
 	for _, requirePeriod := range []bool{false, true} {
-		if err := (SummaryOptions{Days: &days}).Validate(requirePeriod); err == nil {
+		if err := (SummaryPeriod{Days: &days}).Validate(requirePeriod); err == nil {
 			t.Fatal("accepted zero days")
 		}
 	}
 }
 
-func TestStartOfDate(t *testing.T) {
-	for _, tt := range []struct{ zone, date, want string }{
-		{"America/Sao_Paulo", "2018-11-04", "2018-11-04T01:00:00-02:00"},
-		{"America/Sao_Paulo", "2018-11-05", "2018-11-05T00:00:00-02:00"},
-		{"America/Havana", "2024-11-03", "2024-11-03T00:00:00-04:00"},
-		{"Pacific/Apia", "2011-12-30", "2011-12-31T00:00:00+14:00"},
-		{"America/New_York", "2040-12-31", "2040-12-31T00:00:00-05:00"},
-	} {
-		t.Run(tt.zone+"/"+tt.date, func(t *testing.T) {
-			loc, err := time.LoadLocation(tt.zone)
-			if err != nil {
-				t.Fatal(err)
-			}
-			date, err := summaryDate(tt.date)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if got := StartOfDate(date, loc).Format(time.RFC3339); got != tt.want {
-				t.Fatalf("start = %s, want %s", got, tt.want)
-			}
-		})
+func TestSummaryPeriodResolvesIndependentlyOfOutput(t *testing.T) {
+	options := SummaryOptions{
+		Period: SummaryPeriod{StartDate: "2026-05-01", EndDate: "2026-05-02"},
+		Output: SummaryOutput{Format: "table", NoDate: true},
+	}
+	if err := options.Validate(true); !errors.Is(err, ErrSummaryTableColumns) {
+		t.Fatalf("expected a table output error, got %v", err)
+	}
+	if _, _, err := options.Period.DateRange(time.Time{}, time.UTC); err != nil {
+		t.Fatalf("valid period could not be resolved: %v", err)
 	}
 }

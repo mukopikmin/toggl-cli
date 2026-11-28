@@ -16,7 +16,7 @@ import (
 func TestSummaryDailyTotalFormats(t *testing.T) {
 	one, two, hidden, absent := int64(1), int64(2), int64(3), int64(4)
 	client := &fakeClient{
-		projects: []model.Project{{ID: one, Name: "A"}, {ID: hidden, Name: "Hidden"}, {ID: two, Name: "B"}},
+		projects: []model.Project{{ID: one, Name: "A", Active: true}, {ID: hidden, Name: "Hidden", Active: true}, {ID: two, Name: "B", Active: true}},
 		entries: []model.TimeEntry{
 			{ProjectID: &one, Start: time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC), DurationSeconds: 1},
 			{ProjectID: &two, Start: time.Date(2026, 5, 1, 1, 0, 0, 0, time.UTC), DurationSeconds: 1},
@@ -61,7 +61,7 @@ func TestSummaryDailyTotalFormats(t *testing.T) {
 }
 
 func TestSummaryDailyTotalEmpty(t *testing.T) {
-	for _, projects := range [][]model.Project{nil, {{ID: 1, Name: "A"}}} {
+	for _, projects := range [][]model.Project{nil, {{ID: 1, Name: "A", Active: true}}} {
 		app, out := configuredApp(t, &fakeClient{projects: projects}, "")
 		if err := app.Run(context.Background(), []string{"summary", "2026-05-01", "2026-05-01", "--daily-total", "-ftsv"}); err != nil {
 			t.Fatal(err)
@@ -85,7 +85,7 @@ func TestSummaryDailyTotalMonthBoundaries(t *testing.T) {
 		t.Run(tt.zone, func(t *testing.T) {
 			start, _ := time.Parse(time.RFC3339, tt.start)
 			end, _ := time.Parse(time.RFC3339, tt.end)
-			client := &fakeClient{projects: []model.Project{{ID: pid, Name: "A"}}, entries: []model.TimeEntry{
+			client := &fakeClient{projects: []model.Project{{ID: pid, Name: "A", Active: true}}, entries: []model.TimeEntry{
 				{ProjectID: &pid, Start: start, DurationSeconds: 60},
 				{ProjectID: &pid, Start: end, DurationSeconds: 120},
 			}}

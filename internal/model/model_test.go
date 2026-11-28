@@ -51,20 +51,12 @@ func TestSummarizeTimeZonesAndMonthBoundaries(t *testing.T) {
 		})
 	}
 }
-func TestDateRangeMonthEnds(t *testing.T) {
-	a, _ := time.Parse(time.DateOnly, "2024-02-28")
-	b, _ := time.Parse(time.DateOnly, "2024-03-01")
-	got := DateRange(a, b)
-	if len(got) != 3 || got[1] != "2024-02-29" {
-		t.Fatal(got)
-	}
-}
 
-func TestVisibleSortedDoesNotMutate(t *testing.T) {
+func TestSortedProjectsDoesNotMutate(t *testing.T) {
 	one, two := float64(1), float64(2)
 	input := []Project{{ID: 1, Hidden: false, DisplayOrder: &two}, {ID: 2, Hidden: true}, {ID: 3, DisplayOrder: &one}}
-	got := VisibleSorted(input)
-	if len(got) != 2 || got[0].ID != 3 || got[1].ID != 1 {
+	got := SortedProjects(input)
+	if len(got) != 3 || got[0].ID != 3 || got[1].ID != 1 || got[2].ID != 2 {
 		t.Fatalf("%+v", got)
 	}
 	if input[0].ID != 1 {
@@ -79,5 +71,25 @@ func TestSummarizeRunningAndUnassigned(t *testing.T) {
 	got := Summarize(entries, time.UTC, start.Add(45*time.Minute))
 	if got["2026-05-01"][7] != 45 || len(got["2026-05-01"]) != 1 {
 		t.Fatalf("%v", got)
+	}
+}
+
+func TestElapsedSecondsClampsRunningEntriesAfterReportTime(t *testing.T) {
+	now := time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)
+	entry := TimeEntry{Start: now.Add(10 * time.Second), Running: true}
+	if got := entry.ElapsedSeconds(now); got != 0 {
+		t.Fatalf("got %d seconds, want zero", got)
+	}
+}
+
+func TestProjectWithSettings(t *testing.T) {
+	project := Project{ID: 42, Name: "Backend", Active: true}
+	if got := project.WithSettings(ProjectSettings{}); got.DisplayName != "Backend" || got.Alias != "" {
+		t.Fatalf("unexpected default project: %+v", got)
+	}
+	order := float64(3)
+	got := project.WithSettings(ProjectSettings{DisplayName: "Infrastructure", Hidden: true, DisplayOrder: &order})
+	if got.ID != 42 || !got.Active || got.Name != "Backend" || got.Alias != "Infrastructure" || got.DisplayName != got.Alias || !got.Hidden || got.DisplayOrder == nil || *got.DisplayOrder != 3 {
+		t.Fatalf("unexpected resolved project: %+v", got)
 	}
 }

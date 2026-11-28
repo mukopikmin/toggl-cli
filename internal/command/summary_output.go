@@ -11,7 +11,7 @@ import (
 	"github.com/mukopikmin/toggl-cli/internal/model"
 )
 
-func (a App) writeSummary(ctx context.Context, settings model.SummaryOptions, from, to time.Time, sum model.Summary, projects []model.Project, watch, dailyTotal bool) error {
+func (a App) writeSummary(ctx context.Context, settings model.SummaryOutput, from, to time.Time, sum model.Summary, projects []model.Project, watch, dailyTotal bool) error {
 	if settings.Format == "json" {
 		data, err := json.MarshalIndent(sum, "", "  ")
 		if err != nil {
@@ -20,8 +20,8 @@ func (a App) writeSummary(ctx context.Context, settings model.SummaryOptions, fr
 		return a.writeSummaryText(string(data), settings.Clipboard)
 	}
 
-	days := model.DateRange(from, to)
-	rows := summaryRows(sum, model.VisibleSorted(projects), days, dailyTotal)
+	days := summaryDays(from, to)
+	rows := summaryRows(sum, projects, days, dailyTotal)
 	headers := append([]string{"Project"}, days...)
 	if settings.Format == "table" {
 		options := tableOutputOptions{watch: watch, clipboard: settings.Clipboard, truncateProjects: true}
@@ -37,6 +37,14 @@ func (a App) writeSummary(ctx context.Context, settings model.SummaryOptions, fr
 		headers = nil
 	}
 	return a.writeSummaryText(delimited(headers, rows, settings.Format), settings.Clipboard)
+}
+
+func summaryDays(from, to time.Time) []string {
+	var days []string
+	for day := from; !day.After(to); day = day.AddDate(0, 0, 1) {
+		days = append(days, day.Format(time.DateOnly))
+	}
+	return days
 }
 
 func (a App) writeSummaryText(text string, copyToClipboard bool) error {

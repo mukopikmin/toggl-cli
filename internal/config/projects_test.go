@@ -45,7 +45,7 @@ func TestSaveProjectOrderAcrossTOMLLayouts(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			doc := Document{Path: path, Text: text, Config: cfg}
+			doc := Document{Path: path, Text: text, Settings: cfg}
 			if err := doc.SaveProjectOrder([]int64{1}); err != nil {
 				t.Fatal(err)
 			}
@@ -67,7 +67,7 @@ func TestSaveProjectOrderAcrossTOMLLayouts(t *testing.T) {
 	}
 }
 
-func TestSyncProjectsRejectsStaleDocument(t *testing.T) {
+func TestAddProjectsRejectsStaleDocument(t *testing.T) {
 	original := "workspace = \"1\"\ntoken = \"test-token\"\ntimezone = \"UTC\"\n"
 	edited := strings.Replace(original, "UTC", "Asia/Tokyo", 1)
 	path := filepath.Join(t.TempDir(), "config.toml")
@@ -78,8 +78,8 @@ func TestSyncProjectsRejectsStaleDocument(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	doc := Document{Path: path, Text: original, Config: cfg}
-	if _, err := doc.SyncProjects([]model.Project{{ID: 1, Name: "Project"}}); err == nil {
+	doc := Document{Path: path, Text: original, Settings: cfg}
+	if err := doc.AddProjects([]model.Project{{ID: 1, Name: "Project"}}); err == nil {
 		t.Fatal("saved a stale document")
 	}
 	got, err := os.ReadFile(path)

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/mukopikmin/toggl-cli/internal/config"
-	"github.com/mukopikmin/toggl-cli/internal/model"
 )
 
 func TestSummaryDaysIncludesToday(t *testing.T) {
@@ -61,6 +60,15 @@ func TestSummaryDaysIncludesToday(t *testing.T) {
 	}
 }
 
+func TestSummaryDaysMonthEnds(t *testing.T) {
+	a, _ := time.Parse(time.DateOnly, "2024-02-28")
+	b, _ := time.Parse(time.DateOnly, "2024-03-01")
+	got := summaryDays(a, b)
+	if len(got) != 3 || got[1] != "2024-02-29" {
+		t.Fatal(got)
+	}
+}
+
 func TestSummaryTableDateHeadings(t *testing.T) {
 	tests := []struct {
 		name, start, end string
@@ -85,7 +93,7 @@ func TestSummaryTableDateHeadings(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			days := model.DateRange(from, to)
+			days := summaryDays(from, to)
 			headers := append([]string{"Project"}, days...)
 			output := table(headers, nil, tableLayout{maxWidth: tt.terminalWidth}, summaryHeaderVariants(days, from, to)...)
 			if heading := strings.SplitN(output, "\n", 3)[1]; heading != tt.want {

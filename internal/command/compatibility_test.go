@@ -42,7 +42,7 @@ func TestEmptyProjectJSONIsArray(t *testing.T) {
 		projects []model.Project
 	}{
 		{"nil", nil}, {"empty", []model.Project{}},
-		{"all hidden", []model.Project{{ID: 1, Name: "Hidden"}}},
+		{"all hidden", []model.Project{{ID: 1, Name: "Hidden", Active: true}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -157,8 +157,8 @@ func TestInitTimezoneInputCompletion(t *testing.T) {
 				return
 			}
 			doc, loadErr := config.Load()
-			if err != nil || loadErr != nil || doc.Config.Timezone != tt.timezone {
-				t.Fatalf("init=%v load=%v timezone=%q", err, loadErr, doc.Config.Timezone)
+			if err != nil || loadErr != nil || doc.Settings.Timezone != tt.timezone {
+				t.Fatalf("init=%v load=%v timezone=%q", err, loadErr, doc.Settings.Timezone)
 			}
 		})
 	}

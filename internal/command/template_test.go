@@ -12,7 +12,6 @@ import (
 
 	"github.com/mukopikmin/toggl-cli/internal/config"
 	"github.com/mukopikmin/toggl-cli/internal/model"
-	"github.com/mukopikmin/toggl-cli/internal/template"
 )
 
 func TestTemplateLifecycleWithoutConfigurationOrAPI(t *testing.T) {
@@ -38,8 +37,8 @@ func TestTemplateLifecycleWithoutConfigurationOrAPI(t *testing.T) {
 		t.Fatal(got)
 	}
 	shown := run("template", "show", "weekly")
-	doc, err := template.Parse(shown)
-	if err != nil || len(doc.Templates) != 1 || doc.Templates["weekly"].Format != "table" || *doc.Templates["weekly"].Days != 6 {
+	doc, err := config.ParseTemplates(shown)
+	if err != nil || len(doc.Templates) != 1 || doc.Templates["weekly"].Options.Output.Format != "table" || *doc.Templates["weekly"].Options.Period.Days != 6 {
 		t.Fatalf("shown = %q, error = %v", shown, err)
 	}
 	p := filepath.Join(home, ".config", "toggl-cli", "templates.toml")
@@ -55,11 +54,11 @@ func TestTemplateLifecycleWithoutConfigurationOrAPI(t *testing.T) {
 		t.Fatal("duplicate add changed file")
 	}
 	run("template", "add", "weekly", "--days", "1", "--force")
-	doc, err = template.Load()
-	if err != nil || *doc.Templates["weekly"].Days != 1 || doc.Templates["weekly"].Format != "table" {
+	doc, err = config.LoadTemplates()
+	if err != nil || *doc.Templates["weekly"].Options.Period.Days != 1 || doc.Templates["weekly"].Options.Output.Format != "table" {
 		t.Fatalf("force did not replace the template: %+v, %v", doc, err)
 	}
-	if !doc.Templates["spreadsheet"].NoDate {
+	if !doc.Templates["spreadsheet"].Options.Output.NoDate {
 		t.Fatal("force changed unrelated template")
 	}
 	run("template", "delete", "weekly")
@@ -181,7 +180,7 @@ func TestSummaryTemplateMatchesDirectExecution(t *testing.T) {
 func TestLegacyTemplateSeparatorDoesNotOverrideFormat(t *testing.T) {
 	projectID := int64(1)
 	fake := &fakeClient{
-		projects: []model.Project{{ID: projectID, Name: "Project A"}},
+		projects: []model.Project{{ID: projectID, Name: "Project A", Active: true}},
 		entries:  []model.TimeEntry{{ProjectID: &projectID, Start: time.Date(2026, 5, 2, 1, 0, 0, 0, time.UTC), DurationSeconds: 90}},
 	}
 	app, out := configuredApp(t, fake, "")
@@ -197,6 +196,13 @@ func TestLegacyTemplateSeparatorDoesNotOverrideFormat(t *testing.T) {
 	}
 	if got, want := out.String(), "Project,2026-05-02\nProject A,1.5\n"; got != want {
 		t.Fatalf("got %q, want %q", got, want)
+	}
+	out.Reset()
+	if err := app.Run(context.Background(), []string{"template", "show", "legacy"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "separator = ") {
+		t.Fatalf("legacy field was lost: %q", out.String())
 	}
 }
 

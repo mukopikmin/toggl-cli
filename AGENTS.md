@@ -16,13 +16,15 @@
   `project list` and `project sync`. Require a subcommand for resources. Keep
   standalone operations such as `summary` and `init` at the top level.
 - Use the same command names in parsing, dispatch, help, tests, and docs.
-- Keep `cmd/toggl/main.go` focused on argument dispatch and dependency assembly.
-  Use `internal/command` for CLI input, coordination, and output formatting.
-- Keep API calls, private DTOs, and conversion in `internal/toggl`. Its public
-  methods return domain models. Keep `internal/model` independent of the API
-  adapter, with pure date calculations and aggregation where possible.
-- Keep configuration loading and validation in `internal/config`. Leave
-  command-specific behavior in `internal/command`.
+- Use `internal/command` for CLI argument handling, terminal interaction, and
+  output formatting.
+- Use `internal/usecase` to coordinate application workflows, such as retrieving
+  entries for a summary or selecting and saving projects during sync.
+- Use `internal/model` for application data and pure rules. Compute derived
+  models from their source models.
+- Use `internal/config` to read and write settings and summary templates in TOML.
+- Use `internal/toggl` for Toggl API calls and conversion to model types. Keep
+  API DTOs private to the adapter.
 
 ## Tests and CI
 

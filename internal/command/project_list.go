@@ -48,7 +48,6 @@ func (a App) parseProjectListOptions(args []string) (projectListOptions, error) 
 }
 
 func (a App) writeProjectList(ctx context.Context, projects []model.Project, o projectListOptions) error {
-	projects = model.SortedProjects(projects, o.includeHidden)
 	first := o.selectedFields[0].name
 	options := tableOutputOptions{watch: o.watch, truncateProjects: first == "name" || first == "alias" || first == "displayName"}
 	return writeList(ctx, a, projects, o.selectedFields, o.format, options)
