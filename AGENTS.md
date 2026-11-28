@@ -65,23 +65,12 @@
 
 ## Separation of Responsibilities
 
-- Keep `main.ts` focused on argument parsing, dependency assembly, and
-  delegation to commands. Do not add API communication or complex aggregation
-  logic directly to it.
-- Use `command/` for CLI use cases, input interpretation, and output formatting.
-- Use `model/` for API-independent domain models and pure domain operations.
-  Derived models such as `TimeEntrySummary` belong with the source models and
-  must be computable without depending on an API client or API DTO.
-- Use `toggl/` for Toggl API communication, request and response DTOs, and
-  translation between those DTOs and domain models. Keep DTOs private to the
-  adapter when they are not shared by multiple Toggl modules.
-- Public API client methods must return domain models rather than exposing API
-  DTOs. Dependencies must point from `toggl/` adapters to `model/`; code in
-  `model/` must not import from `toggl/`.
-- Keep fetching and derived operations separate. Commands may coordinate them,
-  for example by fetching `TimeEntry[]` and then deriving a `TimeEntrySummary`.
-- Keep `config.ts` responsible for configuration loading and validation. Do not
-  add command-specific behavior to it.
+- Follow the [README architecture](README.md#architecture) for package
+  responsibilities.
+- Keep derived models with their source models, with pure computations that use
+  model values as inputs.
+- Keep Toggl API DTOs private to the adapter. Public client methods return
+  models, and dependencies point from `toggl/` to `model/`.
 - Split a file or function when it begins to hold multiple independent
   responsibilities. Do not introduce an abstraction that has only one caller and
   does not reduce complexity.
