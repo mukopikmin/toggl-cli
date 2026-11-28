@@ -141,3 +141,96 @@ func TestSummaryReportsOutputFailure(t *testing.T) {
 		t.Fatalf("got %v, want %v", err, want)
 	}
 }
+
+func TestDefaultTableRejectsCSVOptionsBeforeConfiguration(t *testing.T) {
+	tests := [][]string{
+		{"summary", "--days", "1", "--no-project"},
+		{"summary", "--days", "1", "--no-date"},
+	}
+	for _, args := range tests {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			t.Setenv("HOME", t.TempDir())
+			client := &fakeClient{}
+			app := App{NewClient: useClient(client), Out: &bytes.Buffer{}}
+			err := app.Run(context.Background(), args)
+			var usageError UsageError
+			if !errors.As(err, &usageError) || !strings.Contains(err.Error(), "cannot be used with table format") || client.entryCalls != 0 || client.projectCalls != 0 {
+				t.Fatalf("expected table option error before configuration/API access, got %v", err)
+			}
+		})
+	}
+}
+
+func TestSummaryFormatsAndBoundaries(t *testing.T) {
+	pid := int64(1)
+	client := &fakeClient{projects: []model.Project{{ID: 1, Name: "P", Active: true}}, entries: []model.TimeEntry{{ID: 1, ProjectID: &pid, Start: time.Date(2026, 5, 1, 23, 30, 0, 0, time.UTC), DurationSeconds: 90}}}
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"tsv", []string{"summary", "2026-05-01", "2026-05-02", "--format", "tsv"}, "Project\t2026-05-01\t2026-05-02\nP\t1.5\t"},
+		{"csv", []string{"summary", "2026-05-01", "2026-05-02", "--format", "csv"}, "Project,2026-05-01,2026-05-02\nP,1.5,"},
+		{"json", []string{"summary", "--days", "2", "--format", "json"}, `"2026-05-01"`},
+		{"table", []string{"summary", "--days", "2", "--format", "table"}, "│ Project"},
+		{"no headers tsv", []string{"summary", "2026-05-01", "2026-05-02", "-ftsv", "--no-project", "--no-date"}, "1.5\t"},
+		{"no headers csv", []string{"summary", "2026-05-01", "2026-05-02", "-fcsv", "--no-project", "--no-date"}, "1.5,"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			app, out := configuredApp(t, client, "")
+			if err := app.Run(context.Background(), tt.args); err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(out.String(), tt.want) {
+				t.Fatalf("%q", out.String())
+			}
+		})
+	}
+	app, _ := configuredApp(t, client, "")
+	for _, flag := range []string{"--no-project", "--no-date"} {
+		if err := app.Run(context.Background(), []string{"summary", "2026-05-01", "2026-05-02", "--format", "table", flag}); err == nil {
+			t.Fatalf("expected table/%s error", flag)
+		}
+	}
+}
+
+func TestJSONSummaryOmitsHiddenProjects(t *testing.T) {
+	hidden, visible := int64(42), int64(17)
+	client := &fakeClient{entries: []model.TimeEntry{{ProjectID: &hidden, Start: time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC), DurationSeconds: 60}, {ProjectID: &visible, Start: time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC), DurationSeconds: 60}}}
+	app, out := configuredApp(t, client, "")
+	if err := os.WriteFile(config.Path(os.Getenv("HOME")), []byte("workspace='1'\ntoken='secret'\n[projects.42]\nhidden=true\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.Run(context.Background(), []string{"summary", "--days", "2", "-fjson"}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), "42") || !strings.Contains(out.String(), "17") {
+		t.Fatal(out.String())
+	}
+	if client.projectCalls != 0 {
+		t.Fatalf("got %d project requests for a JSON summary", client.projectCalls)
+	}
+}
+
+func TestSummaryUsageBeforeConfiguration(t *testing.T) {
+	tests := [][]string{
+		{"summary"}, {"summary", "2026-05-01"},
+		{"summary", "--days", "0"},
+		{"summary", "2026-05-01", "2026-05-02", "--days", "1"},
+		{"summary", "2026-02-30", "2026-03-01"},
+		{"summary", "2026-05-02", "2026-05-01"},
+	}
+	for _, args := range tests {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			t.Setenv("HOME", t.TempDir())
+			client := &fakeClient{}
+			app := App{NewClient: useClient(client), Out: &bytes.Buffer{}}
+			err := app.Run(context.Background(), args)
+			var usageError UsageError
+			if !errors.As(err, &usageError) || client.entryCalls != 0 || client.projectCalls != 0 {
+				t.Fatalf("expected usage error before configuration/API access, got %v", err)
+			}
+		})
+	}
+}

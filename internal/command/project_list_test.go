@@ -209,3 +209,37 @@ func TestProjectListInvalidOptionsBeforeConfiguration(t *testing.T) {
 		})
 	}
 }
+
+func TestEmptyProjectListWritesHeaders(t *testing.T) {
+	app, out := configuredApp(t, &fakeClient{}, "")
+	if err := app.Run(context.Background(), []string{"project", "list", "--format", "tsv"}); err != nil {
+		t.Fatal(err)
+	}
+	if out.String() != "name\tid\talias\tdisplayName\thidden\tactive\tdisplayOrder\n" {
+		t.Fatalf("%q", out.String())
+	}
+}
+
+func TestEmptyProjectJSONIsArray(t *testing.T) {
+	tests := []struct {
+		name     string
+		projects []model.Project
+	}{
+		{"nil", nil}, {"empty", []model.Project{}},
+		{"all hidden", []model.Project{{ID: 1, Name: "Hidden", Active: true}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			app, out := configuredApp(t, &fakeClient{projects: tt.projects}, "")
+			if tt.name == "all hidden" {
+				appendProjectConfig(t, "\n[projects.1]\nhidden = true\n")
+			}
+			if err := app.Run(context.Background(), []string{"project", "list", "--format", "json"}); err != nil {
+				t.Fatal(err)
+			}
+			if out.String() != "[]\n" {
+				t.Fatalf("got %q, want an empty JSON array", out.String())
+			}
+		})
+	}
+}
