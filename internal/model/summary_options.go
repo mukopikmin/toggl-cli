@@ -83,28 +83,3 @@ func (o SummaryOptions) DateRange(now time.Time, loc *time.Location) (time.Time,
 	to, _ := summaryDate(o.EndDate)
 	return from, to, nil
 }
-
-// StartOfDate returns the first instant of a calendar date in loc. If the
-// date was skipped, it returns the start of the first date that follows it.
-func StartOfDate(date time.Time, loc *time.Location) time.Time {
-	// IANA timezone offsets are less than 24 hours in magnitude. Start
-	// before any possible local midnight, then walk the offset intervals.
-	cursor := date.Add(-24 * time.Hour).In(loc)
-	for {
-		_, offset := cursor.Zone()
-		_, next := cursor.ZoneBounds()
-		if !next.IsZero() && !next.After(cursor) {
-			// Go can report December 31 UTC as the end of a rule
-			// interval in a future leap year. Advance to January 1.
-			next = time.Date(cursor.UTC().Year()+1, time.January, 1, 0, 0, 0, 0, time.UTC)
-		}
-		start := date.Add(-time.Duration(offset) * time.Second).In(loc)
-		if start.Before(cursor) {
-			start = cursor
-		}
-		if next.IsZero() || start.Before(next) {
-			return start
-		}
-		cursor = next
-	}
-}

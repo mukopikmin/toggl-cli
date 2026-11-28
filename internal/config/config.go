@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
+	"github.com/mukopikmin/toggl-cli/internal/model"
 )
 
 const DisplayPath = "~/.config/toggl-cli/config.toml"
@@ -24,18 +25,9 @@ type FileNotFoundError struct{}
 
 func (FileNotFoundError) Error() string { return DisplayPath + " file not found" }
 
-type Project struct {
-	DisplayName  string
-	Hidden       bool
-	DisplayOrder *float64
-}
-type Config struct {
-	Workspace, Token, Timezone string
-	Projects                   map[int64]Project
-}
 type Document struct {
 	Path, Text string
-	Config     Config
+	Settings   model.Settings
 }
 type rawProject struct {
 	DisplayName  *string  `toml:"display_name"`
@@ -50,12 +42,19 @@ type rawConfig struct {
 }
 
 func Path(home string) string { return filepath.Join(home, ".config", "toggl-cli", "config.toml") }
-func Load() (Document, error) {
+func homePath() (string, error) {
 	home := os.Getenv("HOME")
 	if home == "" {
-		return Document{}, HomeNotSetError{}
+		return "", HomeNotSetError{}
 	}
-	p := Path(home)
+	return Path(home), nil
+}
+
+func Load() (Document, error) {
+	p, err := homePath()
+	if err != nil {
+		return Document{}, err
+	}
 	b, err := os.ReadFile(p)
 	if os.IsNotExist(err) {
 		return Document{}, FileNotFoundError{}
@@ -63,23 +62,23 @@ func Load() (Document, error) {
 	if err != nil {
 		return Document{}, fmt.Errorf("Unable to read %s: %w", DisplayPath, err)
 	}
-	c, err := Parse(string(b))
-	return Document{Path: p, Text: string(b), Config: c}, err
+	settings, err := Parse(string(b))
+	return Document{Path: p, Text: string(b), Settings: settings}, err
 }
 
-func Parse(text string) (Config, error) {
+func Parse(text string) (model.Settings, error) {
 	var raw rawConfig
 	metadata, err := toml.Decode(text, &raw)
 	if err != nil {
 		var diagnostic toml.ParseError
 		if errors.As(err, &diagnostic) && diagnostic.Position.Line > 0 {
-			return Config{}, fmt.Errorf("Invalid configuration at line %d", diagnostic.Position.Line)
+			return model.Settings{}, fmt.Errorf("Invalid configuration at line %d", diagnostic.Position.Line)
 		}
-		return Config{}, errors.New("Invalid configuration")
+		return model.Settings{}, errors.New("Invalid configuration")
 	}
 	// Implicit parent tables have no metadata type; explicit values must be tables.
 	if kind := metadata.Type("projects"); kind != "" && kind != "Hash" {
-		return Config{}, fmt.Errorf("Invalid project configuration: projects")
+		return model.Settings{}, fmt.Errorf("Invalid project configuration: projects")
 	}
 	var missing []string
 	if raw.Workspace == nil || *raw.Workspace == "" {
@@ -89,9 +88,9 @@ func Parse(text string) (Config, error) {
 		missing = append(missing, "token")
 	}
 	if len(missing) > 0 {
-		return Config{}, fmt.Errorf("Missing required configuration: %s", strings.Join(missing, ", "))
+		return model.Settings{}, fmt.Errorf("Missing required configuration: %s", strings.Join(missing, ", "))
 	}
-	cfg := Config{Workspace: *raw.Workspace, Token: *raw.Token, Projects: map[int64]Project{}}
+	cfg := model.Settings{Workspace: *raw.Workspace, Token: *raw.Token, Projects: map[int64]model.ProjectSettings{}}
 	if raw.Timezone != nil {
 		cfg.Timezone = *raw.Timezone
 	}
@@ -103,7 +102,11 @@ func Parse(text string) (Config, error) {
 			invalid = append(invalid, "projects."+key)
 			continue
 		}
-		project := Project{DisplayOrder: p.DisplayOrder}
+		if _, exists := cfg.Projects[id]; exists {
+			invalid = append(invalid, fmt.Sprintf("projects.%d (duplicate project ID)", id))
+			continue
+		}
+		project := model.ProjectSettings{DisplayOrder: p.DisplayOrder}
 		if p.DisplayOrder != nil && (math.IsNaN(*p.DisplayOrder) || math.IsInf(*p.DisplayOrder, 0)) {
 			invalid = append(invalid, "projects."+key)
 			continue
@@ -121,7 +124,7 @@ func Parse(text string) (Config, error) {
 		cfg.Projects[id] = project
 	}
 	if len(invalid) > 0 {
-		return Config{}, fmt.Errorf("Invalid project configuration: %s", strings.Join(invalid, ", "))
+		return model.Settings{}, fmt.Errorf("Invalid project configuration: %s", strings.Join(invalid, ", "))
 	}
 	return cfg, nil
 }

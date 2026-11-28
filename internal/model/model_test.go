@@ -44,7 +44,7 @@ func TestSummarizeTimeZonesAndMonthBoundaries(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			loc, _ := time.LoadLocation(tt.zone)
-			got := Summarize(entries, loc, time.Now())
+			got := Summarize(entries, loc, time.Now(), nil)
 			if got["2026-01-31"][1] != tt.jan || got["2026-02-01"][1] != tt.feb {
 				t.Fatalf("%v", got)
 			}
@@ -76,8 +76,28 @@ func TestSummarizeRunningAndUnassigned(t *testing.T) {
 	pid := int64(7)
 	start := time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)
 	entries := []TimeEntry{{ProjectID: &pid, Start: start, Running: true}, {ProjectID: nil, Start: start, DurationSeconds: 3600}}
-	got := Summarize(entries, time.UTC, start.Add(45*time.Minute))
+	got := Summarize(entries, time.UTC, start.Add(45*time.Minute), nil)
 	if got["2026-05-01"][7] != 45 || len(got["2026-05-01"]) != 1 {
 		t.Fatalf("%v", got)
+	}
+}
+
+func TestElapsedSecondsClampsRunningEntriesAfterReportTime(t *testing.T) {
+	now := time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)
+	entry := TimeEntry{Start: now.Add(10 * time.Second), Running: true}
+	if got := entry.ElapsedSeconds(now); got != 0 {
+		t.Fatalf("got %d seconds, want zero", got)
+	}
+}
+
+func TestProjectWithSettings(t *testing.T) {
+	project := Project{ID: 42, Name: "Backend", Active: true}
+	if got := project.WithSettings(ProjectSettings{}); got.DisplayName != "Backend" || got.Alias != "" {
+		t.Fatalf("unexpected default project: %+v", got)
+	}
+	order := float64(3)
+	got := project.WithSettings(ProjectSettings{DisplayName: "Infrastructure", Hidden: true, DisplayOrder: &order})
+	if got.ID != 42 || !got.Active || got.Name != "Backend" || got.Alias != "Infrastructure" || got.DisplayName != got.Alias || !got.Hidden || got.DisplayOrder == nil || *got.DisplayOrder != 3 {
+		t.Fatalf("unexpected resolved project: %+v", got)
 	}
 }

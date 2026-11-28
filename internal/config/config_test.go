@@ -90,3 +90,10 @@ func TestInvalidTokenDiagnostic(t *testing.T) {
 		t.Fatalf("unexpected diagnostic: %v", err)
 	}
 }
+
+func TestParseRejectsEquivalentProjectIDs(t *testing.T) {
+	_, err := Parse("workspace='1'\ntoken='test-token'\n[projects.1]\ndisplay_name='One'\n[projects.01]\ndisplay_name='Another'\n")
+	if err == nil || err.Error() != "Invalid project configuration: projects.1 (duplicate project ID)" {
+		t.Fatalf("unexpected diagnostic: %v", err)
+	}
+}

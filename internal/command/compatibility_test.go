@@ -157,8 +157,8 @@ func TestInitTimezoneInputCompletion(t *testing.T) {
 				return
 			}
 			doc, loadErr := config.Load()
-			if err != nil || loadErr != nil || doc.Config.Timezone != tt.timezone {
-				t.Fatalf("init=%v load=%v timezone=%q", err, loadErr, doc.Config.Timezone)
+			if err != nil || loadErr != nil || doc.Settings.Timezone != tt.timezone {
+				t.Fatalf("init=%v load=%v timezone=%q", err, loadErr, doc.Settings.Timezone)
 			}
 		})
 	}

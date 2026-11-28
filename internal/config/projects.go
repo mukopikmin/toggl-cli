@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
-	"slices"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -16,33 +14,22 @@ import (
 	"github.com/mukopikmin/toggl-cli/internal/model"
 )
 
-// SyncProjects adds missing project settings to the snapshot loaded before the fetch.
-func (d Document) SyncProjects(projects []model.Project) (int, error) {
-	projects = slices.Clone(projects)
-	sort.Slice(projects, func(i, j int) bool { return projects[i].ID < projects[j].ID })
+// AddProjects writes the selected projects to the loaded configuration snapshot.
+func (d Document) AddProjects(projects []model.Project) error {
+	if len(projects) == 0 {
+		return nil
+	}
 	var text strings.Builder
 	text.WriteString(d.Text)
 	if !strings.HasSuffix(d.Text, "\n") {
 		text.WriteByte('\n')
 	}
-	count := 0
-	added := make(map[int64]bool)
+	unifyNewlines := strings.NewReplacer("\r\n", "\n", "\r", "\n")
 	for _, project := range projects {
-		if _, exists := d.Config.Projects[project.ID]; exists || added[project.ID] {
-			continue
-		}
-		name := strings.NewReplacer("\r\n", "\n", "\r", "\n").Replace(project.Name)
+		name := unifyNewlines.Replace(project.Name)
 		fmt.Fprintf(&text, "\n# %s\n[projects.\"%d\"]\nhidden = false\n", strings.ReplaceAll(name, "\n", "\n# "), project.ID)
-		added[project.ID] = true
-		count++
 	}
-	if count == 0 {
-		return 0, nil
-	}
-	if err := d.save(text.String()); err != nil {
-		return 0, err
-	}
-	return count, nil
+	return d.save(text.String())
 }
 
 // SaveProjectOrder updates visible projects in the order returned by the terminal.

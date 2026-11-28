@@ -3,6 +3,7 @@ package command
 import (
 	"context"
 
+	"github.com/mukopikmin/toggl-cli/internal/config"
 	"github.com/mukopikmin/toggl-cli/internal/model"
 )
 
@@ -32,11 +33,11 @@ func (a App) client(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	d, err := loadCfg()
+	d, err := config.Load()
 	if err != nil {
 		return err
 	}
-	clients, err := a.NewClient(d.Config.Workspace, d.Config.Token).Clients(ctx)
+	clients, err := a.NewClient(d.Settings.Workspace, d.Settings.Token).Clients(ctx)
 	if err != nil {
 		return err
 	}

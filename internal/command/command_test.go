@@ -365,6 +365,9 @@ func TestJSONSummaryOmitsHiddenProjects(t *testing.T) {
 	if strings.Contains(out.String(), "42") || !strings.Contains(out.String(), "17") {
 		t.Fatal(out.String())
 	}
+	if client.projectCalls != 0 {
+		t.Fatalf("got %d project requests for a JSON summary", client.projectCalls)
+	}
 }
 
 func TestTimeEntryListSortsByInstant(t *testing.T) {

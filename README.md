@@ -352,15 +352,18 @@ replaces all settings, rather than merging them with the previous template.
 ## Architecture
 
 - `cmd/toggl/main.go`: argument entry point and dependency assembly.
-- `internal/command/`: CLI interpretation and output formatting. `options.go`
-  handles shared option parsing.
+- `internal/command/`: CLI argument validation, output formatting, and terminal
+  interaction. `options.go` handles shared option parsing.
+- `internal/usecase/`: summary retrieval, project preference application, and
+  selection of projects to add during sync.
 - `internal/selfupdate/`: release lookup, verification, and installation.
 - `internal/command/summary_output.go`: formats fetched summary data.
-- `internal/model/`: API-independent models and pure aggregation.
+- `internal/model/`: API-independent settings and models, with pure project
+  display, calendar, and aggregation rules.
 - `internal/template/`: validated TOML storage for named summary settings.
-- `internal/toggl/`: authenticated HTTP client, private DTOs, and domain
-  conversion. The CLI applies local project display preferences.
-- `internal/config/`: configuration loading, validation, and project edits.
+- `internal/toggl/`: authenticated HTTP client and conversion of private API
+  responses to models.
+- `internal/config/`: TOML parsing, validation, and settings file updates.
 
 ## Development
 

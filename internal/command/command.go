@@ -8,16 +8,11 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
-	"regexp"
-	"slices"
-	"sort"
 	"strings"
 	"time"
 
 	"github.com/mukopikmin/toggl-cli/internal/config"
 	"github.com/mukopikmin/toggl-cli/internal/model"
-	"github.com/mukopikmin/toggl-cli/internal/template"
 	"golang.org/x/term"
 )
 
@@ -140,25 +135,6 @@ func (a App) Run(ctx context.Context, args []string) error {
 	}
 }
 
-type outputTimeEntry struct {
-	ID              int64
-	Description     string
-	ProjectID       *int64
-	Start           string
-	Stop            *string
-	DurationMinutes float64
-}
-
-var timeEntryFields = listFields[outputTimeEntry]{
-	{"id", "id", "id", func(e outputTimeEntry) any { return e.ID }},
-	{"description", "description", "desc", func(e outputTimeEntry) any { return e.Description }},
-	{"project_id", "project_id", "proj_id", func(e outputTimeEntry) any { return optionalListValue(e.ProjectID) }},
-	{"start", "start", "start", func(e outputTimeEntry) any { return e.Start }},
-	{"stop", "stop", "stop", func(e outputTimeEntry) any { return optionalListValue(e.Stop) }},
-	{"duration_minutes", "duration_minutes", "mins", func(e outputTimeEntry) any { return e.DurationMinutes }},
-}
-
-func loadCfg() (config.Document, error) { return config.Load() }
 func (a App) showConfig(ctx context.Context, args []string) error {
 	o, e := parseOpts(args, map[string]bool{"format": true, "watch": true})
 	if e != nil {
@@ -170,19 +146,19 @@ func (a App) showConfig(ctx context.Context, args []string) error {
 	if err := a.validateTableWatch(o.watch, o.format); err != nil {
 		return err
 	}
-	d, e := loadCfg()
+	d, e := config.Load()
 	if e != nil {
 		return e
 	}
-	v := map[string]string{"WORKSPACE": d.Config.Workspace}
-	if d.Config.Timezone != "" {
-		v["TIMEZONE"] = d.Config.Timezone
+	v := map[string]string{"WORKSPACE": d.Settings.Workspace}
+	if d.Settings.Timezone != "" {
+		v["TIMEZONE"] = d.Settings.Timezone
 	}
 	if o.format == "json" {
 		visible := struct {
 			Workspace string `json:"WORKSPACE"`
 			Timezone  string `json:"TIMEZONE,omitempty"`
-		}{d.Config.Workspace, d.Config.Timezone}
+		}{d.Settings.Workspace, d.Settings.Timezone}
 		b, _ := json.MarshalIndent(visible, "", "  ")
 		fmt.Fprintln(a.Out, string(b))
 		return nil
@@ -204,15 +180,9 @@ func (a App) init(args []string) error {
 	if len(args) > 0 {
 		return usage("init does not accept arguments")
 	}
-	home := os.Getenv("HOME")
-	if home == "" {
-		return errors.New("HOME environment variable not set")
-	}
-	p := config.Path(home)
-	if _, e := os.Stat(p); e == nil {
-		return fmt.Errorf("%s already exists", config.DisplayPath)
-	} else if !os.IsNotExist(e) {
-		return e
+	path, err := config.PrepareCreate()
+	if err != nil {
+		return err
 	}
 	r := bufio.NewReader(a.In)
 	interactive := false
@@ -271,256 +241,17 @@ func (a App) init(args []string) error {
 	if e != nil {
 		return e
 	}
-	if e = os.MkdirAll(filepath.Dir(p), 0700); e != nil {
-		return e
-	}
-	text, e := config.EncodeInitial(w, t, z)
-	if e != nil {
-		return e
-	}
-	file, e := os.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
-	if e != nil {
-		return e
-	}
-	if _, e = file.WriteString(text); e != nil {
-		file.Close()
-		os.Remove(p)
-		return e
-	}
-	if e = file.Close(); e != nil {
-		os.Remove(p)
-		return e
+	settings := model.Settings{Workspace: w, Token: t, Timezone: z}
+	if err := config.Create(path, settings); err != nil {
+		return err
 	}
 	fmt.Fprintf(a.Out, "Wrote %s\n", config.DisplayPath)
 	return nil
 }
 
-func (a App) project(ctx context.Context, args []string) error {
-	if len(args) == 0 {
-		return usage("project requires a subcommand: list, reorder, or sync")
-	}
-	var listOptions projectListOptions
-	switch args[0] {
-	case "list":
-		var err error
-		listOptions, err = a.parseProjectListOptions(args[1:])
-		if err != nil {
-			return err
-		}
-	case "sync":
-		if len(args) > 1 {
-			return usage("project sync does not accept arguments")
-		}
-	case "reorder":
-		if len(args) > 1 {
-			return usage("project reorder does not accept arguments")
-		}
-	default:
-		return usagef("unknown project subcommand: %s", args[0])
-	}
-	d, e := loadCfg()
-	if e != nil {
-		return e
-	}
-	ps, e := a.projects(ctx, d.Config)
-	if e != nil {
-		return e
-	}
-	switch args[0] {
-	case "list":
-		return a.writeProjectList(ctx, ps, listOptions)
-	case "sync":
-		count, err := d.SyncProjects(ps)
-		if err != nil {
-			return err
-		}
-		if count == 0 {
-			fmt.Fprintln(a.Out, "All active projects are already configured")
-			return nil
-		}
-		fmt.Fprintf(a.Out, "Added %d project(s) to the config file\n", count)
-		return nil
-	case "reorder":
-		return a.reorderProjects(d, model.VisibleSorted(ps))
-	}
-	return nil
-}
-
-func location(c config.Config) (*time.Location, error) {
-	if c.Timezone == "" {
+func location(settings model.Settings) (*time.Location, error) {
+	if settings.Timezone == "" {
 		return time.Local, nil
 	}
-	return time.LoadLocation(c.Timezone)
-}
-func parseMonth(v string) (time.Time, error) {
-	if !regexp.MustCompile(`^\d{4}[-/]?\d{2}$`).MatchString(v) {
-		return time.Time{}, usage("month must use YYYY-MM, YYYYMM, or YYYY/MM")
-	}
-	v = strings.ReplaceAll(v, "/", "-")
-	if len(v) == 6 {
-		v = v[:4] + "-" + v[4:]
-	}
-	t, err := time.Parse("2006-01", v)
-	if err != nil {
-		return time.Time{}, usage("month must be a valid month")
-	}
-	return t, nil
-}
-func (a App) summary(ctx context.Context, args []string) error {
-	allowed := summaryFlags()
-	allowed["template"] = true
-	allowed["month"] = true
-	allowed["watch"] = true
-	allowed["daily-total"] = true
-	o, e := parseOpts(args, allowed)
-	if e != nil {
-		return e
-	}
-	if o.monthSet {
-		if o.days != nil || len(o.pos) > 0 {
-			return usage("summary accepts only one of start and end date, --days, or --month")
-		}
-	}
-	base := model.SummaryOptions{}
-	if o.templateSet {
-		if err := template.ValidateName(o.template); err != nil {
-			return usage(err.Error())
-		}
-		d, err := template.Load()
-		if err != nil {
-			return err
-		}
-		var exists bool
-		base, exists = d.Templates[o.template]
-		if !exists {
-			return fmt.Errorf("unknown template: %s", o.template)
-		}
-	}
-	settings, e := summaryOptions(base, o)
-	if e != nil {
-		return e
-	}
-	if o.monthSet {
-		monthStart, err := parseMonth(o.month)
-		if err != nil {
-			return err
-		}
-		settings.Days = nil
-		settings.StartDate = monthStart.Format(time.DateOnly)
-		settings.EndDate = monthStart.AddDate(0, 1, -1).Format(time.DateOnly)
-	}
-	if o.dailyTotal && settings.Format == "json" {
-		return usage("--daily-total cannot be used with json format")
-	}
-	if e = settings.Validate(true); e != nil {
-		return usage(e.Error())
-	}
-	if err := a.validateTableWatch(o.watch, settings.Format); err != nil {
-		return err
-	}
-	d, e := loadCfg()
-	if e != nil {
-		return e
-	}
-	loc, e := location(d.Config)
-	if e != nil {
-		return e
-	}
-	now := a.Now()
-	from, to, e := settings.DateRange(now, loc)
-	if e != nil {
-		return usage(e.Error())
-	}
-	start := model.StartOfDate(from, loc)
-	end := model.StartOfDate(to.AddDate(0, 0, 1), loc)
-	entries, e := a.NewClient(d.Config.Workspace, d.Config.Token).TimeEntries(ctx, start, end)
-	if e != nil {
-		return e
-	}
-	entries = slices.DeleteFunc(entries, func(entry model.TimeEntry) bool {
-		return entry.ProjectID != nil && d.Config.Projects[*entry.ProjectID].Hidden
-	})
-	sum := model.Summarize(entries, loc, now)
-	var projects []model.Project
-	if settings.Format != "json" {
-		projects, e = a.projects(ctx, d.Config)
-		if e != nil {
-			return e
-		}
-	}
-	return a.writeSummary(ctx, settings, from, to, sum, projects, o.watch, o.dailyTotal)
-}
-func (a App) timeEntry(ctx context.Context, args []string) error {
-	if len(args) == 0 {
-		return usage("time-entry requires a subcommand: list")
-	}
-	if args[0] != "list" {
-		return usagef("unknown time-entry subcommand: %s", args[0])
-	}
-	o, e := parseOpts(args[1:], map[string]bool{"format": true, "watch": true, "fields": true})
-	if e != nil {
-		return e
-	}
-	if len(o.pos) != 2 {
-		return usage("time-entry list requires start and end day")
-	}
-	if err := a.validateTableWatch(o.watch, o.format); err != nil {
-		return err
-	}
-	fields, e := timeEntryFields.selectFields("time-entry", o.fields)
-	if e != nil {
-		return e
-	}
-	now := a.Now()
-	sd, ok := parseUnsignedInteger(o.pos[0])
-	if !ok {
-		return usage("start and end day must be valid integers")
-	}
-	ed, ok := parseUnsignedInteger(o.pos[1])
-	if !ok {
-		return usage("start and end day must be valid integers")
-	}
-	if sd < 1 || ed < 1 || sd > 31 || ed > 31 {
-		return usage("start and end day must be valid dates")
-	}
-	if sd > ed {
-		return usage("start day must not be after end day")
-	}
-	d, e := loadCfg()
-	if e != nil {
-		return e
-	}
-	loc, e := location(d.Config)
-	if e != nil {
-		return e
-	}
-	y, m, _ := now.In(loc).Date()
-	lastDay := time.Date(y, m+1, 0, 0, 0, 0, 0, time.UTC).Day()
-	if ed > lastDay {
-		return usage("start and end day must be valid dates")
-	}
-	from := model.StartOfDate(time.Date(y, m, sd, 0, 0, 0, 0, time.UTC), loc)
-	end := model.StartOfDate(time.Date(y, m, ed+1, 0, 0, 0, 0, time.UTC), loc)
-	entries, e := a.NewClient(d.Config.Workspace, d.Config.Token).TimeEntries(ctx, from, end)
-	if e != nil {
-		return e
-	}
-	sort.Slice(entries, func(i, j int) bool {
-		if order := entries[i].Start.Compare(entries[j].Start); order != 0 {
-			return order < 0
-		}
-		return entries[i].ID < entries[j].ID
-	})
-	objects := make([]outputTimeEntry, 0, len(entries))
-	for _, x := range entries {
-		minutes := float64(int(float64(x.ElapsedSeconds(now))/60*100+0.5)) / 100
-		start := spreadsheetText(o.format, x.Start.Format(time.RFC3339Nano))
-		var stop *string
-		if x.Stop != nil {
-			formatted := spreadsheetText(o.format, x.Stop.Format(time.RFC3339Nano))
-			stop = &formatted
-		}
-		objects = append(objects, outputTimeEntry{ID: x.ID, Description: spreadsheetText(o.format, x.Description), ProjectID: x.ProjectID, Start: start, Stop: stop, DurationMinutes: minutes})
-	}
-	return writeList(ctx, a, objects, fields, o.format, tableOutputOptions{watch: o.watch})
+	return time.LoadLocation(settings.Timezone)
 }
