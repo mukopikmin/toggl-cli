@@ -2,11 +2,12 @@ package command
 
 import (
 	"context"
+	"errors"
 	"sort"
 	"time"
 
 	"github.com/mukopikmin/toggl-cli/internal/config"
-	"github.com/mukopikmin/toggl-cli/internal/model"
+	"github.com/mukopikmin/toggl-cli/internal/usecase"
 )
 
 type outputTimeEntry struct {
@@ -71,12 +72,12 @@ func (a App) timeEntry(ctx context.Context, args []string) error {
 	if e != nil {
 		return e
 	}
-	from, end, valid := model.MonthDayRange(now, sd, ed, loc)
-	if !valid {
-		return usage("start and end day must be valid dates")
-	}
-	entries, e := a.NewClient(d.Settings.Workspace, d.Settings.Token).TimeEntries(ctx, from, end)
+	client := a.NewClient(d.Settings.Workspace, d.Settings.Token)
+	entries, e := usecase.LoadMonthTimeEntries(ctx, client, sd, ed, now, loc)
 	if e != nil {
+		if errors.Is(e, usecase.ErrInvalidMonthDays) {
+			return usage(e.Error())
+		}
 		return e
 	}
 	sort.Slice(entries, func(i, j int) bool {

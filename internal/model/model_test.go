@@ -51,14 +51,6 @@ func TestSummarizeTimeZonesAndMonthBoundaries(t *testing.T) {
 		})
 	}
 }
-func TestDateRangeMonthEnds(t *testing.T) {
-	a, _ := time.Parse(time.DateOnly, "2024-02-28")
-	b, _ := time.Parse(time.DateOnly, "2024-03-01")
-	got := DateRange(a, b)
-	if len(got) != 3 || got[1] != "2024-02-29" {
-		t.Fatal(got)
-	}
-}
 
 func TestVisibleSortedDoesNotMutate(t *testing.T) {
 	one, two := float64(1), float64(2)

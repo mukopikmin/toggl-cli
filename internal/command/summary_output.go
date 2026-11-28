@@ -20,7 +20,7 @@ func (a App) writeSummary(ctx context.Context, settings model.SummaryOptions, fr
 		return a.writeSummaryText(string(data), settings.Clipboard)
 	}
 
-	days := model.DateRange(from, to)
+	days := summaryDays(from, to)
 	rows := summaryRows(sum, model.VisibleSorted(projects), days, dailyTotal)
 	headers := append([]string{"Project"}, days...)
 	if settings.Format == "table" {
@@ -37,6 +37,14 @@ func (a App) writeSummary(ctx context.Context, settings model.SummaryOptions, fr
 		headers = nil
 	}
 	return a.writeSummaryText(delimited(headers, rows, settings.Format), settings.Clipboard)
+}
+
+func summaryDays(from, to time.Time) []string {
+	var days []string
+	for day := from; !day.After(to); day = day.AddDate(0, 0, 1) {
+		days = append(days, day.Format(time.DateOnly))
+	}
+	return days
 }
 
 func (a App) writeSummaryText(text string, copyToClipboard bool) error {
