@@ -1,5 +1,4 @@
-// Package template persists named summary settings separately from credentials.
-package template
+package config
 
 import (
 	"bytes"
@@ -13,9 +12,12 @@ import (
 	"github.com/mukopikmin/toggl-cli/internal/model"
 )
 
-const DisplayPath = "~/.config/toggl-cli/templates.toml"
+const (
+	templatesFilename    = "templates.toml"
+	templatesDisplayPath = "~/.config/toggl-cli/" + templatesFilename
+)
 
-type Document struct {
+type TemplateDocument struct {
 	Templates map[string]SavedSummary
 }
 
@@ -24,7 +26,7 @@ type SavedSummary struct {
 	legacySeparator *string
 }
 
-type tomlDocument struct {
+type tomlTemplates struct {
 	Templates map[string]tomlSummary `toml:"templates"`
 }
 
@@ -40,49 +42,41 @@ type tomlSummary struct {
 	Clipboard bool    `toml:"clipboard"`
 }
 
-func ValidateName(name string) error {
+func ValidateTemplateName(name string) error {
 	if !regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]*$`).MatchString(name) {
 		return fmt.Errorf("template name must start with a letter or digit and contain only letters, digits, underscores, or hyphens")
 	}
 	return nil
 }
 
-func path() (string, error) {
-	home := os.Getenv("HOME")
-	if home == "" {
-		return "", fmt.Errorf("HOME environment variable not set")
-	}
-	return filepath.Join(home, ".config", "toggl-cli", "templates.toml"), nil
-}
-
-func Load() (Document, error) {
-	p, err := path()
+func LoadTemplates() (TemplateDocument, error) {
+	p, err := homePath(templatesFilename)
 	if err != nil {
-		return Document{}, err
+		return TemplateDocument{}, err
 	}
 	b, err := os.ReadFile(p)
 	if os.IsNotExist(err) {
-		return Document{Templates: map[string]SavedSummary{}}, nil
+		return TemplateDocument{Templates: map[string]SavedSummary{}}, nil
 	}
 	if err != nil {
-		return Document{}, fmt.Errorf("unable to read %s: %w", DisplayPath, err)
+		return TemplateDocument{}, fmt.Errorf("unable to read %s: %w", templatesDisplayPath, err)
 	}
-	return Parse(string(b))
+	return ParseTemplates(string(b))
 }
 
-func Parse(text string) (Document, error) {
-	var stored tomlDocument
+func ParseTemplates(text string) (TemplateDocument, error) {
+	var stored tomlTemplates
 	metadata, err := toml.Decode(text, &stored)
 	if err != nil {
-		return Document{}, fmt.Errorf("invalid templates: %w", err)
+		return TemplateDocument{}, fmt.Errorf("invalid templates: %w", err)
 	}
 	if keys := metadata.Undecoded(); len(keys) != 0 {
-		return Document{}, fmt.Errorf("unknown template setting: %s", keys[0])
+		return TemplateDocument{}, fmt.Errorf("unknown template setting: %s", keys[0])
 	}
 	if kind := metadata.Type("templates"); kind != "" && kind != "Hash" {
-		return Document{}, fmt.Errorf("templates must be a TOML table")
+		return TemplateDocument{}, fmt.Errorf("templates must be a TOML table")
 	}
-	d := Document{Templates: make(map[string]SavedSummary, len(stored.Templates))}
+	d := TemplateDocument{Templates: make(map[string]SavedSummary, len(stored.Templates))}
 	for name, s := range stored.Templates {
 		d.Templates[name] = SavedSummary{
 			Options: model.SummaryOptions{
@@ -93,12 +87,12 @@ func Parse(text string) (Document, error) {
 		}
 	}
 	if err := d.validate(); err != nil {
-		return Document{}, err
+		return TemplateDocument{}, err
 	}
 	return d, nil
 }
 
-func (d Document) Names() []string {
+func (d TemplateDocument) Names() []string {
 	names := make([]string, 0, len(d.Templates))
 	for name := range d.Templates {
 		names = append(names, name)
@@ -107,9 +101,9 @@ func (d Document) Names() []string {
 	return names
 }
 
-func (d Document) validate() error {
+func (d TemplateDocument) validate() error {
 	for _, name := range d.Names() {
-		if err := ValidateName(name); err != nil {
+		if err := ValidateTemplateName(name); err != nil {
 			return fmt.Errorf("invalid template %q: %w", name, err)
 		}
 		if err := d.Templates[name].Options.Validate(false); err != nil {
@@ -119,11 +113,11 @@ func (d Document) validate() error {
 	return nil
 }
 
-func (d Document) Encode() (string, error) {
+func (d TemplateDocument) Encode() (string, error) {
 	if err := d.validate(); err != nil {
 		return "", err
 	}
-	stored := tomlDocument{}
+	stored := tomlTemplates{}
 	if d.Templates != nil {
 		stored.Templates = make(map[string]tomlSummary, len(d.Templates))
 	}
@@ -148,12 +142,12 @@ func (d Document) Encode() (string, error) {
 }
 
 // Write replaces the file only after the full document is validated and written.
-func (d Document) Write() error {
+func (d TemplateDocument) Write() error {
 	text, err := d.Encode()
 	if err != nil {
 		return err
 	}
-	p, err := path()
+	p, err := homePath(templatesFilename)
 	if err != nil {
 		return err
 	}

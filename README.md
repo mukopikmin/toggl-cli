@@ -360,11 +360,10 @@ replaces all settings, rather than merging them with the previous template.
 - `internal/command/summary_output.go`: formats fetched summary data.
 - `internal/model/`: settings and pure rules for project display, entry duration,
   and aggregation. Summary period calculation and output validation are separate.
-- `internal/template/`: TOML storage for named summary options, including legacy
-  template fields.
 - `internal/toggl/`: authenticated HTTP client and conversion of private API
   responses to models.
-- `internal/config/`: TOML parsing, validation, and settings file updates.
+- `internal/config/`: TOML parsing, validation, and updates for `config.toml`
+  and `templates.toml`. Template storage also handles legacy template fields.
 
 ## Development
 

@@ -15,7 +15,10 @@ import (
 	"github.com/mukopikmin/toggl-cli/internal/model"
 )
 
-const DisplayPath = "~/.config/toggl-cli/config.toml"
+const (
+	settingsFilename = "config.toml"
+	DisplayPath      = "~/.config/toggl-cli/" + settingsFilename
+)
 
 type HomeNotSetError struct{}
 
@@ -41,17 +44,22 @@ type rawConfig struct {
 	Projects  map[string]rawProject `toml:"projects"`
 }
 
-func Path(home string) string { return filepath.Join(home, ".config", "toggl-cli", "config.toml") }
-func homePath() (string, error) {
+func Path(home string) string { return configPath(home, settingsFilename) }
+
+func configPath(home, filename string) string {
+	return filepath.Join(home, ".config", "toggl-cli", filename)
+}
+
+func homePath(filename string) (string, error) {
 	home := os.Getenv("HOME")
 	if home == "" {
 		return "", HomeNotSetError{}
 	}
-	return Path(home), nil
+	return configPath(home, filename), nil
 }
 
 func Load() (Document, error) {
-	p, err := homePath()
+	p, err := homePath(settingsFilename)
 	if err != nil {
 		return Document{}, err
 	}

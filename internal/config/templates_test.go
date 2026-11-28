@@ -1,4 +1,4 @@
-package template
+package config
 
 import (
 	"bytes"
@@ -11,10 +11,10 @@ import (
 	"github.com/mukopikmin/toggl-cli/internal/model"
 )
 
-func TestDocumentRoundTrip(t *testing.T) {
+func TestTemplateDocumentRoundTrip(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	one, empty, separator := 1, "", "\"\\\t\n#"
-	d := Document{Templates: map[string]SavedSummary{
+	d := TemplateDocument{Templates: map[string]SavedSummary{
 		"today": {
 			Options: model.SummaryOptions{Period: model.SummaryPeriod{Days: &one}, Output: model.SummaryOutput{Format: "json", Clipboard: true}},
 		},
@@ -31,11 +31,11 @@ func TestDocumentRoundTrip(t *testing.T) {
 	if err := d.Write(); err != nil {
 		t.Fatal(err)
 	}
-	got, err := Load()
+	got, err := LoadTemplates()
 	if err != nil || !reflect.DeepEqual(d, got) {
 		t.Fatalf("got %+v, %v; want %+v", got, err, d)
 	}
-	p, _ := path()
+	p, _ := homePath(templatesFilename)
 	info, err := os.Stat(p)
 	if err != nil {
 		t.Fatal(err)
@@ -43,10 +43,10 @@ func TestDocumentRoundTrip(t *testing.T) {
 	if runtime.GOOS != "windows" && info.Mode().Perm() != 0600 {
 		t.Fatalf("file permissions = %o", info.Mode().Perm())
 	}
-	if err := (Document{Templates: map[string]SavedSummary{}}).Write(); err != nil {
+	if err := (TemplateDocument{Templates: map[string]SavedSummary{}}).Write(); err != nil {
 		t.Fatal(err)
 	}
-	got, err = Load()
+	got, err = LoadTemplates()
 	if err != nil || len(got.Templates) != 0 {
 		t.Fatalf("empty document = %+v, %v", got, err)
 	}
@@ -69,20 +69,20 @@ func TestParseRejectsInvalidTemplates(t *testing.T) {
 		"[templates.bad]\nclipboard = 'false'", "[templates.bad]\nformat = 'csv'\nformat = 'json'",
 	} {
 		t.Run(text, func(t *testing.T) {
-			if _, err := Parse(text); err == nil {
+			if _, err := ParseTemplates(text); err == nil {
 				t.Fatal("accepted invalid document")
 			}
 		})
 	}
 }
 
-func TestInvalidWritePreservesExistingFile(t *testing.T) {
+func TestInvalidTemplateWritePreservesExistingFile(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
-	d := Document{Templates: map[string]SavedSummary{"good": {Options: model.SummaryOptions{Output: model.SummaryOutput{Format: "table"}}}}}
+	d := TemplateDocument{Templates: map[string]SavedSummary{"good": {Options: model.SummaryOptions{Output: model.SummaryOutput{Format: "table"}}}}}
 	if err := d.Write(); err != nil {
 		t.Fatal(err)
 	}
-	p, _ := path()
+	p, _ := homePath(templatesFilename)
 	before, _ := os.ReadFile(p)
 	d.Templates["bad"] = SavedSummary{Options: model.SummaryOptions{Output: model.SummaryOutput{Format: "invalid"}}}
 	if err := d.Write(); err == nil {
@@ -94,27 +94,27 @@ func TestInvalidWritePreservesExistingFile(t *testing.T) {
 	}
 }
 
-func TestLoadMissingHomeAndIOErrors(t *testing.T) {
+func TestLoadTemplatesMissingHomeAndIOErrors(t *testing.T) {
 	t.Setenv("HOME", "")
-	if _, err := Load(); err == nil {
+	if _, err := LoadTemplates(); err == nil {
 		t.Fatal("accepted missing HOME")
 	}
-	if err := (Document{}).Write(); err == nil {
+	if err := (TemplateDocument{}).Write(); err == nil {
 		t.Fatal("write accepted missing HOME")
 	}
 	t.Setenv("HOME", t.TempDir())
-	d, err := Load()
+	d, err := LoadTemplates()
 	if err != nil || len(d.Templates) != 0 {
 		t.Fatalf("missing file: %+v, %v", d, err)
 	}
-	p, _ := path()
+	p, _ := homePath(templatesFilename)
 	if err := os.MkdirAll(p, 0700); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Load(); err == nil {
+	if _, err := LoadTemplates(); err == nil {
 		t.Fatal("directory read succeeded")
 	}
-	if err := (Document{}).Write(); err == nil {
+	if err := (TemplateDocument{}).Write(); err == nil {
 		t.Fatal("replaced directory with file")
 	}
 	leftovers, _ := filepath.Glob(filepath.Join(filepath.Dir(p), ".templates-*"))

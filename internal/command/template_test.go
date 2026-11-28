@@ -12,7 +12,6 @@ import (
 
 	"github.com/mukopikmin/toggl-cli/internal/config"
 	"github.com/mukopikmin/toggl-cli/internal/model"
-	"github.com/mukopikmin/toggl-cli/internal/template"
 )
 
 func TestTemplateLifecycleWithoutConfigurationOrAPI(t *testing.T) {
@@ -38,7 +37,7 @@ func TestTemplateLifecycleWithoutConfigurationOrAPI(t *testing.T) {
 		t.Fatal(got)
 	}
 	shown := run("template", "show", "weekly")
-	doc, err := template.Parse(shown)
+	doc, err := config.ParseTemplates(shown)
 	if err != nil || len(doc.Templates) != 1 || doc.Templates["weekly"].Options.Output.Format != "table" || *doc.Templates["weekly"].Options.Period.Days != 6 {
 		t.Fatalf("shown = %q, error = %v", shown, err)
 	}
@@ -55,7 +54,7 @@ func TestTemplateLifecycleWithoutConfigurationOrAPI(t *testing.T) {
 		t.Fatal("duplicate add changed file")
 	}
 	run("template", "add", "weekly", "--days", "1", "--force")
-	doc, err = template.Load()
+	doc, err = config.LoadTemplates()
 	if err != nil || *doc.Templates["weekly"].Options.Period.Days != 1 || doc.Templates["weekly"].Options.Output.Format != "table" {
 		t.Fatalf("force did not replace the template: %+v, %v", doc, err)
 	}

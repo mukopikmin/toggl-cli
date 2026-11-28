@@ -9,7 +9,6 @@ import (
 
 	"github.com/mukopikmin/toggl-cli/internal/config"
 	"github.com/mukopikmin/toggl-cli/internal/model"
-	"github.com/mukopikmin/toggl-cli/internal/template"
 	"github.com/mukopikmin/toggl-cli/internal/usecase"
 )
 
@@ -44,10 +43,10 @@ func (a App) summary(ctx context.Context, args []string) error {
 	}
 	base := model.SummaryOptions{}
 	if o.templateSet {
-		if err := template.ValidateName(o.template); err != nil {
+		if err := config.ValidateTemplateName(o.template); err != nil {
 			return usage(err.Error())
 		}
-		d, err := template.Load()
+		d, err := config.LoadTemplates()
 		if err != nil {
 			return err
 		}

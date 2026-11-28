@@ -3,8 +3,8 @@ package command
 import (
 	"fmt"
 
+	"github.com/mukopikmin/toggl-cli/internal/config"
 	"github.com/mukopikmin/toggl-cli/internal/model"
-	"github.com/mukopikmin/toggl-cli/internal/template"
 )
 
 func summaryFlags() map[string]bool {
@@ -107,11 +107,11 @@ func (a App) template(args []string) error {
 		return usagef("unknown template subcommand: %s", args[0])
 	}
 	if args[0] != "list" {
-		if err := template.ValidateName(name); err != nil {
+		if err := config.ValidateTemplateName(name); err != nil {
 			return usage(err.Error())
 		}
 	}
-	d, err := template.Load()
+	d, err := config.LoadTemplates()
 	if err != nil {
 		return err
 	}
@@ -121,7 +121,7 @@ func (a App) template(args []string) error {
 		if exists && !force {
 			return fmt.Errorf("template %q already exists; use template add --force to replace it", name)
 		}
-		d.Templates[name] = template.SavedSummary{Options: settings}
+		d.Templates[name] = config.SavedSummary{Options: settings}
 		if err := d.Write(); err != nil {
 			return err
 		}
@@ -134,7 +134,7 @@ func (a App) template(args []string) error {
 		if !exists {
 			return fmt.Errorf("unknown template: %s", name)
 		}
-		text, err := (template.Document{Templates: map[string]template.SavedSummary{name: existing}}).Encode()
+		text, err := (config.TemplateDocument{Templates: map[string]config.SavedSummary{name: existing}}).Encode()
 		if err != nil {
 			return err
 		}

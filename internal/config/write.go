@@ -10,7 +10,7 @@ import (
 
 // PrepareCreate checks whether the home configuration can be created before prompting.
 func PrepareCreate() (string, error) {
-	path, err := homePath()
+	path, err := homePath(settingsFilename)
 	if err != nil {
 		return "", err
 	}
