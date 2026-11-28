@@ -6,9 +6,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mukopikmin/toggl-cli/internal/model"
 )
 
 func TestTimeEntriesDateRange(t *testing.T) {
@@ -43,6 +46,7 @@ func TestTimeEntriesDateRange(t *testing.T) {
 		})
 	}
 }
+
 func TestProjectsMapsDTOAndAuthorization(t *testing.T) {
 	var auth, path string
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -65,6 +69,7 @@ func TestProjectsMapsDTOAndAuthorization(t *testing.T) {
 		t.Fatal(path)
 	}
 }
+
 func TestTimeEntriesMapsFallbackPIDAndErrors(t *testing.T) {
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`[{"id":1,"pid":9,"start":"2026-01-01T00:00:00Z","stop":null,"duration":-1767225600,"description":"work"}]`))
@@ -83,5 +88,55 @@ func TestTimeEntriesMapsFallbackPIDAndErrors(t *testing.T) {
 	defer bad.Close()
 	if _, err = (HTTPClient{Endpoint: bad.URL}).Projects(context.Background()); err == nil {
 		t.Fatal("expected API error")
+	}
+}
+
+func TestClientsMapsDTOAndRequest(t *testing.T) {
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.EscapedPath() != "/workspaces/a%2Fb/clients" || r.URL.RawQuery != "" {
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL)
+		}
+		user, pass, ok := r.BasicAuth()
+		if !ok || user != "test-token" || pass != "api_token" {
+			t.Error("incorrect API authentication")
+		}
+		w.Write([]byte(`[{"id":2,"name":"取引先","wid":7,"archived":false},{"id":1,"name":"Other","wid":7,"archived":true}]`))
+	}))
+	defer s.Close()
+	got, err := (HTTPClient{Endpoint: s.URL, Workspace: "a/b", Token: "test-token"}).Clients(context.Background())
+	want := []model.Client{{ID: 2, Name: "取引先"}, {ID: 1, Name: "Other"}}
+	if err != nil || !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %+v, %v; want %+v", got, err, want)
+	}
+}
+
+func TestClientsEmptyAndErrors(t *testing.T) {
+	tests := []struct {
+		name, body string
+		status     int
+		wantError  string
+	}{
+		{"empty", `[]`, http.StatusOK, ""},
+		{"null", `null`, http.StatusOK, ""},
+		{"unauthorized", `unauthorized`, http.StatusUnauthorized, "Failed to fetch clients: HTTP 401"},
+		{"server error", `unavailable`, http.StatusInternalServerError, "Failed to fetch clients: HTTP 500"},
+		{"malformed JSON", `[{`, http.StatusOK, "unexpected EOF"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(tt.status)
+				w.Write([]byte(tt.body))
+			}))
+			defer s.Close()
+			got, err := (HTTPClient{Endpoint: s.URL, Workspace: "1"}).Clients(context.Background())
+			if tt.wantError != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantError) {
+					t.Fatalf("expected %q, got %v", tt.wantError, err)
+				}
+			} else if err != nil || got == nil || len(got) != 0 {
+				t.Fatalf("expected empty client slice, got %+v, %v", got, err)
+			}
+		})
 	}
 }
