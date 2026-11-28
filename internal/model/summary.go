@@ -4,10 +4,10 @@ import "time"
 
 type Summary map[string]map[int64]float64
 
-func Summarize(entries []TimeEntry, location *time.Location, now time.Time, projects map[int64]ProjectSettings) Summary {
+func Summarize(entries []TimeEntry, location *time.Location, now time.Time) Summary {
 	r := Summary{}
 	for _, e := range entries {
-		if e.ProjectID == nil || projects[*e.ProjectID].Hidden {
+		if e.ProjectID == nil {
 			continue
 		}
 		day := e.Start.In(location).Format(time.DateOnly)

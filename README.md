@@ -354,14 +354,14 @@ replaces all settings, rather than merging them with the previous template.
 - `cmd/toggl/main.go`: argument entry point and dependency assembly.
 - `internal/command/`: CLI argument validation, output formatting, and terminal
   interaction. `options.go` handles shared option parsing.
-- `internal/usecase/`: time-entry query ranges and retrieval for summaries and
-  lists, project preference application, and selection of projects to add during
-  sync.
+- `internal/usecase/`: time-entry query ranges and retrieval, selection of
+  projects for lists and summaries, and project sync from retrieval to saving.
 - `internal/selfupdate/`: release lookup, verification, and installation.
 - `internal/command/summary_output.go`: formats fetched summary data.
-- `internal/model/`: API-independent settings and models, with pure rules for
-  project display, entry duration, summary periods, and aggregation.
-- `internal/template/`: validated TOML storage for named summary settings.
+- `internal/model/`: settings and pure rules for project display, entry duration,
+  and aggregation. Summary period calculation and output validation are separate.
+- `internal/template/`: TOML storage for named summary options, including legacy
+  template fields.
 - `internal/toggl/`: authenticated HTTP client and conversion of private API
   responses to models.
 - `internal/config/`: TOML parsing, validation, and settings file updates.

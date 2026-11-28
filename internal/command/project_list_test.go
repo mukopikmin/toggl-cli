@@ -53,7 +53,7 @@ func TestProjectListFields(t *testing.T) {
 			name: "csv protects text and preserves numbers",
 			args: []string{"--format", "csv", "--fields", "name,alias,displayOrder"},
 			project: []model.Project{
-				{ID: 1, Name: "+ Example", Alias: "- Example", DisplayOrder: &negative},
+				{ID: 1, Name: "+ Example", Alias: "- Example", DisplayOrder: &negative, Active: true},
 			},
 			want: "name,alias,displayOrder\n'+ Example,'- Example,-2.5\n",
 		},

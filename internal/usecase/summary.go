@@ -20,5 +20,15 @@ func LoadSummary(
 	if err != nil {
 		return nil, err
 	}
-	return model.Summarize(entries, loc, now, projects), nil
+	if len(projects) != 0 {
+		visible := make([]model.TimeEntry, 0, len(entries))
+		for _, entry := range entries {
+			if entry.ProjectID != nil && projects[*entry.ProjectID].Hidden {
+				continue
+			}
+			visible = append(visible, entry)
+		}
+		entries = visible
+	}
+	return model.Summarize(entries, loc, now), nil
 }

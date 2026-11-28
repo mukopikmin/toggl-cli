@@ -1,6 +1,9 @@
 package model
 
-import "sort"
+import (
+	"slices"
+	"sort"
+)
 
 type Project struct {
 	ID           int64    `json:"id"`
@@ -23,17 +26,8 @@ func (p Project) WithSettings(settings ProjectSettings) Project {
 	return p
 }
 
-func VisibleSorted(projects []Project) []Project {
-	return SortedProjects(projects, false)
-}
-
-func SortedProjects(projects []Project, includeHidden bool) []Project {
-	r := make([]Project, 0, len(projects))
-	for _, p := range projects {
-		if includeHidden || !p.Hidden {
-			r = append(r, p)
-		}
-	}
+func SortedProjects(projects []Project) []Project {
+	r := slices.Clone(projects)
 	sort.SliceStable(r, func(i, j int) bool {
 		a, b := r[i].DisplayOrder, r[j].DisplayOrder
 		if a == nil {

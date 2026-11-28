@@ -75,14 +75,11 @@ func (c HTTPClient) Projects(ctx context.Context) ([]model.Project, error) {
 		if d.Active == nil && d.ProjectActive != nil {
 			active = *d.ProjectActive
 		}
-		if !active {
-			continue
-		}
 		name := d.Name
 		if name == "" {
 			name = d.ProjectName
 		}
-		out = append(out, model.Project{ID: d.ID, Name: name, Active: true})
+		out = append(out, model.Project{ID: d.ID, Name: name, Active: active})
 	}
 	return out, nil
 }

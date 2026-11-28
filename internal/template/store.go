@@ -16,7 +16,28 @@ import (
 const DisplayPath = "~/.config/toggl-cli/templates.toml"
 
 type Document struct {
-	Templates map[string]model.SummaryOptions `toml:"templates"`
+	Templates map[string]SavedSummary
+}
+
+type SavedSummary struct {
+	Options         model.SummaryOptions
+	legacySeparator *string
+}
+
+type tomlDocument struct {
+	Templates map[string]tomlSummary `toml:"templates"`
+}
+
+type tomlSummary struct {
+	StartDate string `toml:"start_date,omitempty"`
+	EndDate   string `toml:"end_date,omitempty"`
+	Days      *int   `toml:"days,omitempty"`
+	Format    string `toml:"format,omitempty"`
+	// Preserve the legacy field when showing or rewriting a saved template.
+	Separator *string `toml:"separator,omitempty"`
+	NoProject bool    `toml:"no_project"`
+	NoDate    bool    `toml:"no_date"`
+	Clipboard bool    `toml:"clipboard"`
 }
 
 func ValidateName(name string) error {
@@ -41,7 +62,7 @@ func Load() (Document, error) {
 	}
 	b, err := os.ReadFile(p)
 	if os.IsNotExist(err) {
-		return Document{Templates: map[string]model.SummaryOptions{}}, nil
+		return Document{Templates: map[string]SavedSummary{}}, nil
 	}
 	if err != nil {
 		return Document{}, fmt.Errorf("unable to read %s: %w", DisplayPath, err)
@@ -50,8 +71,8 @@ func Load() (Document, error) {
 }
 
 func Parse(text string) (Document, error) {
-	d := Document{Templates: map[string]model.SummaryOptions{}}
-	metadata, err := toml.Decode(text, &d)
+	var stored tomlDocument
+	metadata, err := toml.Decode(text, &stored)
 	if err != nil {
 		return Document{}, fmt.Errorf("invalid templates: %w", err)
 	}
@@ -60,6 +81,16 @@ func Parse(text string) (Document, error) {
 	}
 	if kind := metadata.Type("templates"); kind != "" && kind != "Hash" {
 		return Document{}, fmt.Errorf("templates must be a TOML table")
+	}
+	d := Document{Templates: make(map[string]SavedSummary, len(stored.Templates))}
+	for name, s := range stored.Templates {
+		d.Templates[name] = SavedSummary{
+			Options: model.SummaryOptions{
+				Period: model.SummaryPeriod{StartDate: s.StartDate, EndDate: s.EndDate, Days: s.Days},
+				Output: model.SummaryOutput{Format: s.Format, NoProject: s.NoProject, NoDate: s.NoDate, Clipboard: s.Clipboard},
+			},
+			legacySeparator: s.Separator,
+		}
 	}
 	if err := d.validate(); err != nil {
 		return Document{}, err
@@ -81,7 +112,7 @@ func (d Document) validate() error {
 		if err := ValidateName(name); err != nil {
 			return fmt.Errorf("invalid template %q: %w", name, err)
 		}
-		if err := d.Templates[name].Validate(false); err != nil {
+		if err := d.Templates[name].Options.Validate(false); err != nil {
 			return fmt.Errorf("invalid template %q: %w", name, err)
 		}
 	}
@@ -92,8 +123,25 @@ func (d Document) Encode() (string, error) {
 	if err := d.validate(); err != nil {
 		return "", err
 	}
+	stored := tomlDocument{}
+	if d.Templates != nil {
+		stored.Templates = make(map[string]tomlSummary, len(d.Templates))
+	}
+	for name, saved := range d.Templates {
+		period, output := saved.Options.Period, saved.Options.Output
+		stored.Templates[name] = tomlSummary{
+			StartDate: period.StartDate,
+			EndDate:   period.EndDate,
+			Days:      period.Days,
+			Format:    output.Format,
+			Separator: saved.legacySeparator,
+			NoProject: output.NoProject,
+			NoDate:    output.NoDate,
+			Clipboard: output.Clipboard,
+		}
+	}
 	var out bytes.Buffer
-	if err := toml.NewEncoder(&out).Encode(d); err != nil {
+	if err := toml.NewEncoder(&out).Encode(stored); err != nil {
 		return "", err
 	}
 	return out.String(), nil

@@ -11,7 +11,7 @@ import (
 	"github.com/mukopikmin/toggl-cli/internal/model"
 )
 
-func (a App) writeSummary(ctx context.Context, settings model.SummaryOptions, from, to time.Time, sum model.Summary, projects []model.Project, watch, dailyTotal bool) error {
+func (a App) writeSummary(ctx context.Context, settings model.SummaryOutput, from, to time.Time, sum model.Summary, projects []model.Project, watch, dailyTotal bool) error {
 	if settings.Format == "json" {
 		data, err := json.MarshalIndent(sum, "", "  ")
 		if err != nil {
@@ -21,7 +21,7 @@ func (a App) writeSummary(ctx context.Context, settings model.SummaryOptions, fr
 	}
 
 	days := summaryDays(from, to)
-	rows := summaryRows(sum, model.VisibleSorted(projects), days, dailyTotal)
+	rows := summaryRows(sum, projects, days, dailyTotal)
 	headers := append([]string{"Project"}, days...)
 	if settings.Format == "table" {
 		options := tableOutputOptions{watch: watch, clipboard: settings.Clipboard, truncateProjects: true}

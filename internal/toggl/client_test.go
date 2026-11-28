@@ -55,7 +55,7 @@ func TestProjectsMapsDTOAndAuthorization(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(projects) != 1 || projects[0].Name != "Old" || !projects[0].Active {
+	if len(projects) != 2 || projects[0].Name != "Old" || !projects[0].Active || projects[1].Name != "New" || projects[1].Active {
 		t.Fatalf("%+v", projects)
 	}
 	if auth != "Basic "+base64.StdEncoding.EncodeToString([]byte("secret:api_token")) {

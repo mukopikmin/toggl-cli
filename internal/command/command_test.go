@@ -166,12 +166,15 @@ func TestProjectListAndSync(t *testing.T) {
 		t.Fatal(out.String())
 	}
 	out.Reset()
-	client.projects = append(client.projects, model.Project{ID: 3, Name: "New", Active: true})
+	client.projects = append(client.projects,
+		model.Project{ID: 3, Name: "New", Active: true},
+		model.Project{ID: 4, Name: "Archived"},
+	)
 	if err := app.Run(context.Background(), []string{"project", "sync"}); err != nil {
 		t.Fatal(err)
 	}
 	b, _ := os.ReadFile(config.Path(os.Getenv("HOME")))
-	if !strings.Contains(string(b), "[projects.\"3\"]") {
+	if !strings.Contains(string(b), "[projects.\"3\"]") || strings.Contains(string(b), "[projects.\"4\"]") {
 		t.Fatal(string(b))
 	}
 }

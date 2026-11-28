@@ -42,7 +42,7 @@ func TestEmptyProjectJSONIsArray(t *testing.T) {
 		projects []model.Project
 	}{
 		{"nil", nil}, {"empty", []model.Project{}},
-		{"all hidden", []model.Project{{ID: 1, Name: "Hidden"}}},
+		{"all hidden", []model.Project{{ID: 1, Name: "Hidden", Active: true}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

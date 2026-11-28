@@ -14,11 +14,19 @@ import (
 func TestDocumentRoundTrip(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	one, empty, separator := 1, "", "\"\\\t\n#"
-	d := Document{Templates: map[string]model.SummaryOptions{
-		"today":           {Days: &one, Format: "json", Clipboard: true},
-		"fixed":           {StartDate: "2026-05-01", EndDate: "2026-05-31", Separator: &separator, NoDate: true},
-		"empty-separator": {Separator: &empty, NoProject: true},
-		"output-only":     {Format: "table"},
+	d := Document{Templates: map[string]SavedSummary{
+		"today": {
+			Options: model.SummaryOptions{Period: model.SummaryPeriod{Days: &one}, Output: model.SummaryOutput{Format: "json", Clipboard: true}},
+		},
+		"fixed": {
+			Options: model.SummaryOptions{
+				Period: model.SummaryPeriod{StartDate: "2026-05-01", EndDate: "2026-05-31"},
+				Output: model.SummaryOutput{NoDate: true},
+			},
+			legacySeparator: &separator,
+		},
+		"empty-separator": {Options: model.SummaryOptions{Output: model.SummaryOutput{NoProject: true}}, legacySeparator: &empty},
+		"output-only":     {Options: model.SummaryOptions{Output: model.SummaryOutput{Format: "table"}}},
 	}}
 	if err := d.Write(); err != nil {
 		t.Fatal(err)
@@ -35,7 +43,7 @@ func TestDocumentRoundTrip(t *testing.T) {
 	if runtime.GOOS != "windows" && info.Mode().Perm() != 0600 {
 		t.Fatalf("file permissions = %o", info.Mode().Perm())
 	}
-	if err := (Document{Templates: map[string]model.SummaryOptions{}}).Write(); err != nil {
+	if err := (Document{Templates: map[string]SavedSummary{}}).Write(); err != nil {
 		t.Fatal(err)
 	}
 	got, err = Load()
@@ -70,13 +78,13 @@ func TestParseRejectsInvalidTemplates(t *testing.T) {
 
 func TestInvalidWritePreservesExistingFile(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
-	d := Document{Templates: map[string]model.SummaryOptions{"good": {Format: "table"}}}
+	d := Document{Templates: map[string]SavedSummary{"good": {Options: model.SummaryOptions{Output: model.SummaryOutput{Format: "table"}}}}}
 	if err := d.Write(); err != nil {
 		t.Fatal(err)
 	}
 	p, _ := path()
 	before, _ := os.ReadFile(p)
-	d.Templates["bad"] = model.SummaryOptions{Format: "invalid"}
+	d.Templates["bad"] = SavedSummary{Options: model.SummaryOptions{Output: model.SummaryOutput{Format: "invalid"}}}
 	if err := d.Write(); err == nil {
 		t.Fatal("invalid write succeeded")
 	}

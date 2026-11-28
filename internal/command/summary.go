@@ -51,11 +51,11 @@ func (a App) summary(ctx context.Context, args []string) error {
 		if err != nil {
 			return err
 		}
-		var exists bool
-		base, exists = d.Templates[o.template]
+		saved, exists := d.Templates[o.template]
 		if !exists {
 			return fmt.Errorf("unknown template: %s", o.template)
 		}
+		base = saved.Options
 	}
 	settings, e := summaryOptions(base, o)
 	if e != nil {
@@ -66,17 +66,18 @@ func (a App) summary(ctx context.Context, args []string) error {
 		if err != nil {
 			return err
 		}
-		settings.Days = nil
-		settings.StartDate = monthStart.Format(time.DateOnly)
-		settings.EndDate = monthStart.AddDate(0, 1, -1).Format(time.DateOnly)
+		settings.Period = model.SummaryPeriod{
+			StartDate: monthStart.Format(time.DateOnly),
+			EndDate:   monthStart.AddDate(0, 1, -1).Format(time.DateOnly),
+		}
 	}
-	if o.dailyTotal && settings.Format == "json" {
+	if o.dailyTotal && settings.Output.Format == "json" {
 		return usage("--daily-total cannot be used with json format")
 	}
 	if e = settings.Validate(true); e != nil {
-		return usage(e.Error())
+		return summaryUsage(e)
 	}
-	if err := a.validateTableWatch(o.watch, settings.Format); err != nil {
+	if err := a.validateTableWatch(o.watch, settings.Output.Format); err != nil {
 		return err
 	}
 	d, e := config.Load()
@@ -88,9 +89,9 @@ func (a App) summary(ctx context.Context, args []string) error {
 		return e
 	}
 	now := a.Now()
-	from, to, e := settings.DateRange(now, loc)
+	from, to, e := settings.Period.DateRange(now, loc)
 	if e != nil {
-		return usage(e.Error())
+		return summaryUsage(e)
 	}
 	client := a.NewClient(d.Settings.Workspace, d.Settings.Token)
 	sum, e := usecase.LoadSummary(ctx, client, from, to, loc, now, d.Settings.Projects)
@@ -98,11 +99,11 @@ func (a App) summary(ctx context.Context, args []string) error {
 		return e
 	}
 	var projects []model.Project
-	if settings.Format != "json" {
-		projects, e = usecase.LoadProjects(ctx, client, d.Settings.Projects)
+	if settings.Output.Format != "json" {
+		projects, e = usecase.LoadProjects(ctx, client, d.Settings.Projects, false)
 		if e != nil {
 			return e
 		}
 	}
-	return a.writeSummary(ctx, settings, from, to, sum, projects, o.watch, o.dailyTotal)
+	return a.writeSummary(ctx, settings.Output, from, to, sum, projects, o.watch, o.dailyTotal)
 }

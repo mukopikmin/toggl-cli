@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/mukopikmin/toggl-cli/internal/config"
-	"github.com/mukopikmin/toggl-cli/internal/model"
 	"github.com/mukopikmin/toggl-cli/internal/usecase"
 )
 
@@ -37,26 +36,24 @@ func (a App) project(ctx context.Context, args []string) error {
 		return e
 	}
 	client := a.NewClient(d.Settings.Workspace, d.Settings.Token)
-	ps, e := usecase.LoadProjects(ctx, client, d.Settings.Projects)
-	if e != nil {
-		return e
-	}
-	switch args[0] {
-	case "list":
-		return a.writeProjectList(ctx, ps, listOptions)
-	case "sync":
-		missing := usecase.ProjectsToAdd(ps, d.Settings.Projects)
-		if len(missing) == 0 {
+	if args[0] == "sync" {
+		count, err := usecase.SyncProjects(ctx, client, d, d.Settings.Projects)
+		if err != nil {
+			return err
+		}
+		if count == 0 {
 			fmt.Fprintln(a.Out, "All active projects are already configured")
 			return nil
 		}
-		if err := d.AddProjects(missing); err != nil {
-			return err
-		}
-		fmt.Fprintf(a.Out, "Added %d project(s) to the config file\n", len(missing))
+		fmt.Fprintf(a.Out, "Added %d project(s) to the config file\n", count)
 		return nil
-	case "reorder":
-		return a.reorderProjects(d, model.VisibleSorted(ps))
 	}
-	return nil
+	projects, err := usecase.LoadProjects(ctx, client, d.Settings.Projects, listOptions.includeHidden)
+	if err != nil {
+		return err
+	}
+	if args[0] == "list" {
+		return a.writeProjectList(ctx, projects, listOptions)
+	}
+	return a.reorderProjects(d, projects)
 }
